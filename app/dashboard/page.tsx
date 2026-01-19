@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Map, MapPin, Users, CheckCircle, Clock, Loader2 } from "lucide-react"
 import type { DashboardStats, AssignmentWithDetails } from "@/lib/types"
+import { Key, ReactElement, JSXElementConstructor, ReactNode, ReactPortal } from "react"
 
 export default function DashboardPage() {
   const { profile, isAdmin, isDirigente, loading: authLoading, user } = useAuth()
@@ -43,15 +44,8 @@ export default function DashboardPage() {
       console.log("Dashboard - Fetching data for profile:", profile.id)
 
       try {
-        // Fetch stats
-        const [
-          { count: totalTerritories },
-          { count: totalBlocks },
-          { count: assignedBlocks },
-          { count: completedBlocks },
-          { count: availableBlocks },
-          { count: activeCampaigns },
-        ] = await Promise.all([
+        // Fetch stats with error handling
+        const results = await Promise.allSettled([
           supabase.from("territories").select("*", { count: "exact", head: true }),
           supabase.from("blocks").select("*", { count: "exact", head: true }),
           supabase.from("blocks").select("*", { count: "exact", head: true }).eq("status", "assigned"),
@@ -59,6 +53,13 @@ export default function DashboardPage() {
           supabase.from("blocks").select("*", { count: "exact", head: true }).eq("status", "available"),
           supabase.from("campaigns").select("*", { count: "exact", head: true }).eq("is_active", true),
         ])
+
+        const totalTerritories = results[0].status === "fulfilled" ? results[0].value.count || 0 : 0
+        const totalBlocks = results[1].status === "fulfilled" ? results[1].value.count || 0 : 0
+        const assignedBlocks = results[2].status === "fulfilled" ? results[2].value.count || 0 : 0
+        const completedBlocks = results[3].status === "fulfilled" ? results[3].value.count || 0 : 0
+        const availableBlocks = results[4].status === "fulfilled" ? results[4].value.count || 0 : 0
+        const activeCampaigns = results[5].status === "fulfilled" ? results[5].value.count || 0 : 0
 
         console.log("Dashboard - Stats fetched:", {
           totalTerritories,
@@ -70,59 +71,44 @@ export default function DashboardPage() {
         })
 
         setStats({
-          total_territories: totalTerritories || 0,
-          total_blocks: totalBlocks || 0,
-          assigned_blocks: assignedBlocks || 0,
-          completed_blocks: completedBlocks || 0,
-          available_blocks: availableBlocks || 0,
-          active_campaigns: activeCampaigns || 0,
+          total_territories: totalTerritories,
+          total_blocks: totalBlocks,
+          assigned_blocks: assignedBlocks,
+          completed_blocks: completedBlocks,
+          available_blocks: availableBlocks,
+          active_campaigns: activeCampaigns,
         })
 
-        // Fetch recent assignments with error handling
+        // Fetch recent assignments with better error handling
+        // Skip assignments fetch if tables don't exist yet (MVP mode)
         try {
-          let query = supabase
+          const { data: assignments, error: assignmentsError } = await supabase
             .from("assignments")
             .select(`
               *,
               block:blocks(
                 *,
-                territory:territories(
-                  *,
-                  campaign:campaigns(*)
-                )
+                territory:territories(*)
               ),
               user:profiles!assignments_user_id_fkey(*),
-              assigned_by_user:profiles!assignments_assigned_by_fkey(*)
+              assigned_by_user:profiles!assignments_assigned_by_fkey(*),
+              campaign:campaigns(*)
             `)
             .order("assigned_at", { ascending: false })
             .limit(5)
-
-          // If publicador, only show their assignments
-          if (profile.role === "publicador") {
-            query = query.eq("user_id", profile.id)
-          }
-
-          const { data: assignments, error: assignmentsError } = await query
+            .eq(profile.role === "publicador" ? "user_id" : "id", profile.role === "publicador" ? profile.id : "")
 
           if (assignmentsError) {
-            console.error("Dashboard - Error fetching assignments:", {
-              message: assignmentsError.message,
-              details: assignmentsError.details,
-              hint: assignmentsError.hint,
-              code: assignmentsError.code,
-            })
-            // Set empty array instead of failing completely
+            console.warn("Dashboard - Assignments table not ready yet (expected in MVP):", assignmentsError.message || "No error message")
             setRecentAssignments([])
+          } else if (assignments) {
+            console.log("Dashboard - Assignments fetched:", assignments.length)
+            setRecentAssignments(assignments as unknown as AssignmentWithDetails[])
           } else {
-            console.log("Dashboard - Assignments fetched:", assignments?.length)
-            if (assignments) {
-              setRecentAssignments(assignments as unknown as AssignmentWithDetails[])
-            } else {
-              setRecentAssignments([])
-            }
+            setRecentAssignments([])
           }
-        } catch (assignmentError) {
-          console.error("Dashboard - Exception fetching assignments:", assignmentError)
+        } catch (assignmentError: any) {
+          console.warn("Dashboard - Skipping assignments (table not ready):", assignmentError?.message || "Unknown error")
           setRecentAssignments([])
         }
       } catch (error) {
@@ -240,7 +226,7 @@ export default function DashboardPage() {
           />
           <StatsCard
             title="Em Andamento"
-            value={recentAssignments.filter(a => a.status === "in_progress").length}
+            value={recentAssignments.filter((a: { status: string }) => a.status === "in_progress").length}
             description="Trabalhos em andamento"
             icon={Clock}
           />
@@ -266,7 +252,7 @@ export default function DashboardPage() {
             </p>
           ) : (
             <div className="space-y-4">
-              {recentAssignments.map((assignment) => (
+              {recentAssignments.map((assignment: { id: Key | null | undefined; block: { territory: { name: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined }; name: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined }; user: { full_name: any }; assigned_at: string | number | Date; status: string }) => (
                 <div
                   key={assignment.id}
                   className="flex items-center justify-between rounded-lg border p-4"

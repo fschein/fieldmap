@@ -1,154 +1,163 @@
+// app/dashboard/territories/page.tsx
 "use client"
-
-import React from "react"
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Plus, Map, Loader2, MoreVertical, Pencil, Trash2, Eye } from "lucide-react"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import type { Territory, Campaign, TerritoryWithBlocks } from "@/lib/types"
-
-const COLORS = [
-  "#3b82f6", // blue
-  "#22c55e", // green
-  "#eab308", // yellow
-  "#f97316", // orange
-  "#ef4444", // red
-  "#8b5cf6", // violet
-  "#ec4899", // pink
-  "#06b6d4", // cyan
-]
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Plus, Map, Loader2, Pencil, Trash2, Eye, CornerDownRight, CornerUpLeft, Search, X } from "lucide-react"
+import type { TerritoryWithDetails, Profile, Campaign } from "@/lib/types"
 
 export default function TerritoriesPage() {
-  const [territories, setTerritories] = useState<TerritoryWithBlocks[]>([])
-  const [campaigns, setCampaigns] = useState<Campaign[]>([])
-  const [loading, setLoading] = useState(true)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingTerritory, setEditingTerritory] = useState<Territory | null>(null)
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    campaign_id: "",
-    color: COLORS[0],
-  })
-  const [submitting, setSubmitting] = useState(false)
   const supabase = getSupabaseBrowserClient()
+  const [territories, setTerritories] = useState<TerritoryWithDetails[]>([])
+  const [loading, setLoading] = useState(true)
+  
+  // Assignment modal
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false)
+  const [selectedTerritory, setSelectedTerritory] = useState<TerritoryWithDetails | null>(null)
+  const [users, setUsers] = useState<Profile[]>([])
+  const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [searchUser, setSearchUser] = useState("")
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null)
+  const [assigning, setAssigning] = useState(false)
 
   useEffect(() => {
-    fetchData()
+    fetchTerritories()
+    fetchUsers()
+    fetchCampaigns()
   }, [])
 
-  async function fetchData() {
-    const [territoriesRes, campaignsRes] = await Promise.all([
-      supabase
-        .from("territories")
-        .select(`
-          *,
-          blocks(*),
-          campaign:campaigns(*)
-        `)
-        .order("created_at", { ascending: false }),
-      supabase.from("campaigns").select("*").eq("is_active", true),
-    ])
+  async function fetchTerritories() {
+    const { data, error } = await supabase
+      .from("territories")
+      .select(`
+        *,
+        group:groups(id, name, color),
+        assigned_to_user:profiles!territories_assigned_to_fkey(id, name, email)
+      `)
+      .order("number")
 
-    if (territoriesRes.data) {
-      setTerritories(territoriesRes.data as TerritoryWithBlocks[])
-    }
-    if (campaignsRes.data) {
-      setCampaigns(campaignsRes.data as Campaign[])
+    if (!error && data) {
+      setTerritories(data as unknown as TerritoryWithDetails[])
     }
     setLoading(false)
   }
 
-  const handleOpenDialog = (territory?: Territory) => {
-    if (territory) {
-      setEditingTerritory(territory)
-      setFormData({
-        name: territory.name,
-        description: territory.description || "",
-        campaign_id: territory.campaign_id,
-        color: territory.color,
-      })
-    } else {
-      setEditingTerritory(null)
-      setFormData({
-        name: "",
-        description: "",
-        campaign_id: campaigns[0]?.id || "",
-        color: COLORS[Math.floor(Math.random() * COLORS.length)],
-      })
-    }
-    setDialogOpen(true)
+  async function fetchUsers() {
+    const { data } = await supabase
+      .from("profiles")
+      .select("*")
+      .in("role", ["dirigente", "publicador"])
+      .order("name")
+    
+    if (data) setUsers(data)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSubmitting(true)
+  async function fetchCampaigns() {
+    const { data } = await supabase
+      .from("campaigns")
+      .select("*")
+      .eq("active", true)
+      .order("name")
+    
+    if (data) setCampaigns(data)
+  }
 
-    const payload = {
-      name: formData.name,
-      description: formData.description || null,
-      campaign_id: formData.campaign_id,
-      color: formData.color,
+  const handleOpenAssignDialog = (territory: TerritoryWithDetails) => {
+    setSelectedTerritory(territory)
+    setSelectedUserId(null)
+    setSelectedCampaignId(null)
+    setSearchUser("")
+    setAssignDialogOpen(true)
+  }
+
+  const handleAssign = async () => {
+    if (!selectedTerritory || !selectedUserId) return
+    setAssigning(true)
+
+    try {
+      // Create assignment
+      const { error: assignError } = await supabase
+        .from("assignments")
+        .insert({
+          territory_id: selectedTerritory.id,
+          user_id: selectedUserId,
+          campaign_id: selectedCampaignId,
+          status: "active",
+          assigned_at: new Date().toISOString(),
+        })
+
+      if (assignError) throw assignError
+
+      // Update territory assigned_to
+      const { error: updateError } = await supabase
+        .from("territories")
+        .update({ assigned_to: selectedUserId })
+        .eq("id", selectedTerritory.id)
+
+      if (updateError) throw updateError
+
+      setAssignDialogOpen(false)
+      fetchTerritories()
+    } catch (error: any) {
+      alert("Erro ao designar território: " + error.message)
+    } finally {
+      setAssigning(false)
     }
+  }
 
-    if (editingTerritory) {
+  const handleReturn = async (territory: TerritoryWithDetails) => {
+    if (!confirm(`Devolver território ${territory.number} - ${territory.name}?`)) return
+
+    try {
+      // Mark assignment as returned
+      await supabase
+        .from("assignments")
+        .update({ 
+          status: "returned",
+          delivered_at: new Date().toISOString()
+        })
+        .eq("territory_id", territory.id)
+        .eq("status", "active")
+
+      // Clear assigned_to
       await supabase
         .from("territories")
-        .update(payload)
-        .eq("id", editingTerritory.id)
-    } else {
-      await supabase.from("territories").insert(payload)
+        .update({ assigned_to: null })
+        .eq("id", territory.id)
+
+      fetchTerritories()
+    } catch (error: any) {
+      alert("Erro ao devolver território: " + error.message)
     }
-
-    setDialogOpen(false)
-    setSubmitting(false)
-    fetchData()
   }
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Tem certeza que deseja excluir este território? Todas as quadras serão excluídas também.")) return
+  const handleDelete = async (territory: TerritoryWithDetails) => {
+    if (!confirm(`Excluir território ${territory.number} - ${territory.name}?`)) return
 
-    await supabase.from("territories").delete().eq("id", id)
-    fetchData()
+    const { error } = await supabase
+      .from("territories")
+      .delete()
+      .eq("id", territory.id)
+
+    if (error) {
+      alert("Erro ao excluir: " + error.message)
+    } else {
+      fetchTerritories()
+    }
   }
 
-  const getBlockStats = (territory: TerritoryWithBlocks) => {
-    const blocks = territory.blocks || []
-    const total = blocks.length
-    const available = blocks.filter(b => b.status === "available").length
-    const assigned = blocks.filter(b => b.status === "assigned").length
-    const completed = blocks.filter(b => b.status === "completed").length
-    return { total, available, assigned, completed }
-  }
+  const filteredUsers = users.filter(u => 
+    u.name.toLowerCase().includes(searchUser.toLowerCase()) ||
+    u.email.toLowerCase().includes(searchUser.toLowerCase())
+  )
 
   if (loading) {
     return (
@@ -164,224 +173,226 @@ export default function TerritoriesPage() {
         <div>
           <h1 className="text-3xl font-bold">Territórios</h1>
           <p className="text-muted-foreground">
-            Gerencie os territórios e suas quadras
+            Gerencie os territórios e suas designações
           </p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => handleOpenDialog()} disabled={campaigns.length === 0}>
-              <Plus className="mr-2 h-4 w-4" />
-              Novo Território
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <form onSubmit={handleSubmit}>
-              <DialogHeader>
-                <DialogTitle>
-                  {editingTerritory ? "Editar Território" : "Novo Território"}
-                </DialogTitle>
-                <DialogDescription>
-                  {editingTerritory
-                    ? "Atualize os dados do território"
-                    : "Preencha os dados para criar um novo território"}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label htmlFor="campaign">Campanha</Label>
-                  <Select
-                    value={formData.campaign_id}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, campaign_id: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione uma campanha" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {campaigns.map((campaign) => (
-                        <SelectItem key={campaign.id} value={campaign.id}>
-                          {campaign.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="name">Nome do território</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    placeholder="Ex: Centro, Zona Norte"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">Descrição</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
-                    placeholder="Descrição opcional..."
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Cor do território</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {COLORS.map((color) => (
-                      <button
-                        key={color}
-                        type="button"
-                        className={`h-8 w-8 rounded-full border-2 transition-transform ${
-                          formData.color === color
-                            ? "scale-110 border-foreground"
-                            : "border-transparent"
-                        }`}
-                        style={{ backgroundColor: color }}
-                        onClick={() => setFormData({ ...formData, color })}
-                      />
-                    ))}
+        <Button asChild>
+          <Link href="/dashboard/territories/new">
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Território
+          </Link>
+        </Button>
+      </div>
+
+      {territories.length === 0 ? (
+        <Card className="p-12 text-center">
+          <Map className="h-12 w-12 text-muted-foreground mb-4 mx-auto" />
+          <p className="text-lg font-medium">Nenhum território criado</p>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {territories.map((territory) => (
+            <Card 
+              key={territory.id} 
+              className="p-4 hover:shadow-md transition-shadow cursor-pointer"
+              onClick={() => window.location.href = `/dashboard/territories/${territory.id}`}
+            >
+              <div className="flex items-center justify-between gap-4">
+                {/* Left: Info */}
+                <div className="flex items-center gap-4 min-w-0 flex-1">
+                  <Map className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                  
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline" className="font-mono">
+                        {territory.number}
+                      </Badge>
+                      <span className="font-semibold truncate">
+                        {territory.name}
+                      </span>
+                      {territory.type === "comercial" && (
+                        <Badge variant="secondary">Comercial</Badge>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1 flex-wrap">
+                      {territory.group && (
+                        <div className="flex items-center gap-1.5">
+                          <div 
+                            className="h-3 w-3 rounded-sm flex-shrink-0"
+                            style={{ backgroundColor: territory.group.color }}
+                          />
+                          <span>{territory.group.name}</span>
+                        </div>
+                      )}
+                      
+                      {territory.assigned_to_user && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs">Designado para:</span>
+                          <span className="font-medium">
+                            {territory.assigned_to_user.name}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setDialogOpen(false)}
-                >
-                  Cancelar
-                </Button>
-                <Button type="submit" disabled={submitting}>
-                  {submitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : editingTerritory ? (
-                    "Salvar"
+
+                {/* Right: Actions */}
+                <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                  {territory.assigned_to ? (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleReturn(territory)}
+                      title="Devolver território"
+                    >
+                      <CornerUpLeft className="h-4 w-4" />
+                    </Button>
                   ) : (
-                    "Criar"
+                    <Button
+                      size="sm"
+                      variant="default"
+                      onClick={() => handleOpenAssignDialog(territory)}
+                      title="Designar território"
+                    >
+                      <CornerDownRight className="h-4 w-4" />
+                    </Button>
                   )}
-                </Button>
-              </DialogFooter>
-            </form>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    asChild
+                    title="Visualizar"
+                  >
+                    <Link href={`/dashboard/territories/${territory.id}`}>
+                      <Eye className="h-4 w-4" />
+                    </Link>
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    asChild
+                    title="Editar"
+                  >
+                    <Link href={`/dashboard/territories/${territory.id}/edit`}>
+                      <Pencil className="h-4 w-4" />
+                    </Link>
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleDelete(territory)}
+                    title="Excluir"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Assignment Dialog */}
+      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Designar Território</DialogTitle>
+            <DialogDescription>
+              {selectedTerritory?.number} - {selectedTerritory?.name}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {/* User Search */}
+            <div className="space-y-2">
+              <Label>Designar para *</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar dirigente ou publicador..."
+                  value={searchUser}
+                  onChange={(e) => setSearchUser(e.target.value)}
+                  className="pl-9"
+                />
+                {searchUser && (
+                  <button
+                    onClick={() => setSearchUser("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2"
+                  >
+                    <X className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                )}
+              </div>
+
+              {searchUser && (
+                <div className="border rounded-md max-h-48 overflow-y-auto">
+                  {filteredUsers.length === 0 ? (
+                    <p className="p-3 text-sm text-muted-foreground text-center">
+                      Nenhum usuário encontrado
+                    </p>
+                  ) : (
+                    filteredUsers.map((user) => (
+                      <button
+                        key={user.id}
+                        onClick={() => {
+                          setSelectedUserId(user.id)
+                          setSearchUser(user.name)
+                        }}
+                        className={`w-full text-left p-3 hover:bg-muted transition-colors ${
+                          selectedUserId === user.id ? "bg-muted" : ""
+                        }`}
+                      >
+                        <p className="font-medium text-sm">{user.name}</p>
+                        <p className="text-xs text-muted-foreground">{user.email}</p>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Campaign (optional) */}
+            <div className="space-y-2">
+              <Label>Campanha (opcional)</Label>
+              <select
+                value={selectedCampaignId || ""}
+                onChange={(e) => setSelectedCampaignId(e.target.value || null)}
+                className="w-full rounded-md border px-3 py-2 text-sm"
+              >
+                <option value="">Nenhuma campanha</option>
+                {campaigns.map((campaign) => (
+                  <option key={campaign.id} value={campaign.id}>
+                    {campaign.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={handleAssign} 
+                disabled={!selectedUserId || assigning}
+              >
+                {assigning ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Designando...
+                  </>
+                ) : (
+                  "Designar"
+                )}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
-
-      {campaigns.length === 0 && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Map className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-lg font-medium">Crie uma campanha primeiro</p>
-            <p className="text-sm text-muted-foreground mb-4">
-              Você precisa ter uma campanha ativa para criar territórios
-            </p>
-            <Button asChild>
-              <Link href="/dashboard/campaigns">Ir para Campanhas</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {campaigns.length > 0 && territories.length === 0 && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Map className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-lg font-medium">Nenhum território criado</p>
-            <p className="text-sm text-muted-foreground mb-4">
-              Crie seu primeiro território para começar
-            </p>
-            <Button onClick={() => handleOpenDialog()}>
-              <Plus className="mr-2 h-4 w-4" />
-              Novo Território
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {territories.length > 0 && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {territories.map((territory) => {
-            const stats = getBlockStats(territory)
-            return (
-              <Card key={territory.id}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="h-4 w-4 rounded-full"
-                        style={{ backgroundColor: territory.color }}
-                      />
-                      <div>
-                        <CardTitle className="text-lg">{territory.name}</CardTitle>
-                        <CardDescription>
-                          {territory.campaign?.name || "Sem campanha"}
-                        </CardDescription>
-                      </div>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem asChild>
-                          <Link href={`/dashboard/territories/${territory.id}`}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            Ver detalhes
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                          <Link href={`/dashboard/territories/${territory.id}/map`}>
-                            <Map className="mr-2 h-4 w-4" />
-                            Editar mapa
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleOpenDialog(territory)}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onClick={() => handleDelete(territory.id)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Excluir
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="secondary">{stats.total} quadras</Badge>
-                    {stats.available > 0 && (
-                      <Badge variant="outline" className="border-green-500 text-green-600">
-                        {stats.available} disponíveis
-                      </Badge>
-                    )}
-                    {stats.assigned > 0 && (
-                      <Badge variant="outline" className="border-blue-500 text-blue-600">
-                        {stats.assigned} em trabalho
-                      </Badge>
-                    )}
-                    {stats.completed > 0 && (
-                      <Badge variant="outline" className="border-gray-500 text-gray-600">
-                        {stats.completed} concluídas
-                      </Badge>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-      )}
-    </div>
   )
 }

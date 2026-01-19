@@ -19,7 +19,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Plus, Calendar, Loader2, MoreVertical, Pencil, Trash2 } from "lucide-react"
+import { Plus, Calendar, Loader2, MoreVertical, Pencil, Trash2, CheckCircle, Power, Ban } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +27,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import type { Campaign } from "@/lib/types"
+import { error } from "console"
 
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
@@ -64,7 +65,7 @@ export default function CampaignsPage() {
       setFormData({
         name: campaign.name,
         description: campaign.description || "",
-        start_date: campaign.start_date,
+        start_date: campaign.start_date || "",
         end_date: campaign.end_date || "",
       })
     } else {
@@ -114,7 +115,7 @@ export default function CampaignsPage() {
   const handleToggleActive = async (campaign: Campaign) => {
     await supabase
       .from("campaigns")
-      .update({ is_active: !campaign.is_active })
+      .update({ active: !campaign.active })
       .eq("id", campaign.id)
     fetchCampaigns()
   }
@@ -265,10 +266,18 @@ export default function CampaignsPage() {
                         <Pencil className="mr-2 h-4 w-4" />
                         Editar
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleToggleActive(campaign)}
-                      >
-                        {campaign.is_active ? "Desativar" : "Ativar"}
+                      <DropdownMenuItem onClick={() => handleToggleActive(campaign)}>
+                        {campaign.active ? (
+                          <>
+                            <Ban className="mr-2 h-4 w-4" />
+                            Desativar
+                          </>
+                        ) : (
+                          <>
+                            <CheckCircle className="mr-2 h-4 w-4" />
+                            Ativar
+                          </>
+                        )}
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         className="text-destructive"
@@ -285,7 +294,9 @@ export default function CampaignsPage() {
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-muted-foreground">
                     <p>
-                      Início: {new Date(campaign.start_date).toLocaleDateString("pt-BR")}
+                      Início: {campaign.start_date
+                        ? new Date(campaign.start_date).toLocaleDateString("pt-BR")
+                        : "Não definida"}
                     </p>
                     {campaign.end_date && (
                       <p>
@@ -293,8 +304,8 @@ export default function CampaignsPage() {
                       </p>
                     )}
                   </div>
-                  <Badge variant={campaign.is_active ? "default" : "secondary"}>
-                    {campaign.is_active ? "Ativa" : "Inativa"}
+                  <Badge variant={campaign.active ? "default" : "secondary"}>
+                    {campaign.active ? "Ativa" : "Inativa"}
                   </Badge>
                 </div>
               </CardContent>

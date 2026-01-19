@@ -11,9 +11,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Loader2, FileText, TrendingUp, Users, Map, CheckCircle } from "lucide-react"
-import type { Campaign, Territory, Profile } from "@/lib/types"
-
+import { Loader2, FileText, TrendingUp, Users, Map as MapIcon, CheckCircle } from "lucide-react"
+import type { TerritoryWithDetails, Profile, Territory } from "@/lib/types"
 interface ReportStats {
   totalAssignments: number
   completedAssignments: number
@@ -25,7 +24,7 @@ interface ReportStats {
     completed: number
   }[]
   territoryStats: {
-    territory: Territory
+    territory: TerritoryWithDetails
     total: number
     completed: number
     percentage: number
@@ -33,57 +32,68 @@ interface ReportStats {
 }
 
 export default function ReportsPage() {
-  const [campaigns, setCampaigns] = useState<Campaign[]>([])
-  const [selectedCampaign, setSelectedCampaign] = useState<string>("")
   const [stats, setStats] = useState<ReportStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [statsLoading, setStatsLoading] = useState(false)
   const supabase = getSupabaseBrowserClient()
 
   useEffect(() => {
-    fetchCampaigns()
-  }, [])
+  fetchAssignments()
+  fetchStats()
+}, [])
 
-  useEffect(() => {
-    if (selectedCampaign) {
-      fetchStats()
-    }
-  }, [selectedCampaign])
+async function fetchAssignments() {
+  setLoading(true)
 
-  async function fetchCampaigns() {
-    const { data } = await supabase
-      .from("campaigns")
-      .select("*")
-      .order("created_at", { ascending: false })
+  const { data, error } = await supabase
+    .from("assignments")
+    .select(`
+      id,
+      assigned_at,
+      returned_at,
+      territory:territories (
+        id,
+        name
+      ),
+      user:profiles (
+        id,
+        full_name,
+        email
+      )
+    `)
+    .order("assigned_at", { ascending: false })
 
-    if (data && data.length > 0) {
-      setCampaigns(data as Campaign[])
-      setSelectedCampaign(data[0].id)
-    }
-    setLoading(false)
+  if (!error && data) {
+    // handle data if needed
   }
+
+  setLoading(false)
+}
 
   async function fetchStats() {
     setStatsLoading(true)
 
     // Get territories for this campaign
     const { data: territories } = await supabase
-      .from("territories")
-      .select(`
-        *,
-        blocks(*)
-      `)
-      .eq("campaign_id", selectedCampaign)
-
+  .from("territories")
+  .select(`
+    *,
+    group:groups (
+      id,
+      name,
+      color
+    ),
+    blocks(*)
+  `)
     // Get all assignments for blocks in these territories
-    const territoryIds = territories?.map((t) => t.id) || []
+    const territoryIds = territories?.map((t: { id: any }) => t.id) || []
     
     const { data: blocks } = await supabase
       .from("blocks")
       .select("id")
       .in("territory_id", territoryIds)
 
-    const blockIds = blocks?.map((b) => b.id) || []
+    const blockIds = blocks?.map((b: { id: any }) => b.id) || []
 
     const { data: assignments } = await supabase
       .from("assignments")
@@ -101,19 +111,19 @@ export default function ReportsPage() {
 
     // Calculate stats
     const totalAssignments = assignments.length
-    const completedAssignments = assignments.filter((a) => a.status === "completed").length
-    const returnedAssignments = assignments.filter((a) => a.status === "returned").length
+    const completedAssignments = assignments.filter((a: { status: string }) => a.status === "completed").length
+    const returnedAssignments = assignments.filter((a: { status: string }) => a.status === "returned").length
     const inProgressAssignments = assignments.filter(
-      (a) => a.status === "in_progress" || a.status === "pending"
+      (a: { status: string }) => a.status === "in_progress" || a.status === "pending"
     ).length
 
     // Calculate average completion days
     const completedWithDates = assignments.filter(
-      (a) => a.status === "completed" && a.completed_at
+      (a: { status: string; completed_at: any }) => a.status === "completed" && a.completed_at
     )
     const avgDays =
       completedWithDates.length > 0
-        ? completedWithDates.reduce((acc, a) => {
+        ? completedWithDates.reduce((acc: number, a: { assigned_at: string | number | Date; completed_at: string | number | Date }) => {
             const assigned = new Date(a.assigned_at)
             const completed = new Date(a.completed_at!)
             const days = Math.ceil((completed.getTime() - assigned.getTime()) / (1000 * 60 * 60 * 24))
@@ -122,10 +132,10 @@ export default function ReportsPage() {
         : 0
 
     // Top publishers
-    const publisherStats = new Map<string, { user: Profile; completed: number }>()
+    const publisherStats: Map<string, { user: Profile; completed: number }> = new Map()
     assignments
-      .filter((a) => a.status === "completed")
-      .forEach((a) => {
+      .filter((a: { status: string }) => a.status === "completed")
+      .forEach((a: { user_id: any; user: Profile }) => {
         const userId = a.user_id
         const existing = publisherStats.get(userId)
         if (existing) {
@@ -139,8 +149,8 @@ export default function ReportsPage() {
       .slice(0, 5)
 
     // Territory stats
-    const territoryStats = (territories || []).map((t) => {
-      const tBlocks = t.blocks || []
+    const territoryStats = (territories || []).map((t: TerritoryWithDetails) => {
+      const tBlocks = t.blocks
       const total = tBlocks.length
       const completed = tBlocks.filter((b: { status: string }) => b.status === "completed").length
       const percentage = total > 0 ? Math.round((completed / total) * 100) : 0
@@ -172,49 +182,15 @@ export default function ReportsPage() {
     )
   }
 
-  if (campaigns.length === 0) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Relatórios</h1>
-          <p className="text-muted-foreground">
-            Visualize estatísticas e progresso das campanhas
-          </p>
-        </div>
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-lg font-medium">Nenhuma campanha encontrada</p>
-            <p className="text-sm text-muted-foreground">
-              Crie uma campanha para visualizar relatórios
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Relatórios</h1>
           <p className="text-muted-foreground">
-            Visualize estatísticas e progresso das campanhas
+            Visualize estatísticas e progresso dos territórios
           </p>
         </div>
-        <Select value={selectedCampaign} onValueChange={setSelectedCampaign}>
-          <SelectTrigger className="w-64">
-            <SelectValue placeholder="Selecione uma campanha" />
-          </SelectTrigger>
-          <SelectContent>
-            {campaigns.map((campaign) => (
-              <SelectItem key={campaign.id} value={campaign.id}>
-                {campaign.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
       {statsLoading ? (
@@ -264,7 +240,7 @@ export default function ReportsPage() {
                     <p className="text-2xl font-bold">{stats.inProgressAssignments}</p>
                   </div>
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-yellow-100">
-                    <Map className="h-6 w-6 text-yellow-600" />
+                    <MapIcon className="h-6 w-6 text-yellow-600" />
                   </div>
                 </div>
               </CardContent>
@@ -328,7 +304,7 @@ export default function ReportsPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Map className="h-5 w-5" />
+                  <MapIcon className="h-5 w-5" />
                   Progresso por Território
                 </CardTitle>
                 <CardDescription>
@@ -348,7 +324,7 @@ export default function ReportsPage() {
                           <div className="flex items-center gap-2">
                             <div
                               className="h-3 w-3 rounded-full"
-                              style={{ backgroundColor: item.territory.color }}
+                              style={{ backgroundColor: item.territory.group?.color }}
                             />
                             <span className="font-medium">{item.territory.name}</span>
                           </div>
@@ -358,8 +334,11 @@ export default function ReportsPage() {
                         </div>
                         <div className="h-2 rounded-full bg-muted">
                           <div
-                            className="h-2 rounded-full bg-primary transition-all"
-                            style={{ width: `${item.percentage}%` }}
+                            className="h-2 rounded-full transition-all"
+                            style={{
+                              width: `${item.percentage}%`,
+                              backgroundColor: item.territory.group?.color,
+                            }}
                           />
                         </div>
                       </div>

@@ -55,7 +55,7 @@ export default function UsersPage() {
   useEffect(() => {
     const filtered = users.filter(
       (user) =>
-        user.full_name?.toLowerCase().includes(search.toLowerCase()) ||
+        user.name?.toLowerCase().includes(search.toLowerCase()) ||
         user.email.toLowerCase().includes(search.toLowerCase())
     )
     setFilteredUsers(filtered)
@@ -65,7 +65,7 @@ export default function UsersPage() {
     const { data } = await supabase
       .from("profiles")
       .select("*")
-      .order("full_name")
+      .order("name")
 
     if (data) {
       setUsers(data as Profile[])
@@ -176,7 +176,7 @@ export default function UsersPage() {
                 {filteredUsers.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell className="font-medium">
-                      {user.full_name || "Sem nome"}
+                      {user.name || "Sem nome"}
                     </TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>{getRoleBadge(user.role)}</TableCell>
@@ -206,7 +206,7 @@ export default function UsersPage() {
           <DialogHeader>
             <DialogTitle>Editar Função</DialogTitle>
             <DialogDescription>
-              Altere a função do usuário {selectedUser?.full_name || selectedUser?.email}
+              Altere a função do usuário {selectedUser?.name || selectedUser?.email}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">

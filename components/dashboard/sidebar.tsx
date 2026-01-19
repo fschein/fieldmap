@@ -17,6 +17,9 @@ import {
   Menu,
   X,
   ClipboardList,
+  Group,
+  GroupIcon,
+  Component,
 } from "lucide-react"
 import { useState, useCallback } from "react"
 
@@ -31,6 +34,12 @@ const navItems = [
     title: "Territórios",
     href: "/dashboard/territories",
     icon: Map,
+    roles: ["admin", "dirigente"],
+  },
+  {
+    title: "Grupos",
+    href: "/dashboard/groups",
+    icon: Component,
     roles: ["admin", "dirigente"],
   },
   {
@@ -55,7 +64,7 @@ const navItems = [
     title: "Relatórios",
     href: "/dashboard/reports",
     icon: FileText,
-    roles: ["admin", "dirigente"],
+    roles: ["admin"],
   },
   {
     title: "Configurações",

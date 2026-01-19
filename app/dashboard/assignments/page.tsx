@@ -255,7 +255,7 @@ export default function AssignmentsPage() {
                       {(isAdmin || isDirigente) && (
                         <div>
                           <p className="text-muted-foreground">Publicador</p>
-                          <p className="font-medium">{assignment.user?.full_name || "N/A"}</p>
+                          <p className="font-medium">{assignment.user?.name || "N/A"}</p>
                         </div>
                       )}
                       <div>
@@ -264,14 +264,6 @@ export default function AssignmentsPage() {
                           {new Date(assignment.assigned_at).toLocaleDateString("pt-BR")}
                         </p>
                       </div>
-                      {assignment.due_date && (
-                        <div>
-                          <p className="text-muted-foreground">Data limite</p>
-                          <p className="font-medium">
-                            {new Date(assignment.due_date).toLocaleDateString("pt-BR")}
-                          </p>
-                        </div>
-                      )}
                       {assignment.completed_at && (
                         <div>
                           <p className="text-muted-foreground">Concluído em</p>
