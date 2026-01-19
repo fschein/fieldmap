@@ -48,10 +48,10 @@ export interface Assignment {
   user_id: string
   assigned_by: string
   assigned_at: string
-  due_date: string | null
   completed_at: string | null
   returned_at: string | null
   notes: string | null
+  return_reason: string | null
   status: "pending" | "in_progress" | "completed" | "returned"
 }
 

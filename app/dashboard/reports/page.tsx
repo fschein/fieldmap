@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Loader2, FileText, TrendingUp, Users, Map, CheckCircle } from "lucide-react"
+import { Loader2, FileText, TrendingUp, Users, Map, CheckCircle, LayoutGrid } from "lucide-react"
 import type { Campaign, Territory, Profile } from "@/lib/types"
 
 interface ReportStats {
@@ -20,6 +20,8 @@ interface ReportStats {
   returnedAssignments: number
   inProgressAssignments: number
   averageCompletionDays: number
+  totalBlocks: number
+  completedBlocks: number
   topPublishers: {
     user: Profile
     completed: number
@@ -66,18 +68,26 @@ export default function ReportsPage() {
   async function fetchStats() {
     setStatsLoading(true)
 
-    // Get territories for this campaign
+    // Get territories for this campaign with blocks
     const { data: territories } = await supabase
       .from("territories")
       .select(`
         *,
-        blocks(*)
+        blocks(id, completed)
       `)
       .eq("campaign_id", selectedCampaign)
 
-    // Get all assignments for blocks in these territories
-    const territoryIds = territories?.map((t) => t.id) || []
+    // Calculate total and completed blocks across all territories
+    let totalBlocks = 0
+    let completedBlocks = 0
     
+    const territoryIds = territories?.map((t) => {
+      const tBlocks = t.blocks || []
+      totalBlocks += tBlocks.length
+      completedBlocks += tBlocks.filter((b: { completed: boolean }) => b.completed === true).length
+      return t.id
+    }) || []
+
     const { data: blocks } = await supabase
       .from("blocks")
       .select("id")
@@ -138,11 +148,11 @@ export default function ReportsPage() {
       .sort((a, b) => b.completed - a.completed)
       .slice(0, 5)
 
-    // Territory stats
+    // Territory stats - use the "completed" field from blocks
     const territoryStats = (territories || []).map((t) => {
       const tBlocks = t.blocks || []
       const total = tBlocks.length
-      const completed = tBlocks.filter((b: { status: string }) => b.status === "completed").length
+      const completed = tBlocks.filter((b: { completed: boolean }) => b.completed === true).length
       const percentage = total > 0 ? Math.round((completed / total) * 100) : 0
       return {
         territory: t as Territory,
@@ -158,6 +168,8 @@ export default function ReportsPage() {
       returnedAssignments,
       inProgressAssignments,
       averageCompletionDays: Math.round(avgDays),
+      totalBlocks,
+      completedBlocks,
       topPublishers,
       territoryStats,
     })
@@ -224,7 +236,7 @@ export default function ReportsPage() {
       ) : stats ? (
         <>
           {/* Overview Stats */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <Card>
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
@@ -232,8 +244,8 @@ export default function ReportsPage() {
                     <p className="text-sm text-muted-foreground">Total de Designações</p>
                     <p className="text-2xl font-bold">{stats.totalAssignments}</p>
                   </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
-                    <TrendingUp className="h-6 w-6 text-blue-600" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-950">
+                    <TrendingUp className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                   </div>
                 </div>
               </CardContent>
@@ -250,8 +262,28 @@ export default function ReportsPage() {
                         : "0%"}
                     </p>
                   </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-                    <CheckCircle className="h-6 w-6 text-green-600" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-950">
+                    <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Quadras Trabalhadas</p>
+                    <p className="text-2xl font-bold">{stats.completedBlocks}</p>
+                    <p className="text-xs text-muted-foreground">
+                      de {stats.totalBlocks} quadras (
+                      {stats.totalBlocks > 0
+                        ? `${Math.round((stats.completedBlocks / stats.totalBlocks) * 100)}%`
+                        : "0%"}
+                      )
+                    </p>
+                  </div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950">
+                    <LayoutGrid className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
                   </div>
                 </div>
               </CardContent>
@@ -263,8 +295,8 @@ export default function ReportsPage() {
                     <p className="text-sm text-muted-foreground">Em Andamento</p>
                     <p className="text-2xl font-bold">{stats.inProgressAssignments}</p>
                   </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-yellow-100">
-                    <Map className="h-6 w-6 text-yellow-600" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-950">
+                    <Map className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
                   </div>
                 </div>
               </CardContent>
@@ -276,8 +308,8 @@ export default function ReportsPage() {
                     <p className="text-sm text-muted-foreground">Média de Conclusão</p>
                     <p className="text-2xl font-bold">{stats.averageCompletionDays} dias</p>
                   </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-100">
-                    <FileText className="h-6 w-6 text-purple-600" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-100 dark:bg-purple-950">
+                    <FileText className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                   </div>
                 </div>
               </CardContent>
@@ -292,9 +324,7 @@ export default function ReportsPage() {
                   <Users className="h-5 w-5" />
                   Publicadores Destaque
                 </CardTitle>
-                <CardDescription>
-                  Publicadores com mais trabalhos concluídos
-                </CardDescription>
+                <CardDescription>Publicadores com mais trabalhos concluídos</CardDescription>
               </CardHeader>
               <CardContent>
                 {stats.topPublishers.length === 0 ? (
@@ -331,9 +361,7 @@ export default function ReportsPage() {
                   <Map className="h-5 w-5" />
                   Progresso por Território
                 </CardTitle>
-                <CardDescription>
-                  Percentual de quadras concluídas em cada território
-                </CardDescription>
+                <CardDescription>Percentual de quadras trabalhadas em cada território</CardDescription>
               </CardHeader>
               <CardContent>
                 {stats.territoryStats.length === 0 ? (

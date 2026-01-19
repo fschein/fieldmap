@@ -6,124 +6,102 @@ import { useAuth } from "@/hooks/use-auth"
 import { StatsCard } from "@/components/dashboard/stats-card"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Map, MapPin, Users, CheckCircle, Clock, Loader2 } from "lucide-react"
-import type { DashboardStats, AssignmentWithDetails } from "@/lib/types"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
+import { Map, MapPin, Users, CheckCircle, Clock, Loader2, LayoutGrid } from "lucide-react"
+
+interface Block {
+  id: string
+  name: string
+  completed: boolean
+  territory_id: string
+}
+
+interface Territory {
+  id: string
+  name: string
+  color: string
+  campaign_id: string
+  blocks: Block[]
+}
+
+interface Campaign {
+  id: string
+  name: string
+  is_active: boolean
+}
+
+interface DashboardStats {
+  total_territories: number
+  total_blocks: number
+  completed_blocks: number
+  active_campaigns: number
+}
 
 export default function DashboardPage() {
   const { profile, isAdmin, isDirigente, loading: authLoading, user } = useAuth()
   const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [recentAssignments, setRecentAssignments] = useState<AssignmentWithDetails[]>([])
+  const [territories, setTerritories] = useState<Territory[]>([])
+  const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
   const supabase = getSupabaseBrowserClient()
 
-  // Debug: log auth state
-  useEffect(() => {
-    console.log("Dashboard - Auth State:", { user, profile, authLoading })
-  }, [user, profile, authLoading])
-
   useEffect(() => {
     async function fetchData() {
-      // Wait for auth to be ready
-      if (authLoading) {
-        console.log("Dashboard - Waiting for auth...")
-        return
-      }
-
-      if (!user) {
-        console.log("Dashboard - No user found")
-        return
-      }
-
-      if (!profile) {
-        console.log("Dashboard - No profile found")
+      if (authLoading) return
+      if (!user || !profile) {
         setLoading(false)
         return
       }
 
-      console.log("Dashboard - Fetching data for profile:", profile.id)
-
       try {
-        // Fetch stats
-        const [
-          { count: totalTerritories },
-          { count: totalBlocks },
-          { count: assignedBlocks },
-          { count: completedBlocks },
-          { count: availableBlocks },
-          { count: activeCampaigns },
-        ] = await Promise.all([
-          supabase.from("territories").select("*", { count: "exact", head: true }),
-          supabase.from("blocks").select("*", { count: "exact", head: true }),
-          supabase.from("blocks").select("*", { count: "exact", head: true }).eq("status", "assigned"),
-          supabase.from("blocks").select("*", { count: "exact", head: true }).eq("status", "completed"),
-          supabase.from("blocks").select("*", { count: "exact", head: true }).eq("status", "available"),
-          supabase.from("campaigns").select("*", { count: "exact", head: true }).eq("is_active", true),
-        ])
+        // Fetch campaigns
+        const { data: campaignsData } = await supabase
+          .from("campaigns")
+          .select("*")
+          .eq("is_active", true)
+          .order("name")
 
-        console.log("Dashboard - Stats fetched:", {
-          totalTerritories,
-          totalBlocks,
-          assignedBlocks,
-          completedBlocks,
-          availableBlocks,
-          activeCampaigns,
-        })
+        if (campaignsData) {
+          setCampaigns(campaignsData as Campaign[])
+        }
 
-        setStats({
-          total_territories: totalTerritories || 0,
-          total_blocks: totalBlocks || 0,
-          assigned_blocks: assignedBlocks || 0,
-          completed_blocks: completedBlocks || 0,
-          available_blocks: availableBlocks || 0,
-          active_campaigns: activeCampaigns || 0,
-        })
+        // Fetch territories with blocks
+        const { data: territoriesData } = await supabase
+          .from("territories")
+          .select(`
+            id,
+            name,
+            color,
+            campaign_id,
+            blocks(id, name, completed, territory_id)
+          `)
+          .order("name")
 
-        // Fetch recent assignments with error handling
-        try {
-          let query = supabase
-            .from("assignments")
-            .select(`
-              *,
-              block:blocks(
-                *,
-                territory:territories(
-                  *,
-                  campaign:campaigns(*)
-                )
-              ),
-              user:profiles!assignments_user_id_fkey(*),
-              assigned_by_user:profiles!assignments_assigned_by_fkey(*)
-            `)
-            .order("assigned_at", { ascending: false })
-            .limit(5)
+        if (territoriesData) {
+          setTerritories(territoriesData as unknown as Territory[])
 
-          // If publicador, only show their assignments
-          if (profile.role === "publicador") {
-            query = query.eq("user_id", profile.id)
-          }
+          // Calculate stats from real data
+          const totalTerritories = territoriesData.length
+          let totalBlocks = 0
+          let completedBlocks = 0
 
-          const { data: assignments, error: assignmentsError } = await query
+          territoriesData.forEach((t) => {
+            const blocks = t.blocks || []
+            totalBlocks += blocks.length
+            completedBlocks += blocks.filter((b: { completed: boolean }) => b.completed === true).length
+          })
 
-          if (assignmentsError) {
-            console.error("Dashboard - Error fetching assignments:", {
-              message: assignmentsError.message,
-              details: assignmentsError.details,
-              hint: assignmentsError.hint,
-              code: assignmentsError.code,
-            })
-            // Set empty array instead of failing completely
-            setRecentAssignments([])
-          } else {
-            console.log("Dashboard - Assignments fetched:", assignments?.length)
-            if (assignments) {
-              setRecentAssignments(assignments as unknown as AssignmentWithDetails[])
-            } else {
-              setRecentAssignments([])
-            }
-          }
-        } catch (assignmentError) {
-          console.error("Dashboard - Exception fetching assignments:", assignmentError)
-          setRecentAssignments([])
+          setStats({
+            total_territories: totalTerritories,
+            total_blocks: totalBlocks,
+            completed_blocks: completedBlocks,
+            active_campaigns: campaignsData?.length || 0,
+          })
         }
       } catch (error) {
         console.error("Dashboard - Error fetching data:", error)
@@ -135,34 +113,29 @@ export default function DashboardPage() {
     fetchData()
   }, [profile, supabase, authLoading, user])
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "pending":
-        return <Badge variant="secondary">Pendente</Badge>
-      case "in_progress":
-        return <Badge className="bg-blue-500 hover:bg-blue-600">Em andamento</Badge>
-      case "completed":
-        return <Badge className="bg-green-500 hover:bg-green-600">Concluído</Badge>
-      case "returned":
-        return <Badge variant="outline">Devolvido</Badge>
-      default:
-        return <Badge variant="secondary">{status}</Badge>
-    }
+  // Group territories by campaign
+  function getTerritoriesByCampaign(campaignId: string) {
+    return territories.filter((t) => t.campaign_id === campaignId)
   }
 
-  // Show loading while auth is initializing
+  function getBlockStats(blocks: Block[]) {
+    const total = blocks.length
+    const completed = blocks.filter((b) => b.completed).length
+    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0
+    return { total, completed, percentage }
+  }
+
   if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-          <p className="text-muted-foreground">Carregando autenticação...</p>
+          <p className="text-muted-foreground">Carregando...</p>
         </div>
       </div>
     )
   }
 
-  // Show error if no profile found
   if (!profile) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -178,7 +151,6 @@ export default function DashboardPage() {
     )
   }
 
-  // Show loading while fetching dashboard data
   if (loading) {
     return (
       <div className="space-y-6">
@@ -197,95 +169,160 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Bem-vindo, {profile?.full_name || "Usuário"}!
-        </p>
+        <p className="text-muted-foreground">Bem-vindo, {profile?.full_name || "Usuário"}!</p>
       </div>
 
       {/* Stats Grid */}
-      {(isAdmin || isDirigente) && stats && (
+      {stats && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatsCard title="Campanhas Ativas" value={stats.active_campaigns} icon={Users} />
+          <StatsCard title="Territórios" value={stats.total_territories} icon={Map} />
           <StatsCard
-            title="Territórios"
-            value={stats.total_territories}
-            icon={Map}
-          />
-          <StatsCard
-            title="Quadras"
+            title="Total de Quadras"
             value={stats.total_blocks}
-            description={`${stats.available_blocks} disponíveis`}
-            icon={MapPin}
+            icon={LayoutGrid}
           />
           <StatsCard
-            title="Em trabalho"
-            value={stats.assigned_blocks}
-            icon={Clock}
-          />
-          <StatsCard
-            title="Concluídos"
+            title="Quadras Trabalhadas"
             value={stats.completed_blocks}
+            description={
+              stats.total_blocks > 0
+                ? `${Math.round((stats.completed_blocks / stats.total_blocks) * 100)}% concluído`
+                : "0%"
+            }
             icon={CheckCircle}
           />
         </div>
       )}
 
-      {/* Quick Actions for Publicador */}
-      {profile?.role === "publicador" && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <StatsCard
-            title="Minhas Designações"
-            value={recentAssignments.length}
-            description="Territórios designados para você"
-            icon={MapPin}
-          />
-          <StatsCard
-            title="Em Andamento"
-            value={recentAssignments.filter(a => a.status === "in_progress").length}
-            description="Trabalhos em andamento"
-            icon={Clock}
-          />
-        </div>
-      )}
-
-      {/* Recent Assignments */}
+      {/* Territories Accordion */}
       <Card>
         <CardHeader>
-          <CardTitle>
-            {profile?.role === "publicador" ? "Minhas Designações" : "Designações Recentes"}
+          <CardTitle className="flex items-center gap-2">
+            <Map className="h-5 w-5" />
+            Territórios e Quadras
           </CardTitle>
           <CardDescription>
-            {profile?.role === "publicador"
-              ? "Territórios designados para você"
-              : "Últimas designações realizadas"}
+            Visualize o progresso de cada território e suas quadras
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {recentAssignments.length === 0 ? (
+          {campaigns.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              Nenhuma designação encontrada
+              Nenhuma campanha ativa encontrada
             </p>
           ) : (
-            <div className="space-y-4">
-              {recentAssignments.map((assignment) => (
-                <div
-                  key={assignment.id}
-                  className="flex items-center justify-between rounded-lg border p-4"
-                >
-                  <div className="space-y-1">
-                    <p className="font-medium">
-                      {assignment.block?.territory?.name} - {assignment.block?.name}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {profile?.role !== "publicador" && (
-                        <>Designado para: {assignment.user?.full_name || "N/A"} | </>
+            <Accordion type="multiple" className="w-full">
+              {campaigns.map((campaign) => {
+                const campaignTerritories = getTerritoriesByCampaign(campaign.id)
+                const totalBlocks = campaignTerritories.reduce(
+                  (acc, t) => acc + (t.blocks?.length || 0),
+                  0
+                )
+                const completedBlocks = campaignTerritories.reduce(
+                  (acc, t) => acc + (t.blocks?.filter((b) => b.completed).length || 0),
+                  0
+                )
+
+                return (
+                  <AccordionItem key={campaign.id} value={campaign.id}>
+                    <AccordionTrigger className="hover:no-underline">
+                      <div className="flex items-center justify-between w-full pr-4">
+                        <div className="flex items-center gap-3">
+                          <span className="font-semibold">{campaign.name}</span>
+                          <Badge variant="secondary">
+                            {campaignTerritories.length} territórios
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <span>
+                            {completedBlocks}/{totalBlocks} quadras
+                          </span>
+                          {totalBlocks > 0 && (
+                            <span className="text-xs">
+                              ({Math.round((completedBlocks / totalBlocks) * 100)}%)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent>
+                      {campaignTerritories.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-4 pl-4">
+                          Nenhum território cadastrado nesta campanha
+                        </p>
+                      ) : (
+                        <Accordion type="multiple" className="pl-4">
+                          {campaignTerritories.map((territory) => {
+                            const blockStats = getBlockStats(territory.blocks || [])
+
+                            return (
+                              <AccordionItem key={territory.id} value={territory.id}>
+                                <AccordionTrigger className="hover:no-underline py-3">
+                                  <div className="flex items-center justify-between w-full pr-4">
+                                    <div className="flex items-center gap-3">
+                                      <div
+                                        className="h-3 w-3 rounded-full"
+                                        style={{ backgroundColor: territory.color }}
+                                      />
+                                      <span className="font-medium">{territory.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                                        <div
+                                          className="h-full bg-primary transition-all"
+                                          style={{ width: `${blockStats.percentage}%` }}
+                                        />
+                                      </div>
+                                      <span className="text-sm text-muted-foreground min-w-[80px] text-right">
+                                        {blockStats.completed}/{blockStats.total} (
+                                        {blockStats.percentage}%)
+                                      </span>
+                                    </div>
+                                  </div>
+                                </AccordionTrigger>
+                                <AccordionContent>
+                                  {territory.blocks?.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground py-2 pl-6">
+                                      Nenhuma quadra cadastrada
+                                    </p>
+                                  ) : (
+                                    <div className="grid gap-2 pl-6 py-2 sm:grid-cols-2 lg:grid-cols-3">
+                                      {territory.blocks?.map((block) => (
+                                        <div
+                                          key={block.id}
+                                          className={`flex items-center justify-between rounded-lg border p-3 ${
+                                            block.completed
+                                              ? "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-900"
+                                              : "bg-background"
+                                          }`}
+                                        >
+                                          <div className="flex items-center gap-2">
+                                            <MapPin className="h-4 w-4 text-muted-foreground" />
+                                            <span className="text-sm font-medium">
+                                              {block.name}
+                                            </span>
+                                          </div>
+                                          {block.completed ? (
+                                            <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                          ) : (
+                                            <Clock className="h-4 w-4 text-muted-foreground" />
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </AccordionContent>
+                              </AccordionItem>
+                            )
+                          })}
+                        </Accordion>
                       )}
-                      {new Date(assignment.assigned_at).toLocaleDateString("pt-BR")}
-                    </p>
-                  </div>
-                  {getStatusBadge(assignment.status)}
-                </div>
-              ))}
-            </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                )
+              })}
+            </Accordion>
           )}
         </CardContent>
       </Card>
