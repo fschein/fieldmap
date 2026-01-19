@@ -6,80 +6,134 @@ import { useAuth } from "@/hooks/use-auth"
 import { StatsCard } from "@/components/dashboard/stats-card"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Map, MapPin, Users, CheckCircle, Clock, Calendar } from "lucide-react"
+import { Map, MapPin, Users, CheckCircle, Clock, Loader2 } from "lucide-react"
 import type { DashboardStats, AssignmentWithDetails } from "@/lib/types"
 
 export default function DashboardPage() {
-  const { profile, isAdmin, isDirigente } = useAuth()
+  const { profile, isAdmin, isDirigente, loading: authLoading, user } = useAuth()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [recentAssignments, setRecentAssignments] = useState<AssignmentWithDetails[]>([])
   const [loading, setLoading] = useState(true)
   const supabase = getSupabaseBrowserClient()
 
+  // Debug: log auth state
+  useEffect(() => {
+    console.log("Dashboard - Auth State:", { user, profile, authLoading })
+  }, [user, profile, authLoading])
+
   useEffect(() => {
     async function fetchData() {
-      if (!profile) return
+      // Wait for auth to be ready
+      if (authLoading) {
+        console.log("Dashboard - Waiting for auth...")
+        return
+      }
 
-      // Fetch stats
-      const [
-        { count: totalTerritories },
-        { count: totalBlocks },
-        { count: assignedBlocks },
-        { count: completedBlocks },
-        { count: availableBlocks },
-        { count: activeCampaigns },
-      ] = await Promise.all([
-        supabase.from("territories").select("*", { count: "exact", head: true }),
-        supabase.from("blocks").select("*", { count: "exact", head: true }),
-        supabase.from("blocks").select("*", { count: "exact", head: true }).eq("status", "assigned"),
-        supabase.from("blocks").select("*", { count: "exact", head: true }).eq("status", "completed"),
-        supabase.from("blocks").select("*", { count: "exact", head: true }).eq("status", "available"),
-        supabase.from("campaigns").select("*", { count: "exact", head: true }).eq("is_active", true),
-      ])
+      if (!user) {
+        console.log("Dashboard - No user found")
+        return
+      }
 
-      setStats({
-        total_territories: totalTerritories || 0,
-        total_blocks: totalBlocks || 0,
-        assigned_blocks: assignedBlocks || 0,
-        completed_blocks: completedBlocks || 0,
-        available_blocks: availableBlocks || 0,
-        active_campaigns: activeCampaigns || 0,
-      })
+      if (!profile) {
+        console.log("Dashboard - No profile found")
+        setLoading(false)
+        return
+      }
 
-      // Fetch recent assignments
-      let query = supabase
-        .from("assignments")
-        .select(`
-          *,
-          block:blocks(
-            *,
-            territory:territories(
+      console.log("Dashboard - Fetching data for profile:", profile.id)
+
+      try {
+        // Fetch stats
+        const [
+          { count: totalTerritories },
+          { count: totalBlocks },
+          { count: assignedBlocks },
+          { count: completedBlocks },
+          { count: availableBlocks },
+          { count: activeCampaigns },
+        ] = await Promise.all([
+          supabase.from("territories").select("*", { count: "exact", head: true }),
+          supabase.from("blocks").select("*", { count: "exact", head: true }),
+          supabase.from("blocks").select("*", { count: "exact", head: true }).eq("status", "assigned"),
+          supabase.from("blocks").select("*", { count: "exact", head: true }).eq("status", "completed"),
+          supabase.from("blocks").select("*", { count: "exact", head: true }).eq("status", "available"),
+          supabase.from("campaigns").select("*", { count: "exact", head: true }).eq("is_active", true),
+        ])
+
+        console.log("Dashboard - Stats fetched:", {
+          totalTerritories,
+          totalBlocks,
+          assignedBlocks,
+          completedBlocks,
+          availableBlocks,
+          activeCampaigns,
+        })
+
+        setStats({
+          total_territories: totalTerritories || 0,
+          total_blocks: totalBlocks || 0,
+          assigned_blocks: assignedBlocks || 0,
+          completed_blocks: completedBlocks || 0,
+          available_blocks: availableBlocks || 0,
+          active_campaigns: activeCampaigns || 0,
+        })
+
+        // Fetch recent assignments with error handling
+        try {
+          let query = supabase
+            .from("assignments")
+            .select(`
               *,
-              campaign:campaigns(*)
-            )
-          ),
-          user:profiles!assignments_user_id_fkey(*),
-          assigned_by_user:profiles!assignments_assigned_by_fkey(*)
-        `)
-        .order("assigned_at", { ascending: false })
-        .limit(5)
+              block:blocks(
+                *,
+                territory:territories(
+                  *,
+                  campaign:campaigns(*)
+                )
+              ),
+              user:profiles!assignments_user_id_fkey(*),
+              assigned_by_user:profiles!assignments_assigned_by_fkey(*)
+            `)
+            .order("assigned_at", { ascending: false })
+            .limit(5)
 
-      // If publicador, only show their assignments
-      if (profile.role === "publicador") {
-        query = query.eq("user_id", profile.id)
+          // If publicador, only show their assignments
+          if (profile.role === "publicador") {
+            query = query.eq("user_id", profile.id)
+          }
+
+          const { data: assignments, error: assignmentsError } = await query
+
+          if (assignmentsError) {
+            console.error("Dashboard - Error fetching assignments:", {
+              message: assignmentsError.message,
+              details: assignmentsError.details,
+              hint: assignmentsError.hint,
+              code: assignmentsError.code,
+            })
+            // Set empty array instead of failing completely
+            setRecentAssignments([])
+          } else {
+            console.log("Dashboard - Assignments fetched:", assignments?.length)
+            if (assignments) {
+              setRecentAssignments(assignments as unknown as AssignmentWithDetails[])
+            } else {
+              setRecentAssignments([])
+            }
+          }
+        } catch (assignmentError) {
+          console.error("Dashboard - Exception fetching assignments:", assignmentError)
+          setRecentAssignments([])
+        }
+      } catch (error) {
+        console.error("Dashboard - Error fetching data:", error)
+      } finally {
+        setLoading(false)
       }
-
-      const { data: assignments } = await query
-
-      if (assignments) {
-        setRecentAssignments(assignments as unknown as AssignmentWithDetails[])
-      }
-
-      setLoading(false)
     }
 
     fetchData()
-  }, [profile, supabase])
+  }, [profile, supabase, authLoading, user])
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -96,12 +150,44 @@ export default function DashboardPage() {
     }
   }
 
+  // Show loading while auth is initializing
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="text-muted-foreground">Carregando autenticação...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error if no profile found
+  if (!profile) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>Perfil não encontrado</CardTitle>
+            <CardDescription>
+              Não foi possível carregar seu perfil. Tente fazer logout e login novamente.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    )
+  }
+
+  // Show loading while fetching dashboard data
   if (loading) {
     return (
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">Carregando...</p>
+          <p className="text-muted-foreground">Carregando dados...</p>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       </div>
     )
