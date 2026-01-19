@@ -1,8 +1,6 @@
 "use client"
 
-import React from "react"
-
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useAuth } from "@/hooks/use-auth"
@@ -21,12 +19,18 @@ export default function LoginPage() {
   const { signIn, user, loading, isReady } = useAuth()
   const router = useRouter()
 
+  // Debug: log auth state
+  useEffect(() => {
+    console.log("Auth State:", { user, loading, isReady })
+  }, [user, loading, isReady])
+
   // Redirect if already authenticated
   useEffect(() => {
     if (isReady && user) {
+      console.log("User authenticated, redirecting to dashboard")
       router.replace("/dashboard")
     }
-  }, [isReady, user, router])
+  }, [user, isReady, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -37,27 +41,29 @@ export default function LoginPage() {
     setIsSubmitting(true)
 
     try {
+      console.log("Attempting sign in...")
       const { error: signInError } = await signIn(email, password)
 
       if (signInError) {
+        console.error("Sign in error:", signInError)
         setError(signInError.message === "Invalid login credentials" 
           ? "E-mail ou senha incorretos" 
           : signInError.message)
         setIsSubmitting(false)
       } else {
-        // Small delay to ensure auth state is updated before redirect
-        setTimeout(() => {
-          router.replace("/dashboard")
-        }, 100)
+        console.log("Sign in successful")
+        // Don't manually redirect - let the useEffect handle it
+        // The auth state will update and trigger the redirect
       }
     } catch (err) {
+      console.error("Login exception:", err)
       setError("Erro ao fazer login. Tente novamente.")
       setIsSubmitting(false)
     }
   }
 
-  // Show loading while checking initial auth state
-  if (loading && !isReady) {
+  // Show loading state while auth is initializing
+  if (!isReady || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted/30">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -65,7 +71,7 @@ export default function LoginPage() {
     )
   }
 
-  // Don't render login form if already authenticated (redirect in progress)
+  // Don't render login form if already authenticated
   if (user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted/30">
