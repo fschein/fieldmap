@@ -12,7 +12,7 @@ const MOCK_USER = {
 const MOCK_PROFILE: Profile = {
   id: "mock-user-id",
   email: "admin@example.com",
-  full_name: "Administrador Mock",
+  name: "Administrador Mock",
   phone: null, // Add phone field
   role: "admin", // Change to "dirigente" or "publicador" to test different roles
   created_at: new Date().toISOString(),

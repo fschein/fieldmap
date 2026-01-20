@@ -20,6 +20,7 @@ import {
   Group,
   GroupIcon,
   Component,
+  User,
 } from "lucide-react"
 import { useState, useCallback } from "react"
 
@@ -85,19 +86,22 @@ export function Sidebar() {
     (item) => profile && item.roles.includes(profile.role)
   )
 
-  const handleSignOut = useCallback(async () => {
-    if (isSigningOut) return
-    
-    setIsSigningOut(true)
-    setMobileOpen(false)
-    
-    try {
-      await signOut()
-      router.replace("/login")
-    } catch {
-      setIsSigningOut(false)
-    }
-  }, [signOut, router, isSigningOut])
+const handleSignOut = useCallback(async () => {
+  if (isSigningOut) return
+
+  setIsSigningOut(true)
+  setMobileOpen(false)
+
+  try {
+    await signOut()
+  } catch (error) {
+    console.error("Erro ao invalidar sessão, mas forçando saída:", error)
+  } finally {
+    localStorage.clear()
+
+    window.location.href = "/login"
+  }
+}, [signOut, isSigningOut])
 
   const closeMobileMenu = useCallback(() => {
     setMobileOpen(false)
@@ -171,9 +175,10 @@ export function Sidebar() {
           {/* User section */}
           <div className="border-t p-4">
             <div className="mb-3 px-3">
-              <p className="text-sm font-medium text-foreground truncate">
-                {profile?.full_name || "Usuário"}
-              </p>
+              <Link href="/dashboard/profile" className="flex items-center gap-2">
+                <User className="h-4 w-4" />
+                <span>{profile?.name || profile?.email}</span>
+              </Link>
               <p className="text-xs text-muted-foreground capitalize">
                 {profile?.role === "admin" ? "Administrador" : 
                  profile?.role === "dirigente" ? "Dirigente" : 

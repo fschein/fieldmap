@@ -3,10 +3,9 @@
 import { useEffect, useState } from "react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { useAuth } from "@/hooks/use-auth"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
   DialogContent,
@@ -22,328 +21,432 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
-import { Loader2, ClipboardList, CheckCircle, RotateCcw, Play, MapPin } from "lucide-react"
-import type { AssignmentWithDetails } from "@/lib/types"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import { Loader2, Plus, User, ArrowRight, RotateCcw, CheckCircle } from "lucide-react"
+
+interface AssignmentWithDetails {
+  id: string
+  block_id: string
+  user_id: string
+  assigned_by: string
+  assigned_at: string
+  completed_at: string | null
+  returned_at: string | null
+  notes: string | null
+  return_reason: string | null
+  status: "pending" | "in_progress" | "completed" | "returned"
+  block: {
+    id: string
+    name: string
+    territory: {
+      id: string
+      name: string
+      color: string
+    }
+  }
+  user: {
+    id: string
+    name: string
+  }
+}
+
+interface Block {
+  id: string
+  name: string
+  territory_id: string
+  territory: {
+    id: string
+    name: string
+  }
+}
+
+interface Profile {
+  id: string
+  name: string
+}
+
+const STATUS_COLUMNS = [
+  { key: "pending", label: "Não Iniciada", color: "bg-muted" },
+  { key: "in_progress", label: "Em Andamento", color: "bg-blue-50 dark:bg-blue-950/30" },
+  { key: "completed", label: "Concluída", color: "bg-green-50 dark:bg-green-950/30" },
+  { key: "returned", label: "Devolvida", color: "bg-amber-50 dark:bg-amber-950/30" },
+] as const
 
 export default function AssignmentsPage() {
   const { profile, isAdmin, isDirigente } = useAuth()
   const [assignments, setAssignments] = useState<AssignmentWithDetails[]>([])
+  const [blocks, setBlocks] = useState<Block[]>([])
+  const [users, setUsers] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<string>("all")
-  const [actionDialogOpen, setActionDialogOpen] = useState(false)
+  const [showNewDialog, setShowNewDialog] = useState(false)
+  const [showActionDialog, setShowActionDialog] = useState(false)
   const [selectedAssignment, setSelectedAssignment] = useState<AssignmentWithDetails | null>(null)
-  const [actionType, setActionType] = useState<"complete" | "return" | "start" | null>(null)
-  const [notes, setNotes] = useState("")
+  const [actionType, setActionType] = useState<"start" | "complete" | "return" | null>(null)
+  const [returnReason, setReturnReason] = useState("")
+  const [newAssignment, setNewAssignment] = useState({ block_id: "", user_id: "" })
   const [submitting, setSubmitting] = useState(false)
+
   const supabase = getSupabaseBrowserClient()
+  const canManage = isAdmin || isDirigente
 
   useEffect(() => {
-    fetchAssignments()
-  }, [profile, filter])
+    loadData()
+  }, [profile])
 
-  async function fetchAssignments() {
+  async function loadData() {
     if (!profile) return
+    setLoading(true)
 
-    let query = supabase
-      .from("assignments")
-      .select(`
-        *,
-        block:blocks(
-          *,
-          territory:territories(
-            *,
-            campaign:campaigns(*)
-          )
-        ),
-        user:profiles!assignments_user_id_fkey(*),
-        assigned_by_user:profiles!assignments_assigned_by_fkey(*)
-      `)
-      .order("assigned_at", { ascending: false })
+    let assignmentsQuery = supabase
+    .from("assignments")
+    .select(`
+      *,
+      block:blocks(id, name, territory:territories(id, name, color)),
+      user:profiles!assignments_user_id_fkey(id, name) 
+    `)
+    .order("assigned_at", { ascending: false })
 
-    // Filter by user if publicador
-    if (profile.role === "publicador") {
-      query = query.eq("user_id", profile.id)
+  if (profile.role === "publicador") {
+    assignmentsQuery = assignmentsQuery.eq("user_id", profile.id)
+  }
+
+    const [assignmentsRes, blocksRes, usersRes] = await Promise.all([
+      assignmentsQuery,
+      supabase
+        .from("blocks")
+        .select(`id, name, territory_id, territory:territories(id, name)`)
+        .order("name"),
+      supabase.from("profiles").select("id, name").order("name"),
+    ])
+
+    if (assignmentsRes.data) {
+      setAssignments(assignmentsRes.data as unknown as AssignmentWithDetails[])
     }
 
-    // Filter by status
-    if (filter !== "all") {
-      query = query.eq("status", filter)
+    // 3. Filtrar quadras disponíveis (opcional, mas recomendado para o Modal)
+    if (blocksRes.data) {
+      setBlocks(blocksRes.data as unknown as Block[])
     }
 
-    const { data } = await query
-
-    if (data) {
-      setAssignments(data as unknown as AssignmentWithDetails[])
+    if (usersRes.data) {
+      // Aqui garantimos que o mapeamento interno use 'name'
+      setUsers(usersRes.data)
     }
+
     setLoading(false)
   }
 
-  const handleOpenActionDialog = (
-    assignment: AssignmentWithDetails,
-    type: "complete" | "return" | "start"
-  ) => {
-    setSelectedAssignment(assignment)
-    setActionType(type)
-    setNotes("")
-    setActionDialogOpen(true)
-  }
+  // Quadras que não têm designações ativas
+  const availableBlocks = blocks.filter(
+    (block) =>
+      !assignments.some(
+        (a) => a.block_id === block.id && (a.status === "pending" || a.status === "in_progress")
+      )
+  )
 
-  const handleAction = async () => {
-    if (!selectedAssignment || !actionType) return
+  async function handleCreateAssignment() {
+    if (!newAssignment.block_id || !newAssignment.user_id || !profile) return
+
     setSubmitting(true)
 
-    const now = new Date().toISOString()
-    let updateData: Record<string, string | null> = {}
-    let blockStatus = ""
+    const { error } = await supabase.from("assignments").insert({
+      block_id: newAssignment.block_id,
+      user_id: newAssignment.user_id,
+      assigned_by: profile.id,
+      status: "pending",
+    })
 
-    switch (actionType) {
-      case "start":
-        updateData = { status: "in_progress" }
-        blockStatus = "assigned"
-        break
-      case "complete":
-        updateData = { status: "completed", completed_at: now, notes: notes || null }
-        blockStatus = "completed"
-        break
-      case "return":
-        updateData = { status: "returned", returned_at: now, notes: notes || null }
-        blockStatus = "available"
-        break
+    if (!error) {
+      setShowNewDialog(false)
+      setNewAssignment({ block_id: "", user_id: "" })
+      loadData()
     }
 
-    await supabase
+    setSubmitting(false)
+  }
+
+  async function handleStatusChange() {
+    if (!selectedAssignment || !actionType) return
+
+    setSubmitting(true)
+
+    const updates: Record<string, unknown> = {}
+
+    if (actionType === "start") {
+      updates.status = "in_progress"
+    } else if (actionType === "complete") {
+      updates.status = "completed"
+      updates.completed_at = new Date().toISOString()
+
+      // Marca a quadra como concluída
+      await supabase.from("blocks").update({ completed: true }).eq("id", selectedAssignment.block_id)
+    } else if (actionType === "return") {
+      updates.status = "returned"
+      updates.returned_at = new Date().toISOString()
+      updates.return_reason = returnReason || null
+    }
+
+    const { error } = await supabase
       .from("assignments")
-      .update(updateData)
+      .update(updates)
       .eq("id", selectedAssignment.id)
 
-    await supabase
-      .from("blocks")
-      .update({ status: blockStatus })
-      .eq("id", selectedAssignment.block_id)
+    if (!error) {
+      setShowActionDialog(false)
+      setSelectedAssignment(null)
+      setActionType(null)
+      setReturnReason("")
+      loadData()
+    }
 
-    setActionDialogOpen(false)
     setSubmitting(false)
-    fetchAssignments()
   }
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "pending":
-        return <Badge variant="secondary">Pendente</Badge>
-      case "in_progress":
-        return <Badge className="bg-blue-500 hover:bg-blue-600">Em andamento</Badge>
-      case "completed":
-        return <Badge className="bg-green-500 hover:bg-green-600">Concluído</Badge>
-      case "returned":
-        return <Badge variant="outline">Devolvido</Badge>
-      default:
-        return <Badge variant="secondary">{status}</Badge>
-    }
+  function openActionDialog(assignment: AssignmentWithDetails, action: "start" | "complete" | "return") {
+    setSelectedAssignment(assignment)
+    setActionType(action)
+    setShowActionDialog(true)
   }
 
-  const getActionButtons = (assignment: AssignmentWithDetails) => {
-    const isOwner = assignment.user_id === profile?.id
-    const canManage = isAdmin || isDirigente || isOwner
+  function getAssignmentsByStatus(status: string) {
+    return assignments.filter((a) => a.status === status)
+  }
 
-    if (!canManage) return null
+  function formatDate(dateString: string) {
+    return new Date(dateString).toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "short",
+    })
+  }
 
-    switch (assignment.status) {
-      case "pending":
-        return (
-          <Button
-            size="sm"
-            onClick={() => handleOpenActionDialog(assignment, "start")}
-          >
-            <Play className="mr-2 h-3 w-3" />
-            Iniciar
-          </Button>
-        )
-      case "in_progress":
-        return (
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              onClick={() => handleOpenActionDialog(assignment, "complete")}
-            >
-              <CheckCircle className="mr-2 h-3 w-3" />
-              Concluir
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleOpenActionDialog(assignment, "return")}
-            >
-              <RotateCcw className="mr-2 h-3 w-3" />
-              Devolver
-            </Button>
-          </div>
-        )
-      default:
-        return null
-    }
+  function canUserAct(assignment: AssignmentWithDetails) {
+    return canManage || assignment.user_id === profile?.id
   }
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex h-96 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Designações</h1>
-        <p className="text-muted-foreground">
-          {profile?.role === "publicador"
-            ? "Gerencie suas designações de território"
-            : "Gerencie todas as designações de território"}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Designações</h1>
+          <p className="text-muted-foreground">
+            {canManage
+              ? "Gerencie as designações de quadras aos publicadores"
+              : "Acompanhe suas designações de território"}
+          </p>
+        </div>
+        {canManage && (
+          <Button onClick={() => setShowNewDialog(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nova designação
+          </Button>
+        )}
       </div>
 
-      <Tabs value={filter} onValueChange={setFilter}>
-        <TabsList>
-          <TabsTrigger value="all">Todas</TabsTrigger>
-          <TabsTrigger value="pending">Pendentes</TabsTrigger>
-          <TabsTrigger value="in_progress">Em andamento</TabsTrigger>
-          <TabsTrigger value="completed">Concluídas</TabsTrigger>
-          <TabsTrigger value="returned">Devolvidas</TabsTrigger>
-        </TabsList>
+      {/* Kanban Board */}
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {STATUS_COLUMNS.map((column) => (
+          <div key={column.key} className={`rounded-lg ${column.color} p-4 min-h-[400px]`}>
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="font-semibold">{column.label}</h3>
+              <Badge variant="secondary">{getAssignmentsByStatus(column.key).length}</Badge>
+            </div>
 
-        <TabsContent value={filter} className="mt-6">
-          {assignments.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <ClipboardList className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-lg font-medium">Nenhuma designação encontrada</p>
-                <p className="text-sm text-muted-foreground">
-                  {filter === "all"
-                    ? "Não há designações no momento"
-                    : `Não há designações com status "${filter}"`}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {assignments.map((assignment) => (
-                <Card key={assignment.id}>
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <CardTitle className="text-lg">
-                            {assignment.block?.territory?.name} - {assignment.block?.name}
-                          </CardTitle>
-                          {getStatusBadge(assignment.status)}
-                        </div>
-                        <CardDescription>
-                          {assignment.block?.territory?.campaign?.name}
-                        </CardDescription>
-                      </div>
-                      {getActionButtons(assignment)}
+            <div className="space-y-3">
+              {getAssignmentsByStatus(column.key).map((assignment) => (
+                <Card key={assignment.id} className="shadow-sm">
+                  <CardContent className="p-4">
+                    <div className="mb-3 flex items-start justify-between">
+                      <div
+                        className="h-3 w-3 rounded-full"
+                        style={{ backgroundColor: assignment.block?.territory?.color || "#666" }}
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        {formatDate(assignment.assigned_at)}
+                      </span>
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                      {(isAdmin || isDirigente) && (
-                        <div>
-                          <p className="text-muted-foreground">Publicador</p>
-                          <p className="font-medium">{assignment.user?.name || "N/A"}</p>
-                        </div>
-                      )}
-                      <div>
-                        <p className="text-muted-foreground">Designado em</p>
-                        <p className="font-medium">
-                          {new Date(assignment.assigned_at).toLocaleDateString("pt-BR")}
-                        </p>
-                      </div>
-                      {assignment.completed_at && (
-                        <div>
-                          <p className="text-muted-foreground">Concluído em</p>
-                          <p className="font-medium">
-                            {new Date(assignment.completed_at).toLocaleDateString("pt-BR")}
-                          </p>
-                        </div>
-                      )}
-                      {assignment.returned_at && (
-                        <div>
-                          <p className="text-muted-foreground">Devolvido em</p>
-                          <p className="font-medium">
-                            {new Date(assignment.returned_at).toLocaleDateString("pt-BR")}
-                          </p>
-                        </div>
-                      )}
+
+                    <h4 className="font-medium leading-tight">{assignment.block?.name}</h4>
+                    <p className="text-sm text-muted-foreground">{assignment.block?.territory?.name}</p>
+
+                    <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+                      <User className="h-3 w-3" />
+                      <span className="truncate">{assignment.user?.name}</span>
                     </div>
+
+                    {assignment.return_reason && (
+                      <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                        Motivo: {assignment.return_reason}
+                      </p>
+                    )}
+
                     {assignment.notes && (
-                      <div className="mt-4 rounded-lg bg-muted p-3">
-                        <p className="text-sm text-muted-foreground">Observações:</p>
-                        <p className="text-sm">{assignment.notes}</p>
+                      <p className="mt-2 text-xs text-muted-foreground">Obs: {assignment.notes}</p>
+                    )}
+
+                    {/* Action Buttons */}
+                    {canUserAct(assignment) && (
+                      <div className="mt-3 flex gap-2">
+                        {column.key === "pending" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1 bg-transparent"
+                            onClick={() => openActionDialog(assignment, "start")}
+                          >
+                            <ArrowRight className="mr-1 h-3 w-3" />
+                            Iniciar
+                          </Button>
+                        )}
+                        {column.key === "in_progress" && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              className="flex-1"
+                              onClick={() => openActionDialog(assignment, "complete")}
+                            >
+                              <CheckCircle className="mr-1 h-3 w-3" />
+                              Concluir
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => openActionDialog(assignment, "return")}
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     )}
                   </CardContent>
                 </Card>
               ))}
+
+              {getAssignmentsByStatus(column.key).length === 0 && (
+                <p className="py-8 text-center text-sm text-muted-foreground">Nenhuma designação</p>
+              )}
             </div>
-          )}
-        </TabsContent>
-      </Tabs>
+          </div>
+        ))}
+      </div>
+
+      {/* New Assignment Dialog */}
+      <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nova designação</DialogTitle>
+            <DialogDescription>Atribua um território a um dirigente</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Território</Label>
+              <Select
+                value={newAssignment.block_id}
+                onValueChange={(value) => setNewAssignment((prev) => ({ ...prev, block_id: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um território" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableBlocks.map((block) => (
+                    <SelectItem key={block.id} value={block.id}>
+                      {block.name} - {block.territory?.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {availableBlocks.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Todas as quadras já estão designadas
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Publicador</Label>
+              <Select
+                value={newAssignment.user_id}
+                onValueChange={(value) => setNewAssignment((prev) => ({ ...prev, user_id: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um publicador" />
+                </SelectTrigger>
+                <SelectContent>
+                  {users.map((user) => (
+                    <SelectItem key={user.id} value={user.id}>
+                      {user.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowNewDialog(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleCreateAssignment}
+              disabled={!newAssignment.block_id || !newAssignment.user_id || submitting}
+            >
+              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Criar Designação
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Action Dialog */}
-      <Dialog open={actionDialogOpen} onOpenChange={setActionDialogOpen}>
+      <Dialog open={showActionDialog} onOpenChange={setShowActionDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
               {actionType === "start" && "Iniciar Trabalho"}
-              {actionType === "complete" && "Concluir Trabalho"}
-              {actionType === "return" && "Devolver Território"}
+              {actionType === "complete" && "Concluir Designação"}
+              {actionType === "return" && "Devolver Designação"}
             </DialogTitle>
             <DialogDescription>
-              {actionType === "start" &&
-                "Confirme para iniciar o trabalho neste território."}
-              {actionType === "complete" &&
-                "Confirme para marcar este território como concluído."}
-              {actionType === "return" &&
-                "Informe o motivo da devolução (opcional)."}
+              {actionType === "start" && "Confirma que deseja iniciar o trabalho nesta quadra?"}
+              {actionType === "complete" && "Confirma que a quadra foi totalmente trabalhada?"}
+              {actionType === "return" && "Informe o motivo da devolução (opcional)"}
             </DialogDescription>
           </DialogHeader>
-          {(actionType === "complete" || actionType === "return") && (
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">
-                  Observações {actionType === "return" ? "(motivo da devolução)" : "(opcional)"}
-                </label>
-                <Textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder={
-                    actionType === "return"
-                      ? "Ex: Não consegui cobrir toda a área..."
-                      : "Ex: Trabalho realizado com sucesso..."
-                  }
-                />
-              </div>
+
+          {actionType === "return" && (
+            <div className="py-4">
+              <Label>Motivo da Devolução</Label>
+              <Textarea
+                value={returnReason}
+                onChange={(e) => setReturnReason(e.target.value)}
+                placeholder="Ex: Área perigosa, muitos prédios fechados..."
+                className="mt-2"
+              />
             </div>
           )}
+
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setActionDialogOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setShowActionDialog(false)}>
               Cancelar
             </Button>
-            <Button onClick={handleAction} disabled={submitting}>
-              {submitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                "Confirmar"
-              )}
+            <Button
+              onClick={handleStatusChange}
+              disabled={submitting}
+              variant={actionType === "return" ? "destructive" : "default"}
+            >
+              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Confirmar
             </Button>
           </DialogFooter>
         </DialogContent>

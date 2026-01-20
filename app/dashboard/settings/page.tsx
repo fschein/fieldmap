@@ -14,7 +14,7 @@ import { Loader2, Settings, User, Lock, CheckCircle } from "lucide-react"
 
 export default function SettingsPage() {
   const { profile, isAdmin } = useAuth()
-  const [fullName, setFullName] = useState(profile?.full_name || "")
+  const [fullName, setFullName] = useState(profile?.name || "")
   const [phone, setPhone] = useState(profile?.phone || "")
   const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
@@ -35,7 +35,7 @@ export default function SettingsPage() {
     const { error } = await supabase
       .from("profiles")
       .update({
-        full_name: fullName,
+        name: fullName,
         phone: phone || null,
       })
       .eq("id", profile?.id)
