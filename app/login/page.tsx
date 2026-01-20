@@ -19,15 +19,9 @@ export default function LoginPage() {
   const { signIn, user, loading, isReady } = useAuth()
   const router = useRouter()
 
-  // Debug: log auth state
-  useEffect(() => {
-    console.log("Auth State:", { user, loading, isReady })
-  }, [user, loading, isReady])
-
   // Redirect if already authenticated
   useEffect(() => {
     if (isReady && user) {
-      console.log("User authenticated, redirecting to dashboard")
       router.replace("/dashboard")
     }
   }, [user, isReady, router])
@@ -41,22 +35,16 @@ export default function LoginPage() {
     setIsSubmitting(true)
 
     try {
-      console.log("Attempting sign in...")
       const { error: signInError } = await signIn(email, password)
 
       if (signInError) {
-        console.error("Sign in error:", signInError)
         setError(signInError.message === "Invalid login credentials" 
           ? "E-mail ou senha incorretos" 
           : signInError.message)
         setIsSubmitting(false)
-      } else {
-        console.log("Sign in successful")
-        // Don't manually redirect - let the useEffect handle it
-        // The auth state will update and trigger the redirect
       }
-    } catch (err) {
-      console.error("Login exception:", err)
+      // If successful, the auth state will update and trigger the redirect
+    } catch {
       setError("Erro ao fazer login. Tente novamente.")
       setIsSubmitting(false)
     }

@@ -3,9 +3,8 @@ export type UserRole = "admin" | "dirigente" | "publicador"
 export interface Profile {
   id: string
   email: string
-  full_name: string | null
+  name: string | null
   role: UserRole
-  phone: string | null
   created_at: string
   updated_at: string
 }

@@ -1,7 +1,9 @@
 "use client"
 
+import { useRouter } from "next/navigation"
+
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/use-auth"
 import { Button } from "@/components/ui/button"
@@ -67,7 +69,6 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname()
-  const router = useRouter()
   const { profile, signOut } = useAuth()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [isSigningOut, setIsSigningOut] = useState(false)
@@ -84,11 +85,12 @@ export function Sidebar() {
     
     try {
       await signOut()
-      router.replace("/login")
+      // Force full page reload to clear all session data
+      window.location.href = "/login"
     } catch {
       setIsSigningOut(false)
     }
-  }, [signOut, router, isSigningOut])
+  }, [signOut, isSigningOut])
 
   const closeMobileMenu = useCallback(() => {
     setMobileOpen(false)
@@ -162,9 +164,9 @@ export function Sidebar() {
           {/* User section */}
           <div className="border-t p-4">
             <div className="mb-3 px-3">
-              <p className="text-sm font-medium text-foreground truncate">
-                {profile?.full_name || "Usuário"}
-              </p>
+              <Link href="/dashboard/profile" className="text-sm font-medium text-foreground truncate hover:underline">
+                {profile?.name || "Usuário"}
+              </Link>
               <p className="text-xs text-muted-foreground capitalize">
                 {profile?.role === "admin" ? "Administrador" : 
                  profile?.role === "dirigente" ? "Dirigente" : 

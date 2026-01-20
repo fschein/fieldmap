@@ -1,52 +1,121 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
+import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import type { Profile } from "@/lib/types"
-
-// Mock user data for MVP development
-const MOCK_USER = {
-  id: "mock-user-id",
-  email: "admin@example.com",
-}
-
-const MOCK_PROFILE: Profile = {
-  id: "mock-user-id",
-  email: "admin@example.com",
-  full_name: "Administrador Mock",
-  phone: null, // Add phone field
-  role: "admin", // Change to "dirigente" or "publicador" to test different roles
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-}
-
+import type { User } from "@supabase/supabase-js"
 
 export function useAuth() {
-  const [user] = useState(MOCK_USER)
-  const [profile] = useState<Profile>(MOCK_PROFILE)
-  const [loading] = useState(false)
-  const [isReady] = useState(true)
+  const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [isReady, setIsReady] = useState(false)
+  const mountedRef = useRef(true)
+  const supabase = getSupabaseBrowserClient()
+
+  const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
+    if (!mountedRef.current) return null
+    
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single()
+
+      if (error || !data) return null
+      return data as Profile
+    } catch {
+      return null
+    }
+  }, [supabase])
 
   useEffect(() => {
-    console.log("useAuth - Mock mode active")
-    console.log("useAuth - Mock user:", MOCK_USER)
-    console.log("useAuth - Mock profile:", MOCK_PROFILE)
-  }, [])
+    mountedRef.current = true
 
-  // Mock functions - don't do anything for now
-  const signIn = async (email: string, password: string) => {
-    console.log("useAuth - Mock signIn called (disabled)")
-    return { data: null, error: null }
-  }
+    const initAuth = async () => {
+      try {
+        const { data: { user: currentUser }, error } = await supabase.auth.getUser()
+        
+        if (!mountedRef.current) return
 
-  const signUp = async (email: string, password: string, fullName: string) => {
-    console.log("useAuth - Mock signUp called (disabled)")
-    return { data: null, error: null }
-  }
+        if (error || !currentUser) {
+          setUser(null)
+          setProfile(null)
+          setLoading(false)
+          setIsReady(true)
+          return
+        }
 
-  const signOut = async () => {
-    console.log("useAuth - Mock signOut called (disabled)")
-    return { error: null }
-  }
+        setUser(currentUser)
+        const userProfile = await fetchProfile(currentUser.id)
+        
+        if (!mountedRef.current) return
+        
+        setProfile(userProfile)
+        setLoading(false)
+        setIsReady(true)
+      } catch {
+        if (!mountedRef.current) return
+        setUser(null)
+        setProfile(null)
+        setLoading(false)
+        setIsReady(true)
+      }
+    }
+
+    initAuth()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!mountedRef.current) return
+
+        if (event === "SIGNED_OUT" || !session?.user) {
+          setUser(null)
+          setProfile(null)
+          return
+        }
+
+        if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+          setUser(session.user)
+          const userProfile = await fetchProfile(session.user.id)
+          if (mountedRef.current) {
+            setProfile(userProfile)
+          }
+        }
+      }
+    )
+
+    return () => {
+      mountedRef.current = false
+      subscription.unsubscribe()
+    }
+  }, [supabase, fetchProfile])
+
+  const signIn = useCallback(async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+    return { data, error }
+  }, [supabase])
+
+  const signUp = useCallback(async (email: string, password: string, name: string) => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || window.location.origin,
+        data: { name }
+      }
+    })
+    return { data, error }
+  }, [supabase])
+
+  const signOut = useCallback(async () => {
+    const { error } = await supabase.auth.signOut()
+    return { error }
+  }, [supabase])
 
   const isAdmin = profile?.role === "admin"
   const isDirigente = profile?.role === "dirigente" || isAdmin
@@ -65,25 +134,3 @@ export function useAuth() {
     isPublicador,
   }
 }
-
-/*
- * INSTRUÇÕES PARA REATIVAR O LOGIN:
- * 
- * 1. Substitua todo este arquivo pelo código original do useAuth
- * 2. Corrija os tipos do onAuthStateChange:
- *    
- *    supabase.auth.onAuthStateChange(
- *      async (event: string, session: any) => {
- *        // seu código aqui
- *      }
- *    )
- * 
- * 3. Ou importe os tipos corretos:
- *    import type { AuthChangeEvent, Session } from "@supabase/supabase-js"
- *    
- *    supabase.auth.onAuthStateChange(
- *      async (event: AuthChangeEvent, session: Session | null) => {
- *        // seu código aqui
- *      }
- *    )
- */
