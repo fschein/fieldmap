@@ -1,9 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
+import { NextResponse, type NextRequest } from 'next/server' // NextRequest vem daqui
 
-export async function updateSession(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
+export async function middleware(request: NextRequest) {
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
   })
 
   const supabase = createServerClient(
@@ -15,21 +17,46 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
-          supabaseResponse = NextResponse.next({
-            request,
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          response = NextResponse.next({
+            request: {
+              headers: request.headers,
+            },
           })
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
+            response.cookies.set(name, value, options)
           )
         },
       },
     }
   )
 
-  // Isso vai atualizar a sessão se o token estiver expirando
-  // Essencial para o F5 não deslogar o usuário
-  await supabase.auth.getUser()
+  // Recupera o usuário de forma segura
+  const { data: { user } } = await supabase.auth.getUser()
 
-  return supabaseResponse
+  const isDashboardPage = request.nextUrl.pathname.startsWith('/dashboard')
+  const isLoginPage = request.nextUrl.pathname.startsWith('/login')
+
+  // Redirecionamentos lógicos
+  if (!user && isDashboardPage) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  if (user && isLoginPage) {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+
+  return response
+}
+
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
 }

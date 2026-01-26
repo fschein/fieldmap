@@ -70,7 +70,7 @@ export interface TerritoryWithSubdivisions extends Territory {
 export interface Assignment {
   id: string
   territory_id: string
-  subdivision_id: string | null // Renomeado de subdivision_id
+  subdivision_id: string | null // Renomeado de block_id
   user_id: string
   campaign_id: string | null
   status: AssignmentStatus

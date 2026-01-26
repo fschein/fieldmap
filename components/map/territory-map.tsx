@@ -13,10 +13,11 @@ interface TerritoryMapProps {
   center?: [number, number]
   zoom?: number
   editable?: boolean
+  focusedSubdivisionId?: string | null
   onSubdivisionCreate?: (coordinates: [number, number][][]) => void
   onSubdivisionUpdate?: (subdivisionId: string, coordinates: [number, number][][]) => void
   onSubdivisionDelete?: (subdivisionId: string) => void
-  onSubdivisionSelect?: (subdivisions: Subdivision) => void
+  onSubdivisionSelect?: (subdivision: Subdivision) => void
 }
 
 const STATUS_COLORS = {
@@ -35,6 +36,7 @@ export function TerritoryMap({
   center,
   zoom,
   editable = false,
+  focusedSubdivisionId,
   onSubdivisionCreate,
   onSubdivisionUpdate,
   onSubdivisionDelete,
@@ -47,6 +49,7 @@ export function TerritoryMap({
   const [selectedSubdivisionId, setSelectedSubdivisionId] = useState<string | null>(null)
   const [mapCenter, setMapCenter] = useState<[number, number]>(DEFAULT_CENTER)
   const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM)
+  const [initialFitDone, setInitialFitDone] = useState(false)
 
   // Calcula o centro do mapa baseado nas subdivisões existentes
   const calculateMapCenter = useCallback(() => {
@@ -59,13 +62,13 @@ export function TerritoryMap({
       const allCoords = subdivisionsWithCoords.flatMap(
         (s) => s.coordinates![0]
       )
-      
+
       const lats = allCoords.map((c) => c[0])
       const lngs = allCoords.map((c) => c[1])
-      
+
       const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2
       const centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2
-      
+
       setMapCenter([centerLat, centerLng])
       setMapZoom(15)
       return
@@ -108,7 +111,7 @@ export function TerritoryMap({
       zoomControl: true,
       attributionControl: true,
     }).setView(mapCenter, mapZoom)
-    
+
     mapInstanceRef.current = map
 
     // Add tile layer
@@ -158,29 +161,29 @@ export function TerritoryMap({
       })
       map.addControl(drawControl)
 
-// Handle draw created
+      // Handle draw created
+      // Handle draw created
       // SOLUÇÃO: Removemos a tipagem explícita do 'e' na entrada ou usamos 'any',
       // e fazemos o cast 'as L.DrawEvents.Created' dentro da função.
-      // Handle draw created
       map.on(L.Draw.Event.CREATED, (e) => {
-        // Truque do 'as any' seguido do tipo correto para acalmar o TypeScript
-        const event = e as any as L.DrawEvents.Created
+        const event = e as L.DrawEvents.Created
         const layer = event.layer as L.Polygon
-        
+
+        // Proteção para garantir que é um polígono e tem LatLngs
         const latlngs = layer.getLatLngs()
         if (!latlngs || latlngs.length === 0) return
 
-        // Garante que pegamos o array correto de coordenadas
-        const rawCoordinates = Array.isArray(latlngs[0]) 
-          ? (latlngs[0] as L.LatLng[]) 
+        // O Leaflet pode retornar LatLng[] ou LatLng[][], dependendo da forma.
+        // Assumindo polígono simples (primeiro array):
+        const rawCoordinates = Array.isArray(latlngs[0])
+          ? (latlngs[0] as L.LatLng[])
           : (latlngs as L.LatLng[])
 
         const coordinates = rawCoordinates.map((latlng) => [
           latlng.lat,
           latlng.lng,
         ] as [number, number])
-        
-        // Apenas envia as coordenadas para a página pai
+
         if (onSubdivisionCreate) {
           onSubdivisionCreate([coordinates])
         }
@@ -190,16 +193,16 @@ export function TerritoryMap({
       map.on(L.Draw.Event.DELETED, (e) => {
         const event = e as L.DrawEvents.Deleted
         const layers = event.layers
-        
+
         layers.eachLayer((layer: L.Layer) => {
           // Aqui precisamos forçar 'any' ou estender o tipo, pois subdivisionId não existe nativamente no Layer
           const subdivisionId = (layer as any).subdivisionId
-          
+
           if (subdivisionId && onSubdivisionDelete) {
             onSubdivisionDelete(subdivisionId)
             // Verifique se subdivisionLayersRef.current existe antes de chamar delete
             if (subdivisionLayersRef.current) {
-                subdivisionLayersRef.current.delete(subdivisionId)
+              subdivisionLayersRef.current.delete(subdivisionId)
             }
           }
         })
@@ -209,31 +212,30 @@ export function TerritoryMap({
       map.on(L.Draw.Event.EDITED, (e) => {
         const event = e as L.DrawEvents.Edited
         const layers = event.layers
-        
+
         layers.eachLayer((layer: L.Layer) => {
           const polygon = layer as L.Polygon
           // Novamente, acessando propriedade customizada via cast
           const subdivisionId = (polygon as any).subdivisionId
-          
+
           if (subdivisionId && onSubdivisionUpdate) {
             const latlngs = polygon.getLatLngs()
-            
+
             // Mesma lógica de extração segura de coordenadas do Create
-            const rawCoordinates = Array.isArray(latlngs[0]) 
-              ? (latlngs[0] as L.LatLng[]) 
+            const rawCoordinates = Array.isArray(latlngs[0])
+              ? (latlngs[0] as L.LatLng[])
               : (latlngs as L.LatLng[])
 
             const coordinates = rawCoordinates.map((latlng) => [
               latlng.lat,
               latlng.lng,
             ] as [number, number])
-            
+
             onSubdivisionUpdate(subdivisionId, [coordinates])
           }
         })
-      }
-    )
-  }
+      })
+    }
 
     return map
   }, [mapCenter, mapZoom, editable, territory.color, onSubdivisionCreate, onSubdivisionDelete, onSubdivisionUpdate])
@@ -241,7 +243,7 @@ export function TerritoryMap({
   // Initialize map
   useEffect(() => {
     const map = initializeMap()
-    
+
     return () => {
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove()
@@ -262,49 +264,65 @@ export function TerritoryMap({
     subdivisionLayersRef.current.clear()
 
     // Add subdivisions to map
-    subdivisions.forEach((subdivisions) => {
-      if (!subdivisions.coordinates || subdivisions.coordinates.length === 0) return
+    subdivisions.forEach((subdivision) => {
+      if (!subdivision.coordinates || subdivision.coordinates.length === 0) return
 
-      const coordinates = subdivisions.coordinates[0].map(
+      const coordinates = subdivision.coordinates[0].map(
         (coord) => [coord[0], coord[1]] as L.LatLngExpression
       )
 
-      const color = STATUS_COLORS[subdivisions.status] || territory.color
+      const color = STATUS_COLORS[subdivision.status] || territory.color
       const polygon = L.polygon(coordinates, {
-        color: selectedSubdivisionId === subdivisions.id ? "#000" : color,
+        color: selectedSubdivisionId === subdivision.id ? "#000" : color,
         fillColor: color,
         fillOpacity: 0.3,
-        weight: selectedSubdivisionId === subdivisions.id ? 3 : 2,
+        weight: selectedSubdivisionId === subdivision.id ? 3 : 2,
       }) as L.Polygon & { subdivisionId?: string }
 
-      polygon.subdivisionId = subdivisions.id
+      polygon.subdivisionId = subdivision.id
 
       // Add tooltip
-      polygon.bindTooltip(subdivisions.name, {
+      polygon.bindTooltip(subdivision.name, {
         permanent: false,
         direction: "center",
       })
 
       // Handle click
       polygon.on("click", () => {
-        setSelectedSubdivisionId(subdivisions.id)
+        setSelectedSubdivisionId(subdivision.id)
         if (onSubdivisionSelect) {
-          onSubdivisionSelect(subdivisions)
+          onSubdivisionSelect(subdivision)
         }
       })
 
       drawnItems.addLayer(polygon)
-      subdivisionLayersRef.current.set(subdivisions.id, polygon)
+      subdivisionLayersRef.current.set(subdivision.id, polygon)
     })
 
-    // Fit bounds if there are subdivisions
-    if (subdivisions.length > 0 && subdivisions.some((s) => s.coordinates)) {
+    // AUTO-FIT: Fit bounds if there are subdivisions (APENAS UMA VEZ no início)
+    if (subdivisions.length > 0 && subdivisions.some((s) => s.coordinates) && !initialFitDone) {
       const bounds = drawnItems.getBounds()
       if (bounds.isValid()) {
-        map.fitBounds(bounds, { padding: [50, 50] })
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 17 })
+        setInitialFitDone(true)
       }
     }
-  }, [subdivisions, territory.color, selectedSubdivisionId, onSubdivisionSelect])
+  }, [subdivisions, territory.color, selectedSubdivisionId, onSubdivisionSelect, initialFitDone])
+
+  // FOCUS: Voa para uma subdivisão específica quando clicada na sidebar
+  useEffect(() => {
+    if (!mapInstanceRef.current || !focusedSubdivisionId) return
+
+    const layer = subdivisionLayersRef.current.get(focusedSubdivisionId)
+    if (layer && layer instanceof L.Polygon) {
+      const bounds = layer.getBounds()
+      mapInstanceRef.current.flyToBounds(bounds, {
+        padding: [100, 100],
+        duration: 0.8,
+        maxZoom: 18
+      })
+    }
+  }, [focusedSubdivisionId])
 
   return (
     <div className="relative h-full w-full">
@@ -322,3 +340,4 @@ export function TerritoryMap({
     </div>
   )
 }
+
