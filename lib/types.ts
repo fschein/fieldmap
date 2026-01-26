@@ -1,15 +1,13 @@
-// lib/types.ts - Correções específicas para relatórios
-
 export type UserRole = "admin" | "dirigente" | "publicador"
 export type TerritoryType = "residencial" | "comercial"
-export type AssignmentStatus = "active" | "completed" | "returned" | "pending" | "in_progress"
+export type AssignmentStatus = "active" | "completed" | "returned"
+export type SubdivisionStatus = "available" | "assigned" | "completed"
 
 export interface Profile {
   id: string
   name: string
   email: string
   role: UserRole
-  phone: string | null
   created_at: string
   updated_at: string
 }
@@ -34,13 +32,16 @@ export interface Group {
   updated_at: string
 }
 
-export interface Block {
+// Nova interface para Subdivision (antiga Block/Quadra)
+export interface Subdivision {
   id: string
   territory_id: string
+  name: string
+  status: SubdivisionStatus
+  coordinates: [number, number][][] | null // Array de polígonos
   geometry: GeoJSON.Polygon | null
   order_index: number
   completed: boolean
-  name?: string
   notes?: string
   created_at: string
   updated_at: string
@@ -51,28 +52,25 @@ export interface Territory {
   number: string
   name: string
   type: TerritoryType
+  color: string
   description: string | null
   group_id: string | null
   assigned_to: string | null
+  campaign_id: string | null
   geometry: GeoJSON.Polygon | null
   created_at: string
   updated_at: string
 }
 
-// Tipo retornado pela VIEW territories_with_assignment
-export interface TerritoryWithAssignment extends Territory {
-  assigned_to_name: string | null
-  assigned_to_email: string | null
-  assigned_at: string | null
-  campaign_id: string | null
-  campaign_name: string | null
-  blocks?: Block[]
+export interface TerritoryWithSubdivisions extends Territory {
+  subdivisions?: Subdivision[]
+  campaign?: Campaign
 }
 
 export interface Assignment {
   id: string
   territory_id: string
-  block_id: string | null
+  subdivision_id: string | null // Renomeado de subdivision_id
   user_id: string
   campaign_id: string | null
   status: AssignmentStatus
@@ -83,29 +81,4 @@ export interface Assignment {
   notes: string | null
   created_at: string
   updated_at: string
-}
-
-// Stats específicos para relatórios
-export interface TerritoryReportStats {
-  territory_id: string
-  territory_number: string
-  territory_name: string
-  assigned_to_name: string | null
-  assigned_at: string | null
-  total_blocks: number
-  completed_blocks: number
-  completion_percentage: number
-  days_retained: number | null
-  is_overdue: boolean // true se > 90 dias
-}
-
-export interface ReportStats {
-  totalAssignments: number
-  completedAssignments: number
-  returnedAssignments: number
-  inProgressAssignments: number
-  averageCompletionDays: number
-  totalBlocks: number
-  completedBlocks: number
-  territoryStats: TerritoryReportStats[]
 }

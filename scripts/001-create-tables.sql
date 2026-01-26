@@ -27,8 +27,8 @@ CREATE TABLE territories (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Create blocks table (quadras)
-CREATE TABLE blocks (
+-- Create subdivisions table (quadras)
+CREATE TABLE subdivisions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   territory_id UUID NOT NULL REFERENCES territories(id) ON DELETE CASCADE,
   geometry JSONB NOT NULL,
@@ -52,7 +52,7 @@ CREATE TABLE assignments (
 );
 
 -- Create indexes for better query performance
-CREATE INDEX idx_blocks_territory_id ON blocks(territory_id);
+CREATE INDEX idx_subdivisions_territory_id ON subdivisions(territory_id);
 CREATE INDEX idx_assignments_territory_id ON assignments(territory_id);
 CREATE INDEX idx_assignments_user_id ON assignments(user_id);
 CREATE INDEX idx_assignments_campaign_id ON assignments(campaign_id);
@@ -62,7 +62,7 @@ CREATE INDEX idx_assignments_delivered_at ON assignments(delivered_at);
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE campaigns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE territories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE blocks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE subdivisions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assignments ENABLE ROW LEVEL SECURITY;
 
 -- Profiles policies
@@ -122,26 +122,26 @@ CREATE POLICY "Admins can delete territories" ON territories
   );
 
 -- Blocks policies
-CREATE POLICY "Anyone can view blocks" ON blocks
+CREATE POLICY "Anyone can view subdivisions" ON subdivisions
   FOR SELECT USING (true);
 
-CREATE POLICY "Admins can insert blocks" ON blocks
+CREATE POLICY "Admins can insert subdivisions" ON subdivisions
   FOR INSERT WITH CHECK (
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
   );
 
-CREATE POLICY "Users can update blocks of their assigned territories" ON blocks
+CREATE POLICY "Users can update subdivisions of their assigned territories" ON subdivisions
   FOR UPDATE USING (
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
     OR EXISTS (
       SELECT 1 FROM assignments 
-      WHERE assignments.territory_id = blocks.territory_id 
+      WHERE assignments.territory_id = subdivisions.territory_id 
       AND assignments.user_id = auth.uid()
       AND assignments.delivered_at IS NULL
     )
   );
 
-CREATE POLICY "Admins can delete blocks" ON blocks
+CREATE POLICY "Admins can delete subdivisions" ON subdivisions
   FOR DELETE USING (
     EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
   );
@@ -211,8 +211,8 @@ CREATE TRIGGER update_territories_updated_at
   BEFORE UPDATE ON territories
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TRIGGER update_blocks_updated_at
-  BEFORE UPDATE ON blocks
+CREATE TRIGGER update_subdivisions_updated_at
+  BEFORE UPDATE ON subdivisions
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_assignments_updated_at

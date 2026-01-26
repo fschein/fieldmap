@@ -1,9 +1,7 @@
 "use client"
 
-import React from "react"
-
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
+import React, { useEffect, useState } from "react"
+import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
 import { Sidebar } from "@/components/dashboard/sidebar"
 import { Loader2 } from "lucide-react"
@@ -15,15 +13,24 @@ export default function DashboardLayout({
 }) {
   const { loading, user, isReady } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
+  const [shouldRender, setShouldRender] = useState(false)
 
-  // Redirect to login if not authenticated
   useEffect(() => {
-    if (isReady && !user) {
+    // Aguarda até que a autenticação esteja pronta
+    if (!isReady) return
+
+    // Se não há usuário e já está pronto, redireciona
+    if (!user) {
       router.replace("/login")
+      return
     }
+
+    // Se há usuário, pode renderizar
+    setShouldRender(true)
   }, [isReady, user, router])
 
-  // Show loading while checking auth state
+  // Estado de carregamento inicial
   if (!isReady || loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/30">
@@ -35,8 +42,8 @@ export default function DashboardLayout({
     )
   }
 
-  // Don't render dashboard if not authenticated (redirect in progress)
-  if (!user) {
+  // Não renderiza até confirmar que tem usuário
+  if (!shouldRender || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-muted/30">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

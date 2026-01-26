@@ -5,18 +5,18 @@ import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import "leaflet-draw/dist/leaflet.draw.css"
 import "leaflet-draw"
-import type { Block, Territory } from "@/lib/types"
+import type { Subdivision, Territory } from "@/lib/types"
 
 interface TerritoryMapProps {
   territory: Territory
-  blocks: Block[]
+  subdivisions: Subdivision[]
   center?: [number, number]
   zoom?: number
   editable?: boolean
-  onBlockCreate?: (coordinates: [number, number][][]) => void
-  onBlockUpdate?: (blockId: string, coordinates: [number, number][][]) => void
-  onBlockDelete?: (blockId: string) => void
-  onBlockSelect?: (block: Block) => void
+  onSubdivisionCreate?: (coordinates: [number, number][][]) => void
+  onSubdivisionUpdate?: (subdivisionId: string, coordinates: [number, number][][]) => void
+  onSubdivisionDelete?: (subdivisionId: string) => void
+  onSubdivisionSelect?: (subdivisions: Subdivision) => void
 }
 
 const STATUS_COLORS = {
@@ -25,33 +25,96 @@ const STATUS_COLORS = {
   completed: "#6b7280",
 }
 
+// Coordenadas padrão: Gravataí/RS
+const DEFAULT_CENTER: [number, number] = [-29.9447, -50.9919]
+const DEFAULT_ZOOM = 15
+
 export function TerritoryMap({
   territory,
-  blocks,
-  center = [-23.5505, -46.6333], // São Paulo default
-  zoom = 15,
+  subdivisions,
+  center,
+  zoom,
   editable = false,
-  onBlockCreate,
-  onBlockUpdate,
-  onBlockDelete,
-  onBlockSelect,
+  onSubdivisionCreate,
+  onSubdivisionUpdate,
+  onSubdivisionDelete,
+  onSubdivisionSelect,
 }: TerritoryMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
   const drawnItemsRef = useRef<L.FeatureGroup | null>(null)
-  const blockLayersRef = useRef<Map<string, L.Layer>>(new Map())
-  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null)
+  const subdivisionLayersRef = useRef<Map<string, L.Layer>>(new Map())
+  const [selectedSubdivisionId, setSelectedSubdivisionId] = useState<string | null>(null)
+  const [mapCenter, setMapCenter] = useState<[number, number]>(DEFAULT_CENTER)
+  const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM)
+
+  // Calcula o centro do mapa baseado nas subdivisões existentes
+  const calculateMapCenter = useCallback(() => {
+    // 1. Se houver subdivisões com coordenadas, usar bounding box
+    const subdivisionsWithCoords = subdivisions.filter(
+      (s) => s.coordinates && s.coordinates.length > 0
+    )
+
+    if (subdivisionsWithCoords.length > 0) {
+      const allCoords = subdivisionsWithCoords.flatMap(
+        (s) => s.coordinates![0]
+      )
+      
+      const lats = allCoords.map((c) => c[0])
+      const lngs = allCoords.map((c) => c[1])
+      
+      const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2
+      const centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2
+      
+      setMapCenter([centerLat, centerLng])
+      setMapZoom(15)
+      return
+    }
+
+    // 2. Se não houver subdivisões, tentar geolocalização
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setMapCenter([position.coords.latitude, position.coords.longitude])
+          setMapZoom(15)
+        },
+        () => {
+          // 3. Se falhar, usar coordenadas padrão de Gravataí/RS
+          setMapCenter(DEFAULT_CENTER)
+          setMapZoom(13)
+        }
+      )
+    } else {
+      // 3. Sem geolocalização disponível, usar padrão
+      setMapCenter(DEFAULT_CENTER)
+      setMapZoom(13)
+    }
+  }, [subdivisions])
+
+  useEffect(() => {
+    if (!center) {
+      calculateMapCenter()
+    } else {
+      setMapCenter(center)
+      setMapZoom(zoom || DEFAULT_ZOOM)
+    }
+  }, [center, zoom, calculateMapCenter])
 
   const initializeMap = useCallback(() => {
     if (!mapRef.current || mapInstanceRef.current) return
 
     // Initialize map
-    const map = L.map(mapRef.current).setView(center, zoom)
+    const map = L.map(mapRef.current, {
+      zoomControl: true,
+      attributionControl: true,
+    }).setView(mapCenter, mapZoom)
+    
     mapInstanceRef.current = map
 
     // Add tile layer
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19,
     }).addTo(map)
 
     // Initialize feature group for drawn items
@@ -95,50 +158,85 @@ export function TerritoryMap({
       })
       map.addControl(drawControl)
 
+// Handle draw created
+      // SOLUÇÃO: Removemos a tipagem explícita do 'e' na entrada ou usamos 'any',
+      // e fazemos o cast 'as L.DrawEvents.Created' dentro da função.
       // Handle draw created
-      map.on(L.Draw.Event.CREATED, (e: L.DrawEvents.Created) => {
-        const layer = e.layer as L.Polygon
-        const coordinates = (layer.getLatLngs()[0] as L.LatLng[]).map((latlng) => [
+      map.on(L.Draw.Event.CREATED, (e) => {
+        // Truque do 'as any' seguido do tipo correto para acalmar o TypeScript
+        const event = e as any as L.DrawEvents.Created
+        const layer = event.layer as L.Polygon
+        
+        const latlngs = layer.getLatLngs()
+        if (!latlngs || latlngs.length === 0) return
+
+        // Garante que pegamos o array correto de coordenadas
+        const rawCoordinates = Array.isArray(latlngs[0]) 
+          ? (latlngs[0] as L.LatLng[]) 
+          : (latlngs as L.LatLng[])
+
+        const coordinates = rawCoordinates.map((latlng) => [
           latlng.lat,
           latlng.lng,
         ] as [number, number])
         
-        if (onBlockCreate) {
-          onBlockCreate([coordinates])
+        // Apenas envia as coordenadas para a página pai
+        if (onSubdivisionCreate) {
+          onSubdivisionCreate([coordinates])
         }
       })
 
       // Handle delete
-      map.on(L.Draw.Event.DELETED, (e: L.DrawEvents.Deleted) => {
-        const layers = e.layers
+      map.on(L.Draw.Event.DELETED, (e) => {
+        const event = e as L.DrawEvents.Deleted
+        const layers = event.layers
+        
         layers.eachLayer((layer: L.Layer) => {
-          const blockId = (layer as L.Polygon & { blockId?: string }).blockId
-          if (blockId && onBlockDelete) {
-            onBlockDelete(blockId)
-            blockLayersRef.current.delete(blockId)
+          // Aqui precisamos forçar 'any' ou estender o tipo, pois subdivisionId não existe nativamente no Layer
+          const subdivisionId = (layer as any).subdivisionId
+          
+          if (subdivisionId && onSubdivisionDelete) {
+            onSubdivisionDelete(subdivisionId)
+            // Verifique se subdivisionLayersRef.current existe antes de chamar delete
+            if (subdivisionLayersRef.current) {
+                subdivisionLayersRef.current.delete(subdivisionId)
+            }
           }
         })
       })
 
       // Handle edit
-      map.on(L.Draw.Event.EDITED, (e: L.DrawEvents.Edited) => {
-        const layers = e.layers
+      map.on(L.Draw.Event.EDITED, (e) => {
+        const event = e as L.DrawEvents.Edited
+        const layers = event.layers
+        
         layers.eachLayer((layer: L.Layer) => {
-          const polygon = layer as L.Polygon & { blockId?: string }
-          const blockId = polygon.blockId
-          if (blockId && onBlockUpdate) {
-            const coordinates = (polygon.getLatLngs()[0] as L.LatLng[]).map((latlng) => [
+          const polygon = layer as L.Polygon
+          // Novamente, acessando propriedade customizada via cast
+          const subdivisionId = (polygon as any).subdivisionId
+          
+          if (subdivisionId && onSubdivisionUpdate) {
+            const latlngs = polygon.getLatLngs()
+            
+            // Mesma lógica de extração segura de coordenadas do Create
+            const rawCoordinates = Array.isArray(latlngs[0]) 
+              ? (latlngs[0] as L.LatLng[]) 
+              : (latlngs as L.LatLng[])
+
+            const coordinates = rawCoordinates.map((latlng) => [
               latlng.lat,
               latlng.lng,
             ] as [number, number])
-            onBlockUpdate(blockId, [coordinates])
+            
+            onSubdivisionUpdate(subdivisionId, [coordinates])
           }
         })
-      })
-    }
+      }
+    )
+  }
 
     return map
-  }, [center, zoom, editable, territory.color, onBlockCreate, onBlockDelete, onBlockUpdate])
+  }, [mapCenter, mapZoom, editable, territory.color, onSubdivisionCreate, onSubdivisionDelete, onSubdivisionUpdate])
 
   // Initialize map
   useEffect(() => {
@@ -152,7 +250,7 @@ export function TerritoryMap({
     }
   }, [initializeMap])
 
-  // Update blocks on map
+  // Update subdivisions on map
   useEffect(() => {
     if (!mapInstanceRef.current || !drawnItemsRef.current) return
 
@@ -161,62 +259,62 @@ export function TerritoryMap({
 
     // Clear existing layers
     drawnItems.clearLayers()
-    blockLayersRef.current.clear()
+    subdivisionLayersRef.current.clear()
 
-    // Add blocks to map
-    blocks.forEach((block) => {
-      if (!block.coordinates || block.coordinates.length === 0) return
+    // Add subdivisions to map
+    subdivisions.forEach((subdivisions) => {
+      if (!subdivisions.coordinates || subdivisions.coordinates.length === 0) return
 
-      const coordinates = block.coordinates[0].map(
+      const coordinates = subdivisions.coordinates[0].map(
         (coord) => [coord[0], coord[1]] as L.LatLngExpression
       )
 
-      const color = STATUS_COLORS[block.status] || territory.color
+      const color = STATUS_COLORS[subdivisions.status] || territory.color
       const polygon = L.polygon(coordinates, {
-        color: selectedBlockId === block.id ? "#000" : color,
+        color: selectedSubdivisionId === subdivisions.id ? "#000" : color,
         fillColor: color,
         fillOpacity: 0.3,
-        weight: selectedBlockId === block.id ? 3 : 2,
-      }) as L.Polygon & { blockId?: string }
+        weight: selectedSubdivisionId === subdivisions.id ? 3 : 2,
+      }) as L.Polygon & { subdivisionId?: string }
 
-      polygon.blockId = block.id
+      polygon.subdivisionId = subdivisions.id
 
       // Add tooltip
-      polygon.bindTooltip(block.name, {
+      polygon.bindTooltip(subdivisions.name, {
         permanent: false,
         direction: "center",
       })
 
       // Handle click
       polygon.on("click", () => {
-        setSelectedBlockId(block.id)
-        if (onBlockSelect) {
-          onBlockSelect(block)
+        setSelectedSubdivisionId(subdivisions.id)
+        if (onSubdivisionSelect) {
+          onSubdivisionSelect(subdivisions)
         }
       })
 
       drawnItems.addLayer(polygon)
-      blockLayersRef.current.set(block.id, polygon)
+      subdivisionLayersRef.current.set(subdivisions.id, polygon)
     })
 
-    // Fit bounds if there are blocks
-    if (blocks.length > 0 && blocks.some((b) => b.coordinates)) {
+    // Fit bounds if there are subdivisions
+    if (subdivisions.length > 0 && subdivisions.some((s) => s.coordinates)) {
       const bounds = drawnItems.getBounds()
       if (bounds.isValid()) {
         map.fitBounds(bounds, { padding: [50, 50] })
       }
     }
-  }, [blocks, territory.color, selectedBlockId, onBlockSelect])
+  }, [subdivisions, territory.color, selectedSubdivisionId, onSubdivisionSelect])
 
   return (
     <div className="relative h-full w-full">
-      <div ref={mapRef} className="h-full w-full rounded-lg" />
+      <div ref={mapRef} className="h-full w-full rounded-lg" style={{ zIndex: 1 }} />
       {editable && (
-        <div className="absolute bottom-4 left-4 z-[1000] rounded-lg bg-card p-3 shadow-lg">
+        <div className="absolute bottom-4 left-4 z-10 rounded-lg bg-card p-3 shadow-lg border">
           <p className="text-sm font-medium">Instruções:</p>
           <ul className="mt-1 text-xs text-muted-foreground space-y-1">
-            <li>Use as ferramentas para desenhar quadras</li>
-            <li>Clique em uma quadra para selecioná-la</li>
+            <li>Use as ferramentas para desenhar subdivisões</li>
+            <li>Clique em uma subdivisão para selecioná-la</li>
             <li>Use o botão de edição para modificar</li>
           </ul>
         </div>

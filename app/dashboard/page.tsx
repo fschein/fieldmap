@@ -7,130 +7,205 @@ import { StatsCard } from "@/components/dashboard/stats-card"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion"
-import { Map, MapPin, Users, CheckCircle, Clock, Loader2, LayoutGrid } from "lucide-react"
+  Map, MapPin, Users, CheckCircle, Clock, Loader2, 
+  TrendingUp, AlertCircle, Activity
+} from "lucide-react"
 
-interface Block {
+interface Assignment {
   id: string
-  name: string
-  completed: boolean
+  status: string
+  assigned_at: string
+  completed_at: string | null
   territory_id: string
+  user_id: string
 }
 
 interface Territory {
   id: string
   name: string
+  number: string
   color: string
-  campaign_id: string
-  blocks: Block[]
-}
-
-interface Campaign {
-  id: string
-  name: string
-  is_active: boolean
+  campaign_id: string | null
 }
 
 interface DashboardStats {
-  total_territories: number
-  total_blocks: number
-  completed_blocks: number
-  active_campaigns: number
+  totalTerritories: number
+  activeTerritories: number
+  completedAssignments: number
+  activeAssignments: number
+  returnedAssignments: number
+  activeCampaigns: number
+  totalPublishers: number
+  averageDaysInField: number
+  overdueAssignments: number
+  completionRate: number
+}
+
+interface TerritoryWithStats extends Territory {
+  assignmentCount: number
+  lastAssignment?: Assignment
+  isActive: boolean
+  daysInField?: number
+}
+
+interface RecentActivity {
+  id: string
+  type: 'assigned' | 'completed' | 'returned'
+  territory: string
+  publisher: string
+  date: string
 }
 
 export default function DashboardPage() {
-  const { profile, isAdmin, isDirigente, loading: authLoading, user } = useAuth()
+  const { profile, user, isReady } = useAuth()
   const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [territories, setTerritories] = useState<Territory[]>([])
-  const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [territories, setTerritories] = useState<TerritoryWithStats[]>([])
+  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [loading, setLoading] = useState(true)
   const supabase = getSupabaseBrowserClient()
 
   useEffect(() => {
-    async function fetchData() {
-      if (authLoading) return
-      if (!user || !profile) {
-        setLoading(false)
-        return
-      }
+    // Só busca dados quando a autenticação estiver pronta e houver usuário
+    if (!isReady || !user || !profile) {
+      setLoading(false)
+      return
+    }
 
+    let mounted = true
+
+    const fetchData = async () => {
       try {
-        // Fetch campaigns
+        setLoading(true)
+
+        // Busca campanhas
         const { data: campaignsData } = await supabase
           .from("campaigns")
-          .select("*")
-          .eq("is_active", true)
-          .order("name")
+          .select("id, name, active")
+          .eq("active", true)
 
-        if (campaignsData) {
-          setCampaigns(campaignsData as Campaign[])
-        }
-
-        // Fetch territories with blocks
+        // Busca territórios
         const { data: territoriesData } = await supabase
           .from("territories")
+          .select("id, name, number, color, campaign_id")
+          .order("number", { ascending: true })
+
+        // Busca assignments
+        const { data: assignmentsData } = await supabase
+          .from("assignments")
           .select(`
-            id,
-            name,
-            color,
-            campaign_id,
-            blocks(id, name, completed, territory_id)
+            id, status, assigned_at, completed_at, returned_at,
+            territory_id, user_id,
+            territories ( name, number ),
+            profiles!assignments_user_id_fkey ( name )
           `)
-          .order("name")
+          .order("assigned_at", { ascending: false })
+          .limit(100)
 
-        if (territoriesData) {
-          setTerritories(territoriesData as unknown as Territory[])
+        // Busca publicadores
+        const { data: publishersData } = await supabase
+          .from("profiles")
+          .select("id, name")
+          .eq("role", "publicador")
 
-          // Calculate stats from real data
-          const totalTerritories = territoriesData.length
-          let totalBlocks = 0
-          let completedBlocks = 0
-
-          territoriesData.forEach((t: { blocks: never[] }) => {
-            const blocks = t.blocks || []
-            totalBlocks += blocks.length
-            completedBlocks += blocks.filter((b: { completed: boolean }) => b.completed === true).length
-          })
-
-          setStats({
-            total_territories: totalTerritories,
-            total_blocks: totalBlocks,
-            completed_blocks: completedBlocks,
-            active_campaigns: campaignsData?.length || 0,
-          })
+        if (!mounted || !territoriesData || !assignmentsData) {
+          return
         }
+
+        // Calcula estatísticas
+        const activeAssignments = assignmentsData.filter((a: { status: string }) => a.status === 'active')
+        const completedAssignments = assignmentsData.filter((a: { status: string }) => a.status === 'completed')
+
+        // Calcula dias médios em campo
+        const completedWithDays = completedAssignments
+          .filter((a: { completed_at: any }) => a.completed_at)
+          .map((a: { assigned_at: string | number | Date; completed_at: string | number | Date }) => {
+            const start = new Date(a.assigned_at)
+            const end = new Date(a.completed_at!)
+            return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+          })
+        
+        const avgDays = completedWithDays.length > 0
+          ? Math.round(completedWithDays.reduce((a: any, b: any) => a + b, 0) / completedWithDays.length)
+          : 0
+
+        // Calcula atrasados (>90 dias)
+        const overdueCount = activeAssignments.filter((a: { assigned_at: string | number | Date }) => {
+          const days = Math.ceil((new Date().getTime() - new Date(a.assigned_at).getTime()) / (1000 * 60 * 60 * 24))
+          return days > 90
+        }).length
+
+        // Taxa de conclusão
+        const totalAssignments = assignmentsData.length
+        const completionRate = totalAssignments > 0
+          ? Math.round((completedAssignments.length / totalAssignments) * 100)
+          : 0
+
+        // Mapeia territórios com suas estatísticas
+        const territoriesWithStats: TerritoryWithStats[] = territoriesData.map((t: { id: any }) => {
+          const territoryAssignments = assignmentsData.filter((a: { territory_id: any }) => a.territory_id === t.id)
+          const activeAssignment = territoryAssignments.find((a: { status: string }) => a.status === 'active')
+          const daysInField = activeAssignment 
+            ? Math.ceil((new Date().getTime() - new Date(activeAssignment.assigned_at).getTime()) / (1000 * 60 * 60 * 24))
+            : undefined
+
+          return {
+            ...t,
+            assignmentCount: territoryAssignments.filter((a: { status: string }) => a.status === 'completed').length,
+            lastAssignment: territoryAssignments[0],
+            isActive: !!activeAssignment,
+            daysInField
+          }
+        })
+
+        // Atividades recentes (últimas 5)
+        const activities: RecentActivity[] = assignmentsData.slice(0, 5).map((a: { id: any; status: string; territories: any; profiles: any; completed_at: any; returned_at: any; assigned_at: any }) => ({
+          id: a.id,
+          type: a.status === 'completed' ? 'completed' : a.status === 'returned' ? 'returned' : 'assigned',
+          territory: (a.territories as any)?.name || 'Território',
+          publisher: (a.profiles as any)?.name || 'Publicador',
+          date: a.completed_at || a.returned_at || a.assigned_at
+        }))
+
+        if (mounted) {
+          setStats({
+            totalTerritories: territoriesData.length,
+            activeTerritories: activeAssignments.length,
+            completedAssignments: completedAssignments.length,
+            activeAssignments: activeAssignments.length,
+            returnedAssignments: assignmentsData.filter((a: { status: string }) => a.status === 'returned').length,
+            activeCampaigns: campaignsData?.length || 0,
+            totalPublishers: publishersData?.length || 0,
+            averageDaysInField: avgDays,
+            overdueAssignments: overdueCount,
+            completionRate
+          })
+
+          setTerritories(territoriesWithStats)
+          setRecentActivity(activities)
+        }
+
       } catch (error) {
         console.error("Dashboard - Error fetching data:", error)
       } finally {
-        setLoading(false)
+        if (mounted) {
+          setLoading(false)
+        }
       }
     }
 
     fetchData()
-  }, [profile, supabase, authLoading, user])
 
-  // Group territories by campaign
-  function getTerritoriesByCampaign(campaignId: string) {
-    return territories.filter((t) => t.campaign_id === campaignId)
-  }
+    return () => {
+      mounted = false
+    }
+  }, [isReady, user, profile, supabase])
 
-  function getBlockStats(blocks: Block[]) {
-    const total = blocks.length
-    const completed = blocks.filter((b) => b.completed).length
-    const percentage = total > 0 ? Math.round((completed / total) * 100) : 0
-    return { total, completed, percentage }
-  }
-
-  if (authLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center space-y-4">
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
-          <p className="text-muted-foreground">Carregando...</p>
+          <p className="text-muted-foreground">Carregando dashboard...</p>
         </div>
       </div>
     )
@@ -151,178 +226,263 @@ export default function DashboardPage() {
     )
   }
 
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground">Carregando dados...</p>
-        </div>
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <p className="text-muted-foreground">Bem-vindo, {profile?.name || "Usuário"}!</p>
       </div>
 
-      {/* Stats Grid */}
+      {/* Stats Grid Principal */}
       {stats && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatsCard title="Campanhas Ativas" value={stats.active_campaigns} icon={Users} />
-          <StatsCard title="Territórios" value={stats.total_territories} icon={Map} />
-          <StatsCard
-            title="Total de Quadras"
-            value={stats.total_blocks}
-            icon={LayoutGrid}
+          <StatsCard 
+            title="Territórios Ativos" 
+            value={stats.activeTerritories}
+            description={`de ${stats.totalTerritories} territórios`}
+            icon={Map}
           />
-          <StatsCard
-            title="Quadras Trabalhadas"
-            value={stats.completed_blocks}
-            description={
-              stats.total_blocks > 0
-                ? `${Math.round((stats.completed_blocks / stats.total_blocks) * 100)}% concluído`
-                : "0%"
-            }
+          <StatsCard 
+            title="Concluídos" 
+            value={stats.completedAssignments}
+            description={`Taxa: ${stats.completionRate}%`}
             icon={CheckCircle}
+          />
+          <StatsCard 
+            title="Média em Campo"
+            value={`${stats.averageDaysInField}d`}
+            description="dias por território"
+            icon={Clock}
+          />
+          <StatsCard 
+            title="Publicadores"
+            value={stats.totalPublishers}
+            description={`${stats.activeCampaigns} campanha${stats.activeCampaigns !== 1 ? 's' : ''} ativa${stats.activeCampaigns !== 1 ? 's' : ''}`}
+            icon={Users}
           />
         </div>
       )}
 
-      {/* Territories Accordion */}
+      {/* Stats Secundários */}
+      {stats && (
+        <div className="grid gap-4 sm:grid-cols-3">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Activity className="h-4 w-4 text-blue-600" />
+                Em Campo Agora
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.activeAssignments}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                designações ativas
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-green-600" />
+                Taxa de Conclusão
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.completionRate}%</div>
+              <div className="mt-2 h-2 bg-slate-200 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-green-600 transition-all duration-500"
+                  style={{ width: `${stats.completionRate}%` }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-orange-600" />
+                Atrasados
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.overdueAssignments}</div>
+              <p className="text-xs text-muted-foreground mt-1">
+                mais de 90 dias
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {/* Atividades Recentes */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="h-5 w-5" />
+              Atividades Recentes
+            </CardTitle>
+            <CardDescription>
+              Últimas movimentações nos territórios
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {recentActivity.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                Nenhuma atividade recente
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {recentActivity.map((activity) => (
+                  <div 
+                    key={activity.id} 
+                    className="flex items-center gap-3 p-3 rounded-lg border bg-slate-50/50"
+                  >
+                    <div className={`
+                      w-2 h-2 rounded-full flex-shrink-0
+                      ${activity.type === 'completed' ? 'bg-green-500' : 
+                        activity.type === 'returned' ? 'bg-orange-500' : 
+                        'bg-blue-500'}
+                    `} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {activity.territory}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {activity.publisher} • {
+                          activity.type === 'completed' ? 'Concluiu' :
+                          activity.type === 'returned' ? 'Devolveu' :
+                          'Recebeu'
+                        }
+                      </p>
+                    </div>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap">
+                      {new Date(activity.date).toLocaleDateString('pt-BR', { 
+                        day: '2-digit', 
+                        month: 'short' 
+                      })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Top Territórios */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Territórios Mais Trabalhados
+            </CardTitle>
+            <CardDescription>
+              Territórios com mais conclusões
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {territories.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">
+                Nenhum território cadastrado
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {territories
+                  .sort((a, b) => b.assignmentCount - a.assignmentCount)
+                  .slice(0, 5)
+                  .map((territory) => (
+                    <div 
+                      key={territory.id}
+                      className="flex items-center justify-between p-3 rounded-lg border"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div 
+                          className="w-3 h-3 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: territory.color }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {territory.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Nº {territory.number}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {territory.isActive && (
+                          <Badge variant="outline" className="text-[10px] bg-blue-50 border-blue-200">
+                            Ativo
+                          </Badge>
+                        )}
+                        <Badge variant="secondary" className="text-xs">
+                          {territory.assignmentCount}x
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Lista de Territórios Ativos */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Map className="h-5 w-5" />
-            Territórios e Quadras
+            <MapPin className="h-5 w-5" />
+            Territórios em Campo
           </CardTitle>
           <CardDescription>
-            Visualize o progresso de cada território e suas quadras
+            Territórios atualmente designados
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {campaigns.length === 0 ? (
+          {territories.filter(t => t.isActive).length === 0 ? (
             <p className="text-center text-muted-foreground py-8">
-              Nenhuma campanha ativa encontrada
+              Nenhum território em campo no momento
             </p>
           ) : (
-            <Accordion type="multiple" className="w-full">
-              {campaigns.map((campaign) => {
-                const campaignTerritories = getTerritoriesByCampaign(campaign.id)
-                const totalBlocks = campaignTerritories.reduce(
-                  (acc, t) => acc + (t.blocks?.length || 0),
-                  0
-                )
-                const completedBlocks = campaignTerritories.reduce(
-                  (acc, t) => acc + (t.blocks?.filter((b) => b.completed).length || 0),
-                  0
-                )
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {territories
+                .filter(t => t.isActive)
+                .map((territory) => {
+                  const isOverdue = territory.daysInField && territory.daysInField > 90
 
-                return (
-                  <AccordionItem key={campaign.id} value={campaign.id}>
-                    <AccordionTrigger className="hover:no-underline">
-                      <div className="flex items-center justify-between w-full pr-4">
-                        <div className="flex items-center gap-3">
-                          <span className="font-semibold">{campaign.name}</span>
-                          <Badge variant="secondary">
-                            {campaignTerritories.length} territórios
-                          </Badge>
+                  return (
+                    <div
+                      key={territory.id}
+                      className={`
+                        p-3 rounded-lg border
+                        ${isOverdue ? 'border-red-300 bg-red-50/50' : 'bg-slate-50/50'}
+                      `}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full"
+                            style={{ backgroundColor: territory.color }}
+                          />
+                          <div>
+                            <p className="text-sm font-medium">{territory.name}</p>
+                            <p className="text-xs text-muted-foreground">Nº {territory.number}</p>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <span>
-                            {completedBlocks}/{totalBlocks} quadras
-                          </span>
-                          {totalBlocks > 0 && (
-                            <span className="text-xs">
-                              ({Math.round((completedBlocks / totalBlocks) * 100)}%)
-                            </span>
-                          )}
-                        </div>
+                        {isOverdue && (
+                          <AlertCircle className="h-4 w-4 text-red-600" />
+                        )}
                       </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      {campaignTerritories.length === 0 ? (
-                        <p className="text-sm text-muted-foreground py-4 pl-4">
-                          Nenhum território cadastrado nesta campanha
-                        </p>
-                      ) : (
-                        <Accordion type="multiple" className="pl-4">
-                          {campaignTerritories.map((territory) => {
-                            const blockStats = getBlockStats(territory.blocks || [])
-
-                            return (
-                              <AccordionItem key={territory.id} value={territory.id}>
-                                <AccordionTrigger className="hover:no-underline py-3">
-                                  <div className="flex items-center justify-between w-full pr-4">
-                                    <div className="flex items-center gap-3">
-                                      <div
-                                        className="h-3 w-3 rounded-full"
-                                        style={{ backgroundColor: territory.color }}
-                                      />
-                                      <span className="font-medium">{territory.name}</span>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                      <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
-                                        <div
-                                          className="h-full bg-primary transition-all"
-                                          style={{ width: `${blockStats.percentage}%` }}
-                                        />
-                                      </div>
-                                      <span className="text-sm text-muted-foreground min-w-[80px] text-right">
-                                        {blockStats.completed}/{blockStats.total} (
-                                        {blockStats.percentage}%)
-                                      </span>
-                                    </div>
-                                  </div>
-                                </AccordionTrigger>
-                                <AccordionContent>
-                                  {territory.blocks?.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground py-2 pl-6">
-                                      Nenhuma quadra cadastrada
-                                    </p>
-                                  ) : (
-                                    <div className="grid gap-2 pl-6 py-2 sm:grid-cols-2 lg:grid-cols-3">
-                                      {territory.blocks?.map((block) => (
-                                        <div
-                                          key={block.id}
-                                          className={`flex items-center justify-between rounded-lg border p-3 ${
-                                            block.completed
-                                              ? "bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-900"
-                                              : "bg-background"
-                                          }`}
-                                        >
-                                          <div className="flex items-center gap-2">
-                                            <MapPin className="h-4 w-4 text-muted-foreground" />
-                                            <span className="text-sm font-medium">
-                                              {block.name}
-                                            </span>
-                                          </div>
-                                          {block.completed ? (
-                                            <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
-                                          ) : (
-                                            <Clock className="h-4 w-4 text-muted-foreground" />
-                                          )}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </AccordionContent>
-                              </AccordionItem>
-                            )
-                          })}
-                        </Accordion>
-                      )}
-                    </AccordionContent>
-                  </AccordionItem>
-                )
-              })}
-            </Accordion>
+                      <div className="text-xs text-muted-foreground">
+                        {territory.daysInField} dia{territory.daysInField !== 1 ? 's' : ''} em campo
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
           )}
         </CardContent>
       </Card>

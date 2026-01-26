@@ -18,7 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { ArrowLeft, Loader2, Save, MapPin } from "lucide-react"
-import type { TerritoryWithBlocks, Block } from "@/lib/types"
+import type { TerritoryWithSubdivisions, Subdivision } from "@/lib/types"
 
 // Dynamic import for map to avoid SSR issues
 const TerritoryMap = dynamic(
@@ -39,12 +39,12 @@ export default function TerritoryMapPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = use(params)
-  const [territory, setTerritory] = useState<TerritoryWithBlocks | null>(null)
+  const [territory, setTerritory] = useState<TerritoryWithSubdivisions | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [selectedBlock, setSelectedBlock] = useState<Block | null>(null)
+  const [selectedSubdivision, setSelectedSubdivision] = useState<Subdivision | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [newBlockName, setNewBlockName] = useState("")
+  const [newSubdivisionName, setNewSubdivisionName] = useState("")
   const [pendingCoordinates, setPendingCoordinates] = useState<[number, number][][] | null>(null)
   const supabase = getSupabaseBrowserClient()
 
@@ -57,62 +57,95 @@ export default function TerritoryMapPage({
       .from("territories")
       .select(`
         *,
-        blocks(*),
+        subdivisions(*),
         campaign:campaigns(*)
       `)
       .eq("id", id)
       .single()
 
     if (data) {
-      setTerritory(data as TerritoryWithBlocks)
+      setTerritory(data as TerritoryWithSubdivisions)
     }
     setLoading(false)
   }
 
-  const handleBlockCreate = async (coordinates: [number, number][][]) => {
+  const handleSubdivisionCreate = async (coordinates: [number, number][][]) => {
     setPendingCoordinates(coordinates)
-    const blockCount = territory?.blocks?.length || 0
-    setNewBlockName(`Quadra ${blockCount + 1}`)
+    
+    // 1. Pega o número do território (Ex: "05")
+    const tNumber = territory?.number || "??"
+    
+    // 2. Conta quantas já existem para definir a letra
+    // Se tem 0, vira letra A (código 65). Se tem 1, vira B (66).
+    const count = territory?.subdivisions?.length || 0
+    const suffix = String.fromCharCode(65 + count) 
+
+    // 3. Define o nome automático (Ex: "05-A")
+    setNewSubdivisionName(`${tNumber}-${suffix}`)
+    
     setDialogOpen(true)
   }
 
-  const handleSaveNewBlock = async () => {
-    if (!pendingCoordinates || !newBlockName.trim()) return
+  const handleSaveNewSubdivision = async () => {
+    if (!pendingCoordinates || !newSubdivisionName.trim()) return
     setSaving(true)
 
-    await supabase.from("blocks").insert({
+    const { error } = await supabase.from("subdivisions").insert({
       territory_id: id,
-      name: newBlockName,
+      name: newSubdivisionName,
       coordinates: pendingCoordinates,
       status: "available",
     })
 
+    if (error) {
+      // Mude disto:
+      // console.error("Error creating subdivisions:", error)
+      
+      // Para isto:
+      console.error("Erro Supabase:", error.message)
+      console.error("Detalhes:", error.details)
+      console.error("Dica:", error.hint)
+    }
+
     setDialogOpen(false)
     setPendingCoordinates(null)
-    setNewBlockName("")
+    setNewSubdivisionName("")
     setSaving(false)
     fetchTerritory()
   }
 
-  const handleBlockUpdate = async (blockId: string, coordinates: [number, number][][]) => {
+  const handleSubdivisionUpdate = async (subdivisionId: string, coordinates: [number, number][][]) => {
     setSaving(true)
-    await supabase
-      .from("blocks")
+    const { error } = await supabase
+      .from("subdivisions")
       .update({ coordinates })
-      .eq("id", blockId)
+      .eq("id", subdivisionId)
+    
+    if (error) {
+      console.error("Error updating subdivisions:", error)
+    }
+    
     setSaving(false)
     fetchTerritory()
   }
 
-  const handleBlockDelete = async (blockId: string) => {
+  const handleSubdivisionDelete = async (subdivisionId: string) => {
     setSaving(true)
-    await supabase.from("blocks").delete().eq("id", blockId)
+    const { error } = await supabase
+      .from("subdivisions")
+      .delete()
+      .eq("id", subdivisionId)
+    
+    if (error) {
+      console.error("Error deleting subdivisions:", error)
+    }
+    
     setSaving(false)
     fetchTerritory()
   }
 
-  const handleBlockSelect = (block: Block) => {
-    setSelectedBlock(block)
+  const handleSubdivisionSelect = (subdivisions: Subdivision) => {
+    setSelectedSubdivision(subdivisions)
   }
 
   const getStatusBadge = (status: string) => {
@@ -166,7 +199,7 @@ export default function TerritoryMapPage({
               <h1 className="text-2xl font-bold">{territory.name}</h1>
             </div>
             <p className="text-sm text-muted-foreground">
-              Editor de Mapa | {territory.blocks?.length || 0} quadras
+              Editor de Mapa | {territory.subdivisions?.length || 0} subdivisões
             </p>
           </div>
         </div>
@@ -180,54 +213,54 @@ export default function TerritoryMapPage({
 
       {/* Main content */}
       <div className="flex flex-1 gap-4 overflow-hidden">
-        {/* Map */}
-        <div className="flex-1 rounded-lg border overflow-hidden">
+        {/* Map - Z-index baixo */}
+        <div className="flex-1 rounded-lg border overflow-hidden relative" style={{ zIndex: 1 }}>
           <TerritoryMap
             territory={territory}
-            blocks={territory.blocks || []}
+            subdivisions={territory.subdivisions || []}
             editable
-            onBlockCreate={handleBlockCreate}
-            onBlockUpdate={handleBlockUpdate}
-            onBlockDelete={handleBlockDelete}
-            onBlockSelect={handleBlockSelect}
+            onSubdivisionCreate={handleSubdivisionCreate}
+            onSubdivisionUpdate={handleSubdivisionUpdate}
+            onSubdivisionDelete={handleSubdivisionDelete}
+            onSubdivisionSelect={handleSubdivisionSelect}
           />
         </div>
 
         {/* Sidebar */}
-        <Card className="w-80 overflow-hidden flex flex-col">
+        <Card className="w-80 overflow-hidden flex flex-col" style={{ zIndex: 10 }}>
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Quadras</CardTitle>
+            <CardTitle className="text-lg">Subdivisões</CardTitle>
             <CardDescription>
-              {territory.blocks?.length || 0} quadras no território
+              {territory.subdivisions?.length || 0} subdivisões no território
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 overflow-y-auto">
-            {territory.blocks?.length === 0 ? (
+            {territory.subdivisions?.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <MapPin className="h-8 w-8 text-muted-foreground mb-2" />
                 <p className="text-sm text-muted-foreground">
-                  Desenhe quadras no mapa usando as ferramentas
+                  Desenhe subdivisões no mapa usando as ferramentas
                 </p>
               </div>
             ) : (
               <div className="space-y-2">
-                {territory.blocks?.map((block) => (
+                {territory.subdivisions?.map((subdivisions) => (
                   <div
-                    key={block.id}
+                    key={subdivisions.id}
                     className={`rounded-lg border p-3 cursor-pointer transition-colors ${
-                      selectedBlock?.id === block.id
+                      selectedSubdivision?.id === subdivisions.id
                         ? "border-primary bg-primary/5"
                         : "hover:bg-muted"
                     }`}
-                    onClick={() => handleBlockSelect(block)}
+                    onClick={() => handleSubdivisionSelect(subdivisions)}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-medium text-sm">{block.name}</span>
-                      {getStatusBadge(block.status)}
+                      <span className="font-medium text-sm">{subdivisions.name}</span>
+                      {getStatusBadge(subdivisions.status)}
                     </div>
-                    {block.notes && (
+                    {subdivisions.notes && (
                       <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
-                        {block.notes}
+                        {subdivisions.notes}
                       </p>
                     )}
                   </div>
@@ -238,23 +271,23 @@ export default function TerritoryMapPage({
         </Card>
       </div>
 
-      {/* New Block Dialog */}
+      {/* New Subdivision Dialog - Z-index alto */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="z-[9999]">
           <DialogHeader>
-            <DialogTitle>Nova Quadra</DialogTitle>
+            <DialogTitle>Nova Subdivisão</DialogTitle>
             <DialogDescription>
-              Dê um nome para a quadra que você desenhou
+              Dê um nome para a subdivisão que você desenhou
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="blockName">Nome da quadra</Label>
+              <Label htmlFor="subdivisionName">Nome da subdivisão</Label>
               <Input
-                id="blockName"
-                value={newBlockName}
-                onChange={(e) => setNewBlockName(e.target.value)}
-                placeholder="Ex: Quadra 1, Rua Principal"
+                id="subdivisionName"
+                value={newSubdivisionName}
+                onChange={(e) => setNewSubdivisionName(e.target.value)}
+                placeholder="Ex: Subdivisão 1, Setor A, Rua Principal"
                 autoFocus
               />
             </div>
@@ -269,7 +302,7 @@ export default function TerritoryMapPage({
             >
               Cancelar
             </Button>
-            <Button onClick={handleSaveNewBlock} disabled={saving || !newBlockName.trim()}>
+            <Button onClick={handleSaveNewSubdivision} disabled={saving || !newSubdivisionName.trim()}>
               {saving ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (

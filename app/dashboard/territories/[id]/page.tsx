@@ -33,7 +33,26 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import type { TerritoryWithDetails, Block, Profile } from "@/lib/types"
+import type { Subdivision, Profile } from "@/lib/types"
+
+interface Block {
+  notes: string
+  name: string
+  id: string
+  territory_id: string
+  geometry: unknown
+  order_index: number
+  completed: boolean
+}
+
+interface TerritoryWithDetails {
+  id: string
+  number: string
+  name: string
+  group?: { id: string; name: string; color: string }
+  subdivisions?: Block[]
+  assigned_to_user?: Profile
+}
 
 export default function TerritoryDetailPage({
   params,
@@ -66,16 +85,16 @@ export default function TerritoryDetailPage({
   async function fetchData() {
     try {
       console.log("Fetching territory with id:", id)
-      
+
       const [territoryRes, usersRes] = await Promise.all([
         supabase
           .from("territories")
           .select(`
-            *,
-            blocks(*),
-            group:groups(id, name, color),
-            assigned_to_user:profiles!territories_assigned_to_fkey(id, name, email)
-          `)
+      *,
+      subdivisions(*),
+      group:groups(id, name, color),
+      assigned_to_user:profiles!territories_assigned_to_fkey(id, name, email)
+    `)
           .eq("id", id)
           .single(),
         supabase
@@ -106,27 +125,27 @@ export default function TerritoryDetailPage({
     }
   }
 
-  const handleOpenDialog = (block?: Block) => {
-    if (block) {
-      setEditingBlock(block)
+  const handleOpenDialog = (subdivisions?: Block) => {
+    if (subdivisions) {
+      setEditingBlock(subdivisions)
       setFormData({
-        name: block.name || "",
-        notes: block.notes || "",
+        name: subdivisions.name || "",
+        notes: subdivisions.notes || "",
       })
     } else {
       setEditingBlock(null)
-      const blockCount = territory?.blocks?.length || 0
+      const subdivisionCount = territory?.subdivisions?.length || 0
       const territoryNumber = territory?.number || "X"
       setFormData({
-        name: `${territoryNumber}-${String.fromCharCode(65 + blockCount)}`, // 01-A, 01-B, etc
+        name: `${territoryNumber}-${String.fromCharCode(65 + subdivisionCount)}`, // 01-A, 01-B, etc
         notes: "",
       })
     }
     setDialogOpen(true)
   }
 
-  const handleOpenAssignDialog = (block: Block) => {
-    setSelectedBlock(block)
+  const handleOpenAssignDialog = (subdivisions: Block) => {
+    setSelectedBlock(subdivisions)
     setAssignData({ user_id: "", due_date: "" })
     setAssignDialogOpen(true)
   }
@@ -139,7 +158,7 @@ export default function TerritoryDetailPage({
       const payload = {
         territory_id: id,
         geometry: null, // Will be set via map editor
-        order_index: territory?.blocks?.length || 0,
+        order_index: territory?.subdivisions?.length || 0,
         completed: false,
       }
 
@@ -150,14 +169,14 @@ export default function TerritoryDetailPage({
         console.warn("Block schema doesn't support name/notes. Update schema first.")
         
         const { error } = await supabase
-          .from("blocks")
+          .from("subdivisions")
           .update(payload)
           .eq("id", editingBlock.id)
         
         if (error) throw error
       } else {
         const { error } = await supabase
-          .from("blocks")
+          .from("subdivisions")
           .insert([payload])
         
         if (error) throw error
@@ -166,7 +185,7 @@ export default function TerritoryDetailPage({
       setDialogOpen(false)
       fetchData()
     } catch (error: any) {
-      console.error("Error saving block:", error)
+      console.error("Error saving subdivisions:", error)
       alert("Erro ao salvar quadra: " + error.message)
     } finally {
       setSubmitting(false)
@@ -184,7 +203,7 @@ export default function TerritoryDetailPage({
       // Create assignment
       const { error: assignError } = await supabase.from("assignments").insert({
         territory_id: id, // Keep for tracking
-        block_id: selectedBlock.id,
+        subdivision_id: selectedBlock.id,
         user_id: assignData.user_id,
         status: "active",
         assigned_at: new Date().toISOString(),
@@ -195,18 +214,18 @@ export default function TerritoryDetailPage({
       setAssignDialogOpen(false)
       fetchData()
     } catch (error: any) {
-      console.error("Error assigning block:", error)
+      console.error("Error assigning subdivisions:", error)
       alert("Erro ao designar quadra: " + error.message)
     } finally {
       setSubmitting(false)
     }
   }
 
-  const handleDelete = async (blockId: string) => {
+  const handleDelete = async (subdivisionId: string) => {
     if (!confirm("Tem certeza que deseja excluir esta quadra?")) return
 
     try {
-      const { error } = await supabase.from("blocks").delete().eq("id", blockId)
+      const { error } = await supabase.from("subdivisions").delete().eq("id", subdivisionId)
       if (error) throw error
       fetchData()
     } catch (error: any) {
@@ -264,7 +283,7 @@ export default function TerritoryDetailPage({
             <h1 className="text-3xl font-bold">{territory.name}</h1>
           </div>
           <p className="text-muted-foreground mt-1">
-            {territory.group?.name || "Sem grupo"} | {territory.blocks?.length || 0} quadras
+            {territory.group?.name || "Sem grupo"} | {territory.subdivisions?.length || 0} quadras
             {territory.assigned_to_user && (
               <> | Designado para: {territory.assigned_to_user.name}</>
             )}
@@ -387,7 +406,7 @@ export default function TerritoryDetailPage({
         </DialogContent>
       </Dialog>
 
-      {!territory.blocks || territory.blocks.length === 0 ? (
+      {!territory.subdivisions || territory.subdivisions.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Map className="h-12 w-12 text-muted-foreground mb-4" />
@@ -405,8 +424,8 @@ export default function TerritoryDetailPage({
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {territory.blocks.map((block, index) => (
-            <Card key={block.id}>
+          {territory.subdivisions.map((subdivisions, index) => (
+            <Card key={subdivisions.id}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div>
@@ -414,7 +433,7 @@ export default function TerritoryDetailPage({
                       Quadra {territory.number}-{String.fromCharCode(65 + index)}
                     </CardTitle>
                     <CardDescription className="text-xs">
-                      Ordem: {block.order_index + 1}
+                      Ordem: {subdivisions.order_index + 1}
                     </CardDescription>
                   </div>
                   <DropdownMenu>
@@ -424,19 +443,19 @@ export default function TerritoryDetailPage({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      {!block.completed && (
-                        <DropdownMenuItem onClick={() => handleOpenAssignDialog(block)}>
+                      {!subdivisions.completed && (
+                        <DropdownMenuItem onClick={() => handleOpenAssignDialog(subdivisions)}>
                           <UserPlus className="mr-2 h-4 w-4" />
                           Designar
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem onClick={() => handleOpenDialog(block)}>
+                      <DropdownMenuItem onClick={() => handleOpenDialog(subdivisions)}>
                         <Pencil className="mr-2 h-4 w-4" />
                         Editar
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         className="text-destructive"
-                        onClick={() => handleDelete(block.id)}
+                        onClick={() => handleDelete(subdivisions.id)}
                       >
                         <Trash2 className="mr-2 h-4 w-4" />
                         Excluir
@@ -446,7 +465,7 @@ export default function TerritoryDetailPage({
                 </div>
               </CardHeader>
               <CardContent>
-                {getStatusBadge(block.completed)}
+                {getStatusBadge(subdivisions.completed)}
               </CardContent>
             </Card>
           ))}
