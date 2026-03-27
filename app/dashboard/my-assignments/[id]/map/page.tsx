@@ -84,63 +84,27 @@ export default function TerritoryMapPage() {
   const [showCompleteDialog, setShowCompleteDialog] = useState(false)
 
   const handleConfirmCompletion = async (reason?: string) => {
-    if (!territory) return
+    if (!territory || !user?.id) return
 
-    const completedSubdivisions = territory.subdivisions?.filter(
+    const isFullyCompleted = (territory.subdivisions?.filter(
       s => s.completed || s.status === 'completed'
-    ).length || 0
-    const totalSubdivisions = territory.subdivisions?.length || 0
-    const isFullyCompleted = completedSubdivisions === totalSubdivisions
-    const finalStatus = isFullyCompleted ? "completed" : "returned"
+    ).length || 0) === (territory.subdivisions?.length || 0)
 
     try {
-      const { error: territoryError } = await supabase
-        .from("territories")
-        .update({
-          status: finalStatus,
-          last_completed_at: isFullyCompleted ? new Date().toISOString() : territory.last_completed_at,
-        })
-        .eq("id", territory.id)
-
-      if (territoryError) throw territoryError
-
-      const { error: assignmentError } = await supabase
-        .from("assignments")
-        .update({
-          status: finalStatus,
-          completed_at: isFullyCompleted ? new Date().toISOString() : null,
-          returned_at: !isFullyCompleted ? new Date().toISOString() : null,
-          notes: reason ? (territory.notes ? `${territory.notes}\n\nMotivo da devolução: ${reason}` : `Motivo da devolução: ${reason}`) : territory.notes
-        })
-        .eq("territory_id", territory.id)
-        .eq("user_id", user?.id)
-        .eq("status", "active")
-
-      if (assignmentError) throw assignmentError
-
-      // Insert notification for returned/completed territory
-      const userName = (user as any)?.user_metadata?.name || user?.email || "Um publicador"
-      await supabase.from("notifications").insert({
-        type: "returned",
-        title: isFullyCompleted ? "Território Concluído" : "Território Devolvido",
-        message: `${userName} ${isFullyCompleted ? 'concluiu' : 'devolveu'} o Território ${territory.number}.`,
-        created_by: user?.id,
-        territory_id: territory.id,
+      const res = await fetch("/api/assignments/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          territoryId: territory.id,
+          userId: user.id,
+          action: isFullyCompleted ? "complete" : "return",
+          reason: reason || null,
+        }),
       })
 
-      // Check if the user now has no remaining active territories -> idle notification
-      const { count } = await supabase
-        .from("territories")
-        .select("id", { count: "exact", head: true })
-        .eq("assigned_to", user?.id)
-
-      if ((count ?? 1) === 0) {
-        await supabase.from("notifications").insert({
-          type: "idle",
-          title: "Publicador sem Território",
-          message: `${userName} ficou sem territórios após devolver o Território ${territory.number}.`,
-          created_by: user?.id,
-        })
+      if (!res.ok) {
+        const { error } = await res.json()
+        throw new Error(error || "Erro ao processar devolução")
       }
 
       router.push("/dashboard/my-assignments")

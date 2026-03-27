@@ -31,6 +31,8 @@ interface Assignment {
   user_id: string
   territory_id: string
   profiles: { name: string } | null
+  notes: string | null
+  return_reason: string | null
 }
 
 interface TerritoryDetails {
@@ -101,6 +103,7 @@ export function AssignmentHistorySheet({
         .from("assignments")
         .select(`
           id, status, assigned_at, completed_at, returned_at, user_id, territory_id,
+          notes, return_reason,
           profiles!assignments_user_id_fkey(name)
         `)
         .eq("territory_id", territoryId)
@@ -399,28 +402,36 @@ export function AssignmentHistorySheet({
                             </div>
                           </div>
 
-                          {/* Datas — modo visualização */}
                           {!isEditing ? (
-                            <div className="grid grid-cols-2 gap-2 text-xs">
-                              <div className="space-y-0.5 bg-white p-1.5 rounded border border-slate-100">
-                                <span className="text-[10px] text-slate-400 uppercase font-semibold">Início</span>
-                                <div className="flex items-center gap-1 text-slate-700 font-mono">
-                                  <Calendar className="w-3 h-3 text-slate-400" /> {formatDate(assignment.assigned_at)}
+                            <div className="space-y-2">
+                              <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div className="space-y-0.5 bg-white p-1.5 rounded border border-slate-100">
+                                  <span className="text-[10px] text-slate-400 uppercase font-semibold">Início</span>
+                                  <div className="flex items-center gap-1 text-slate-700 font-mono">
+                                    <Calendar className="w-3 h-3 text-slate-400" /> {formatDate(assignment.assigned_at)}
+                                  </div>
+                                </div>
+                                <div className="space-y-0.5 bg-white p-1.5 rounded border border-slate-100">
+                                  <span className="text-[10px] text-slate-400 uppercase font-semibold">Fim</span>
+                                  <div className="flex items-center gap-1 text-slate-700 font-mono">
+                                    {isActive ? (
+                                      <span className="text-primary italic">— ativo —</span>
+                                    ) : (
+                                      <>
+                                        <Calendar className="w-3 h-3 text-slate-400" />
+                                        {formatDate(assignment.completed_at || assignment.returned_at)}
+                                      </>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
-                              <div className="space-y-0.5 bg-white p-1.5 rounded border border-slate-100">
-                                <span className="text-[10px] text-slate-400 uppercase font-semibold">Fim</span>
-                                <div className="flex items-center gap-1 text-slate-700 font-mono">
-                                  {isActive ? (
-                                    <span className="text-primary italic">— ativo —</span>
-                                  ) : (
-                                    <>
-                                      <Calendar className="w-3 h-3 text-slate-400" />
-                                      {formatDate(assignment.completed_at || assignment.returned_at)}
-                                    </>
-                                  )}
+                              
+                              {(assignment.notes || assignment.return_reason) && (
+                                <div className="bg-amber-50/50 border border-amber-100 p-2 rounded text-[11px] text-amber-900 italic">
+                                  <span className="font-semibold not-italic text-[10px] text-amber-700 block mb-0.5 uppercase">Motivo:</span>
+                                  "{assignment.notes || assignment.return_reason}"
                                 </div>
-                              </div>
+                              )}
                             </div>
                           ) : (
                             /* Datas — modo edição */
