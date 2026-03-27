@@ -47,7 +47,8 @@ export default function TerritoryMapPage() {
         .select(`
           *,
           campaign:campaigns(*),
-          subdivisions(*)
+          subdivisions(*),
+          assignments(*)
         `)
         .eq("id", territoryId)
         .eq("assigned_to", user.id)
@@ -176,7 +177,8 @@ export default function TerritoryMapPage() {
   const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-4rem)] p-2 sm:p-4 bg-slate-50 gap-2">
+    <div className="-mx-6 -mt-20 md:-mt-6 flex flex-col bg-slate-50" style={{ height: '100dvh' }}>
+      <div className="flex flex-col flex-1 min-h-0 p-2 sm:p-4 gap-2 pt-[4.5rem] md:pt-2">
       {/* Header Compacto */}
       <div className="flex items-center justify-between bg-white px-3 py-2 rounded-lg shadow-sm border border-slate-200">
         <div className="flex items-center gap-2">
@@ -238,8 +240,10 @@ export default function TerritoryMapPage() {
         open={showCompleteDialog}
         onOpenChange={setShowCompleteDialog}
         territory={territory}
+        activeAssignmentDate={(territory as any).assignments?.find((a: any) => a.status === 'active')?.assigned_at}
         onConfirm={handleConfirmCompletion}
       />
+      </div>
     </div>
   )
 }

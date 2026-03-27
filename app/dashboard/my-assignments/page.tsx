@@ -40,7 +40,6 @@ export default function MyAssignmentsPage() {
           assignments(*)
         `)
         .eq("assigned_to", user.id)
-        .eq("status", "assigned")
         .order("number", { ascending: true })
 
       if (territoriesError) {

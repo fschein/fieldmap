@@ -97,73 +97,12 @@ export default function SettingsPage() {
     setPasswordLoading(false)
   }
 
-  if (!isAdmin) {
-    return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Meu Perfil</h1>
-          <p className="text-muted-foreground">Gerencie suas informações</p>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Meu Perfil
-            </CardTitle>
-            <CardDescription>Atualize suas informações pessoais</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleUpdateProfile} className="space-y-4">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-              {profileSuccess && (
-                <Alert>
-                  <CheckCircle className="h-4 w-4" />
-                  <AlertDescription>Perfil atualizado com sucesso!</AlertDescription>
-                </Alert>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Nome completo</Label>
-                <Input
-                  id="fullName"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Seu nome completo"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone">Telefone</Label>
-                <Input
-                  id="phone"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="(00) 00000-0000"
-                />
-              </div>
-              <Button type="submit" disabled={profileLoading}>
-                {profileLoading ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                Salvar
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">Configurações</h1>
+        <h1 className="text-3xl font-bold">{isAdmin ? "Configurações" : "Meu Perfil"}</h1>
         <p className="text-muted-foreground">
-          Gerencie seu perfil e configurações do sistema
+          {isAdmin ? "Gerencie seu perfil e configurações do sistema" : "Gerencie suas informações e senha"}
         </p>
       </div>
 

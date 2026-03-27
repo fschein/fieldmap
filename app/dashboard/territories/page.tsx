@@ -47,6 +47,7 @@ interface TerritoryWithDetails {
   name: string
   type: string
   color: string
+  status?: string
   description?: string
   assigned_to: string | null
   last_completed_at: string | null
@@ -196,6 +197,7 @@ export default function TerritoriesPage() {
   const [editName, setEditName] = useState("")
   const [editNumber, setEditNumber] = useState("")
   const [editColor, setEditColor] = useState("")
+  const [editInactive, setEditInactive] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
 
   const loadData = useCallback(async () => {
@@ -321,16 +323,24 @@ export default function TerritoriesPage() {
     setEditName(territory.name)
     setEditNumber(territory.number)
     setEditColor(territory.color || "#C65D3B")
+    setEditInactive(territory.status === 'inactive')
     setEditDialogOpen(true)
   }
 
   const handleSaveEdit = async () => {
     if (!editingTerritory) return
     setEditSaving(true)
+    const newStatus = editInactive ? 'inactive' : (editingTerritory.status === 'inactive' ? 'available' : editingTerritory.status)
     try {
       const { error } = await supabase
         .from("territories")
-        .update({ name: editName, number: editNumber, color: editColor })
+        .update({
+          name: editName,
+          number: editNumber,
+          color: editColor,
+          status: newStatus,
+          assigned_to: editInactive ? null : editingTerritory.assigned_to,
+        })
         .eq("id", editingTerritory.id)
       if (error) throw error
       setEditDialogOpen(false)
@@ -352,9 +362,11 @@ export default function TerritoriesPage() {
   }
 
   // Divisão para as Abas
-  const availableTerritories = results.filter(p => !p.territory.assigned_to)
-  const assignedTerritories = results.filter(p => !!p.territory.assigned_to)
-  const overdueTerritories = results.filter(p => p.priority === 'critical' || p.priority === 'high')
+  const inactiveTerritories = results.filter(p => p.territory.status === 'inactive')
+  const activeResults = results.filter(p => p.territory.status !== 'inactive')
+  const availableTerritories = activeResults.filter(p => !p.territory.assigned_to)
+  const assignedTerritories = activeResults.filter(p => !!p.territory.assigned_to)
+  const overdueTerritories = activeResults.filter(p => p.priority === 'critical' || p.priority === 'high')
 
   // Componente interno para reuso de Card
   const TerritoryCard = ({ p }: { p: PriorityScore }) => {
@@ -584,8 +596,17 @@ export default function TerritoriesPage() {
                 className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground hover:bg-slate-200/60 data-[state=active]:shadow-sm rounded-md px-4 py-2 text-sm font-medium transition-all"
               >
                 Todos
-                <Badge variant="secondary" className="ml-2 bg-black/5 hover:bg-black/10 text-inherit border-none shadow-none">{results.length}</Badge>
+                <Badge variant="secondary" className="ml-2 bg-black/5 hover:bg-black/10 text-inherit border-none shadow-none">{activeResults.length}</Badge>
               </TabsTrigger>
+              {inactiveTerritories.length > 0 && (
+                <TabsTrigger 
+                  value="inactive" 
+                  className="data-[state=active]:bg-slate-700 data-[state=active]:text-white hover:bg-slate-200/60 data-[state=active]:shadow-sm rounded-md px-4 py-2 text-sm font-medium transition-all"
+                >
+                  Inativos
+                  <Badge className="ml-2 bg-slate-400/20 text-slate-500 shadow-none border-none">{inactiveTerritories.length}</Badge>
+                </TabsTrigger>
+              )}
             </TabsList>
           </div>
         </div>
@@ -593,8 +614,16 @@ export default function TerritoriesPage() {
         {/* Content Áreas */}
         <TabsContent value="all" className="mt-0 outline-none">
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {results.map((p) => <TerritoryCard key={p.territory.id} p={p} />)}
-            {results.length === 0 && <p className="text-slate-500 py-10 col-span-full text-center">Nenhum território encontrado.</p>}
+            {activeResults.map((p) => <TerritoryCard key={p.territory.id} p={p} />)}
+            {activeResults.length === 0 && <p className="text-slate-500 py-10 col-span-full text-center">Nenhum território encontrado.</p>}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="inactive" className="mt-0 outline-none">
+          <p className="text-sm text-slate-500 mb-4">Territórios inativos não aparecem nas designações e são ocultados do fluxo normal.</p>
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {inactiveTerritories.map((p) => <TerritoryCard key={p.territory.id} p={p} />)}
+            {inactiveTerritories.length === 0 && <p className="text-slate-500 py-10 col-span-full text-center">Nenhum território inativo.</p>}
           </div>
         </TabsContent>
 
@@ -755,14 +784,14 @@ export default function TerritoriesPage() {
       </Dialog>
       {/* Edit Territory Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="sm:max-w-xs">
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Editar Território</DialogTitle>
             <DialogDescription>
-              Altere nome, número ou cor do território.
+              Altere os dados do território.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 py-2">
+          <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label htmlFor="edit-number">Número</Label>
               <Input
@@ -793,6 +822,27 @@ export default function TerritoriesPage() {
                 />
                 <span className="text-sm text-slate-600 font-mono">{editColor}</span>
               </div>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-slate-800">Inativar território</p>
+                <p className="text-xs text-slate-500">Oculta das designações e do fluxo normal</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={editInactive}
+                onClick={() => setEditInactive(!editInactive)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${
+                  editInactive ? 'bg-slate-500' : 'bg-slate-200'
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow transform transition-transform duration-200 ${
+                    editInactive ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
             </div>
           </div>
           <DialogFooter>

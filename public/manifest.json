@@ -1,11 +1,11 @@
 {
-  "name": "Territórios",
-  "short_name": "Territórios",
-  "description": "Sistema para gerenciamento de territórios de pregação",
+  "name": "FieldMap",
+  "short_name": "FieldMap",
+  "description": "Gestão inteligente de territórios",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#1d4ed8",
+  "background_color": "#C65D3B",
+  "theme_color": "#C65D3B",
   "orientation": "portrait-primary",
   "icons": [
     {

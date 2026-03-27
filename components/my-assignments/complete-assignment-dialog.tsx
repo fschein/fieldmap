@@ -81,16 +81,22 @@ export function CompleteAssignmentDialog({
 
             {!allCompleted ? (
               <div className="space-y-3">
-                <div className={`rounded-lg p-3 italic text-[13px] border ${daysRemaining < 0 ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
-                  <p>
-                    Atenção: Você está devolvendo o território sem completar todas as quadras.
-                  </p>
-                  {!!activeAssignmentDate && (
-                    <p className="mt-1 font-semibold">
-                      {daysRemaining < 0 
-                        ? `A devolução está atrasada em ${Math.abs(daysRemaining)} ${Math.abs(daysRemaining) === 1 ? 'dia' : 'dias'}.` 
-                        : typeof daysRemaining === 'number' && `Você ainda tinha ${daysRemaining} ${daysRemaining === 1 ? 'dia' : 'dias'} do prazo de 90 dias.`}
-                    </p>
+                <div className={`rounded-lg p-3 text-[13px] border ${daysRemaining < 0 ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+                  {daysRemaining < 0 ? (
+                    <>
+                      <p className="font-semibold">⚠️ Território atrasado</p>
+                      <p className="mt-1">Você está devolvendo o território sem completar todas as quadras. O prazo de 90 dias foi superado em <strong>{Math.abs(daysRemaining)} {Math.abs(daysRemaining) === 1 ? 'dia' : 'dias'}</strong>.</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-semibold">Atenção: você está devolvendo sem completar todas as quadras.</p>
+                      <p className="mt-1">
+                        {activeAssignmentDate
+                          ? <>Restam <strong>{daysRemaining} {daysRemaining === 1 ? 'dia' : 'dias'}</strong> para o território ser considerado atrasado. Você pode ficar com ele até a conclusão.</>
+                          : <>Informe o motivo da devolução incompleta.</>
+                        }
+                      </p>
+                    </>
                   )}
                 </div>
                 

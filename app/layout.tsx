@@ -11,6 +11,7 @@ export const metadata: Metadata = {
   description: "Gestão inteligente de territórios",
 }
 
+
 export default function RootLayout({
   children,
 }: {
