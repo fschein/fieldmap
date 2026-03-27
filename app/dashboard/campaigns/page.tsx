@@ -50,15 +50,21 @@ export default function CampaignsPage() {
   }, [])
 
   async function fetchCampaigns() {
-    const { data } = await supabase
+    const { data: campaignsData } = await supabase
       .from("campaigns")
       .select("*")
       .order("created_at", { ascending: false })
 
-    if (data) {
-      setCampaigns(data as Campaign[])
+    if (campaignsData) {
+      setCampaigns(campaignsData as Campaign[])
       
-      // Fetch stats for these campaigns
+      // Fetch total active territories (denominator for progress)
+      const { count: totalActive } = await supabase
+        .from("territories")
+        .select("*", { count: 'exact', head: true })
+        .neq("status", "inactive")
+
+      // Fetch territories linked to campaigns (numerator)
       const { data: terrs } = await supabase
         .from("territories")
         .select("id, status, campaign_id")
@@ -66,12 +72,20 @@ export default function CampaignsPage() {
         .neq("status", "inactive")
 
       const newStats: Record<string, { total: number, completed: number }> = {}
-      terrs?.forEach(t => {
-        if (!t.campaign_id) return
-        if (!newStats[t.campaign_id]) newStats[t.campaign_id] = { total: 0, completed: 0 }
-        newStats[t.campaign_id].total++
-        if (t.status === 'completed') newStats[t.campaign_id].completed++
+      
+      // Initialize stats for each campaign with the TOTAL active territories
+      campaignsData.forEach((c: Campaign) => {
+        newStats[c.id] = { total: totalActive || 0, completed: 0 }
       })
+
+      // Count completed territories for each campaign
+      terrs?.forEach((t: any) => {
+        if (!t.campaign_id || !newStats[t.campaign_id]) return
+        if (t.status === 'completed') {
+          newStats[t.campaign_id].completed++
+        }
+      })
+      
       setStats(newStats)
     }
     setLoading(false)
@@ -313,12 +327,12 @@ export default function CampaignsPage() {
                   <div className="text-sm text-muted-foreground">
                     <p>
                       Início: {campaign.start_date
-                        ? new Date(`${campaign.start_date}T12:00:00Z`).toLocaleDateString("pt-BR")
+                        ? new Date(campaign.start_date + "T12:00:00").toLocaleDateString("pt-BR")
                         : "Não definida"}
                     </p>
-                    {campaign.end_date && (
+                    {campaign.end_date && campaign.end_date !== "" && (
                       <p>
-                        Término: {new Date(`${campaign.end_date}T12:00:00Z`).toLocaleDateString("pt-BR")}
+                        Término: {new Date(campaign.end_date + "T12:00:00").toLocaleDateString("pt-BR")}
                       </p>
                     )}
                   </div>

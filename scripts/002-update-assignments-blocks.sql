@@ -4,5 +4,8 @@ ALTER TABLE assignments ADD COLUMN IF NOT EXISTS return_reason TEXT;
 -- Add completed column to subdivisions for tracking completion status
 ALTER TABLE subdivisions ADD COLUMN IF NOT EXISTS completed BOOLEAN DEFAULT false;
 
+-- Add status column to subdivisions if not exists
+ALTER TABLE subdivisions ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'available';
+
 -- Update completed status based on existing status
 UPDATE subdivisions SET completed = true WHERE status = 'completed';

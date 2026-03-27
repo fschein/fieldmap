@@ -1,9 +1,9 @@
--- Create profiles table (extends auth.users)
 CREATE TABLE profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
+  full_name TEXT NOT NULL,
   email TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
+  role TEXT NOT NULL DEFAULT 'publicador' CHECK (role IN ('admin', 'dirigente', 'publicador')),
+  must_change_password BOOLEAN DEFAULT false,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -21,8 +21,14 @@ CREATE TABLE campaigns (
 -- Create territories table
 CREATE TABLE territories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  number TEXT,
   name TEXT NOT NULL,
   description TEXT,
+  color TEXT DEFAULT '#C65D3B',
+  status TEXT DEFAULT 'available' CHECK (status IN ('available', 'assigned', 'completed', 'inactive')),
+  assigned_to UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  campaign_id UUID REFERENCES public.campaigns(id) ON DELETE SET NULL,
+  last_completed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -31,9 +37,11 @@ CREATE TABLE territories (
 CREATE TABLE subdivisions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   territory_id UUID NOT NULL REFERENCES territories(id) ON DELETE CASCADE,
+  name TEXT,
   geometry JSONB NOT NULL,
   order_index INTEGER DEFAULT 0,
   completed BOOLEAN DEFAULT false,
+  status TEXT DEFAULT 'available',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -43,10 +51,15 @@ CREATE TABLE assignments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   territory_id UUID NOT NULL REFERENCES territories(id) ON DELETE CASCADE,
   user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  subdivision_id UUID REFERENCES subdivisions(id) ON DELETE CASCADE,
+  assigned_by UUID REFERENCES profiles(id),
   campaign_id UUID REFERENCES campaigns(id) ON DELETE SET NULL,
   assigned_at TIMESTAMPTZ DEFAULT NOW(),
-  delivered_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  returned_at TIMESTAMPTZ,
+  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'completed', 'returned')),
   notes TEXT,
+  return_reason TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

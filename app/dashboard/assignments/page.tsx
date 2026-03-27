@@ -20,8 +20,10 @@ import {
 } from "@/components/ui/table"
 import {
   Loader2, Search, SlidersHorizontal, ArrowUpDown,
-  Download, History, AlertTriangle, Plus, User, Calendar, Clock
+  Download, History, AlertTriangle, Plus, User, Calendar, Clock,
+  CheckSquare, Filter
 } from "lucide-react"
+import { Progress } from "@/components/ui/progress"
 
 type SortOption = "number" | "days_desc" | "days_asc" | "assigned_desc" | "assigned_asc" | "last_completed_asc" | "last_completed_desc"
 type StatusFilter = "all" | "active" | "available" | "overdue"
@@ -76,6 +78,7 @@ export default function AssignmentsPage() {
   const [selectedTerritoryId, setSelectedTerritoryId] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
+  const [showOnlyRemaining, setShowOnlyRemaining] = useState(false)
 
   const fetchData = async () => {
     try {
@@ -160,9 +163,9 @@ export default function AssignmentsPage() {
       ).length
 
       let daysInField: number | null = null
-      let status: 'available' | 'active' | 'overdue' = 'available'
+      let status: 'available' | 'active' | 'overdue' | 'inactive' = t.status || 'available'
 
-      if (activeAssig) {
+      if (status !== 'inactive' && activeAssig) {
         const start = new Date(activeAssig.assigned_at).getTime()
         daysInField = Math.ceil((now.getTime() - start) / (1000 * 60 * 60 * 24))
         status = daysInField > 90 ? 'overdue' : 'active'
@@ -205,7 +208,13 @@ export default function AssignmentsPage() {
     }
 
     if (campaignFilter !== "all") {
-      result = result.filter(t => t.campaignId === campaignFilter)
+      if (showOnlyRemaining) {
+        // "Remaining" = not done for this campaign yet.
+        // That means either it's not in the campaign yet, OR it is but it's active/overdue (not finished)
+        result = result.filter(t => t.campaignId !== campaignFilter || (t.campaignId === campaignFilter && t.status !== 'available'))
+      } else {
+        result = result.filter(t => t.campaignId === campaignFilter)
+      }
     }
 
     result.sort((a, b) => {
@@ -318,6 +327,56 @@ export default function AssignmentsPage() {
             </Button>
           </div>
         </div>
+
+        {/* Campaign Progress Banner */}
+        {campaignFilter !== "all" && (
+          <Card className="bg-primary/5 border-primary/20 shadow-none border-dashed">
+            <CardContent className="p-4">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="flex-1 w-full space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-primary/10 p-1.5 rounded-lg">
+                        <Calendar className="w-4 h-4 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-900 leading-tight">
+                          Campanha: {campaigns.find(c => c.id === campaignFilter)?.name}
+                        </p>
+                        <p className="text-xs text-slate-500">Acompanhamento de progresso geral</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-primary">
+                        {Math.round((data.filter(t => t.campaignId === campaignFilter && t.status === 'available').length / (data.length || 1)) * 100)}%
+                      </p>
+                      <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Concluído</p>
+                    </div>
+                  </div>
+                  <Progress 
+                    value={(data.filter(t => t.campaignId === campaignFilter && t.status === 'available').length / (data.length || 1)) * 100} 
+                    className="h-2 bg-slate-200"
+                  />
+                  <div className="flex justify-between items-center text-[10px] text-slate-400 font-medium">
+                    <span>{data.filter(t => t.campaignId === campaignFilter && t.status === 'available').length} concluídos</span>
+                    <span>{data.length - data.filter(t => t.campaignId === campaignFilter && t.status === 'available').length} faltantes</span>
+                  </div>
+                </div>
+                <div className="flex-shrink-0">
+                  <Button 
+                    variant={showOnlyRemaining ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setShowOnlyRemaining(!showOnlyRemaining)}
+                    className={`gap-2 h-9 px-4 rounded-lg transition-all ${showOnlyRemaining ? 'shadow-md shadow-primary/20' : 'bg-white'}`}
+                  >
+                    {showOnlyRemaining ? <Filter className="w-3.5 h-3.5" /> : <CheckSquare className="w-3.5 h-3.5" />}
+                    {showOnlyRemaining ? "Mostrando faltantes" : "Filtrar por faltantes"}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Filter Bar */}
         <div className="bg-slate-50 border rounded-xl p-3 flex flex-col md:flex-row items-center gap-3">

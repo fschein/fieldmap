@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS public.subdivisions (
   geometry JSONB NOT NULL,
   order_index INTEGER DEFAULT 0,
   completed BOOLEAN DEFAULT false,
-  status TEXT DEFAULT 'available',
+  status TEXT DEFAULT 'available' CHECK (status IN ('available', 'completed')),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -96,6 +96,7 @@ CREATE INDEX IF NOT EXISTS idx_assignments_territory_id ON public.assignments(te
 CREATE INDEX IF NOT EXISTS idx_assignments_user_id ON public.assignments(user_id);
 CREATE INDEX IF NOT EXISTS idx_territories_status ON public.territories(status);
 CREATE INDEX IF NOT EXISTS idx_territories_assigned_to ON public.territories(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_assignments_campaign_id ON public.assignments(campaign_id);
 
 -- 3. Funções e Triggers
 CREATE OR REPLACE FUNCTION public.handle_new_user()
