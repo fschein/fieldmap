@@ -86,7 +86,7 @@ export default function AssignmentsPage() {
 
       const { data: territories, error: terrErr } = await supabase
         .from("territories")
-        .select("id, name, number, color, status, campaign_id")
+        .select("id, name, number, color, status, campaign_id, assigned_to")
         .order("number", { ascending: true })
 
       if (terrErr) throw new Error(`Territories: ${terrErr.message}`)
@@ -165,7 +165,7 @@ export default function AssignmentsPage() {
       let daysInField: number | null = null
       let status: 'available' | 'active' | 'overdue' | 'inactive' = t.status || 'available'
 
-      if (status !== 'inactive' && activeAssig) {
+      if (status !== 'inactive' && activeAssig && activeAssig.user_id === t.assigned_to) {
         const start = new Date(activeAssig.assigned_at).getTime()
         daysInField = Math.ceil((now.getTime() - start) / (1000 * 60 * 60 * 24))
         status = daysInField > 90 ? 'overdue' : 'active'
@@ -183,7 +183,8 @@ export default function AssignmentsPage() {
         totalCompletions: completed.length,
         completionsInPeriod,
         lastCompletedAt,
-        campaignId: t.campaign_id
+        campaignId: t.campaign_id,
+        assignedTo: t.assigned_to
       }
     }).filter(t => t.status !== 'inactive')
 

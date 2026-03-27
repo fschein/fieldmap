@@ -20,6 +20,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "territoryId, userId e action são obrigatórios" }, { status: 400 })
     }
 
+    // 0. Verifica se o território ainda está designado para este usuário
+    const { data: currentTerritory } = await supabaseAdmin
+      .from("territories")
+      .select("assigned_to")
+      .eq("id", territoryId)
+      .single()
+    
+    if (currentTerritory?.assigned_to !== userId) {
+      return NextResponse.json({ error: "Este território não está mais designado para você." }, { status: 403 })
+    }
+
     if (!["complete", "return"].includes(action)) {
       return NextResponse.json({ error: "action deve ser 'complete' ou 'return'" }, { status: 400 })
     }

@@ -32,6 +32,7 @@ export default function TerritoryMapPage() {
   const { user, isReady } = useAuth()
   const [territory, setTerritory] = useState<TerritoryWithSubdivisions | null>(null)
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [selectedSubdivision, setSelectedSubdivision] = useState<Subdivision | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [pinMode, setPinMode] = useState(false)
@@ -84,7 +85,8 @@ export default function TerritoryMapPage() {
   const [showCompleteDialog, setShowCompleteDialog] = useState(false)
 
   const handleConfirmCompletion = async (reason?: string) => {
-    if (!territory || !user?.id) return
+    if (!territory || !user?.id || saving) return
+    setSaving(true)
 
     const isFullyCompleted = (territory.subdivisions?.filter(
       s => s.completed || s.status === 'completed'
@@ -111,6 +113,7 @@ export default function TerritoryMapPage() {
     } catch (error: any) {
       console.error("Erro ao processar devolução:", error?.message || error)
       alert("Erro ao processar devolução. Tente novamente.")
+      setSaving(false)
     }
   }
 
@@ -205,17 +208,18 @@ export default function TerritoryMapPage() {
   return (
     <div className="-mx-6 -mb-6 -mt-20 md:-mt-6 flex flex-col bg-slate-50 overflow-hidden relative" style={{ height: '100dvh' }}>
       {/* Header Fixo Sólido (Mobile) / Flutuante (Desktop) */}
-      <div className="absolute top-0 left-0 right-0 h-16 z-[40] bg-white shadow-sm flex items-center justify-between pr-4 pl-[4.5rem] md:relative md:h-auto md:bg-transparent md:shadow-none md:px-4 md:pt-4 md:pl-4">
+      <div className="absolute top-0 left-0 right-0 h-16 z-[40] bg-white shadow-sm flex items-center justify-between pl-16 pr-4 md:relative md:h-auto md:bg-transparent md:shadow-none md:px-4 md:pt-4">
         
         {/* Lado Esquerdo (Voltar + Nome do Território) */}
         <div className="flex items-center gap-2 overflow-hidden">
           <Button
-            variant="outline"
+            variant="ghost"
             size="icon"
-            className="h-9 w-9 text-slate-500 hover:text-slate-900 hidden md:flex flex-shrink-0 bg-white shadow-sm border-slate-200 rounded-full"
+            className="h-10 w-10 text-slate-600 hover:text-slate-900 rounded-full hover:bg-slate-100 transition-colors"
             onClick={() => router.push("/dashboard/my-assignments")}
+            title="Voltar"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-6 w-6" />
           </Button>
           <div className="flex items-center gap-2 min-w-0 md:bg-white/95 md:backdrop-blur-sm md:px-3 md:py-1.5 md:rounded-full md:shadow-sm md:border md:border-slate-200">
             <div
