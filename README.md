@@ -28,16 +28,34 @@ Uma ferramenta robusta para gestão de territórios, designações e quadras, fo
 3. Em **Project Settings > API**, anote a `URL`, `anon public key` e `service_role key`.
 
 ### 3. Deploy na Vercel
-Clique no botão **Deploy to Vercel** no topo deste README ou siga manualmente:
-1. Importe o repositório na Vercel.
-2. Configure as seguintes variáveis de ambiente:
-   - `NEXT_PUBLIC_SUPABASE_URL`: Sua URL do Supabase.
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Sua chave anon.
-   - `SUPABASE_SERVICE_ROLE_KEY`: Sua chave service role (mantenha secreta!).
-   - `NEXT_PUBLIC_APP_URL`: A URL final do seu app (ou `http://localhost:3000` para dev).
+Clique no botão **Deploy to Vercel** no topo deste README. 
 
-### 4. Primeiro Acesso
-O sistema criará automaticamente um perfil para o primeiro usuário que se registrar via email. Você pode mudar o papel (`role`) para `admin` diretamente no painel do Supabase na tabela `profiles`.
+> [!TIP]
+> **Dica Pro (Integração Nativa):** Ao criar o projeto na Vercel, você pode adicionar a Integração da Supabase. Isso vinculará automaticamente as chaves `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`, restando apenas configurar a `SUPABASE_SERVICE_ROLE_KEY` manualmente.
+
+#### Variáveis de Ambiente Necessárias:
+| Variável | Descrição | Onde encontrar (Supabase) |
+|----------|-----------|---------------------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | URL do Projeto | Settings > API |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Chave Anon | Settings > API |
+| `SUPABASE_SERVICE_ROLE_KEY` | Chave Service Role | Settings > API (Mantenha Segura!) |
+| `NEXT_PUBLIC_APP_URL` | URL do seu App | URL da Vercel ou localhost:3000 |
+
+### 4. Primeiro Acesso (Admin)
+1. Crie sua conta normalmente via email/senha.
+2. No painel do Supabase, vá na tabela `profiles` e mude o campo `role` do seu usuário para `admin`.
+3. Pronto! Você agora terá acesso a todas as ferramentas de gestão.
+
+## 💻 Desenvolvimento Local
+
+Se quiser rodar o projeto na sua máquina para testar antes:
+
+1. Clone o repositório.
+2. Instale as dependências: `npm install`.
+3. Copie o arquivo de exemplo: `cp .env.example .env.local`.
+4. Preencha as variáveis no `.env.local`.
+5. Rode o servidor: `npm run dev`.
+6. Acesse: `http://localhost:3000`.
 
 ## 🛠️ Tecnologias
 - **Frontend**: Next.js 14, Tailwind CSS, Shadcn/UI.
