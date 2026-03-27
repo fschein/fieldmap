@@ -6,6 +6,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/use-auth"
+import { FieldMapLogo, FieldMapLogoBrand } from "@/components/icons/fieldmap-logo"
 import { Button } from "@/components/ui/button"
 import {
   MapPin,
@@ -31,31 +32,37 @@ const navItems = [
     title: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
-    roles: ["admin", "dirigente", "publicador"],
+    roles: ["admin"],
   },
   {
     title: "Territórios",
     href: "/dashboard/territories",
     icon: Map,
-    roles: ["admin", "dirigente"],
+    roles: ["admin"],
   },
   {
     title: "Grupos",
     href: "/dashboard/groups",
     icon: Component,
-    roles: ["admin", "dirigente"],
+    roles: ["admin"],
   },
   {
     title: "Designações",
     href: "/dashboard/assignments",
     icon: ClipboardList,
+    roles: ["admin"],
+  },
+  {
+    title: "Minhas Designações",
+    href: "/dashboard/my-assignments",
+    icon: MapPin,
     roles: ["admin", "dirigente", "publicador"],
   },
   {
     title: "Campanhas",
     href: "/dashboard/campaigns",
     icon: Calendar,
-    roles: ["admin", "dirigente"],
+    roles: ["admin"],
   },
   {
     title: "Usuários",
@@ -64,16 +71,10 @@ const navItems = [
     roles: ["admin"],
   },
   {
-    title: "Relatórios",
-    href: "/dashboard/reports",
-    icon: FileText,
-    roles: ["admin"],
-  },
-  {
-    title: "Configurações",
+    title: "Perfil",
     href: "/dashboard/settings",
-    icon: Settings,
-    roles: ["admin"],
+    icon: User,
+    roles: ["admin", "dirigente", "publicador"],
   },
 ]
 
@@ -141,11 +142,11 @@ const handleSignOut = useCallback(async () => {
       >
         <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="flex h-16 items-center gap-2 border-b px-6">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <MapPin className="h-4 w-4 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-foreground">Territórios</span>
+          <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-6 dark:bg-sidebar">
+            <FieldMapLogoBrand className="h-8 w-8" />
+            <span className="font-bold text-foreground tracking-tight text-xl">
+              Field<span className="text-primary">Map</span>
+            </span>
           </div>
 
           {/* Navigation */}

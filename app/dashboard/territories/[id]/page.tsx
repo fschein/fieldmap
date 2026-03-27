@@ -100,7 +100,7 @@ export default function TerritoryDetailPage({
         supabase
           .from("profiles")
           .select("*")
-          .in("role", ["dirigente", "publicador"])
+          .in("role", ["admin", "dirigente", "publicador"])
           .order("name"),
       ])
 

@@ -1,16 +1,17 @@
 // ============================================================================
-// app/dashboard/territories/page.tsx - DASHBOARD ESTRATÉGICO
+// app/dashboard/territories/page.tsx - DASHBOARD ESTRATÉGICO (Refatorado)
 // ============================================================================
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import Link from "next/link"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { 
   Dialog, 
   DialogContent, 
@@ -30,11 +31,11 @@ import {
   TrendingUp,
   Search,
   X,
-  Sparkles,
-  Clock
+  Clock,
+  CheckCircle2,
+  Pencil
 } from "lucide-react"
 import type { Profile, Campaign, Subdivision } from "@/lib/types"
-import { Separator } from "@radix-ui/react-select"
 
 // ============================================================================
 // INTERFACES
@@ -59,7 +60,11 @@ interface TerritoryWithDetails {
     id: string
     name: string
     email: string
-  }
+  } | null
+  campaign?: {
+    id: string
+    name: string
+  } | null
   subdivisions?: Subdivision[]
 }
 
@@ -143,16 +148,29 @@ function getProgressStats(subdivisions?: Subdivision[]) {
   return { completed, total, percentage }
 }
 
+const getPriorityBadge = (priority: PriorityScore['priority']) => {
+  switch (priority) {
+    case 'critical':
+      return <Badge className="bg-red-600 hover:bg-red-700 text-white border-transparent">Crítico</Badge>
+    case 'high':
+      return <Badge className="bg-orange-500 hover:bg-orange-600 text-white border-transparent">Alta</Badge>
+    case 'medium':
+      return <Badge className="bg-yellow-500 hover:bg-yellow-600 text-white border-transparent">Média</Badge>
+    default:
+      return <Badge variant="outline" className="text-slate-500 border-slate-200 bg-slate-50">Baixa</Badge>
+  }
+}
+
 // ============================================================================
 // COMPONENTE PRINCIPAL
 // ============================================================================
 
 export default function TerritoriesPage() {
   const supabase = getSupabaseBrowserClient()
-  const [territories, setTerritories] = useState<TerritoryWithDetails[]>([])
   const [priorityTerritories, setPriorityTerritories] = useState<PriorityScore[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
+  const [errorMsg, setErrorMsg] = useState("")
   
   // Assignment modal
   const [assignDialogOpen, setAssignDialogOpen] = useState(false)
@@ -162,95 +180,130 @@ export default function TerritoriesPage() {
   const [searchUser, setSearchUser] = useState("")
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null)
+  
+  // Novas datas do Modal Retroativo
+  const formatToday = () => {
+    const today = new Date()
+    return today.toISOString().split('T')[0]
+  }
+  const [startDate, setStartDate] = useState(formatToday())
+  const [endDate, setEndDate] = useState("")
   const [assigning, setAssigning] = useState(false)
 
-  useEffect(() => {
-    fetchTerritories()
-    fetchUsers()
-    fetchCampaigns()
-  }, [])
+  // Edit Territory Dialog
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editingTerritory, setEditingTerritory] = useState<TerritoryWithDetails | null>(null)
+  const [editName, setEditName] = useState("")
+  const [editNumber, setEditNumber] = useState("")
+  const [editColor, setEditColor] = useState("")
+  const [editSaving, setEditSaving] = useState(false)
 
-  async function fetchTerritories() {
-    const { data, error } = await supabase
-      .from("territories")
-      .select(`
-        *,
-        group:groups(id, name, color),
-        assigned_to_user:profiles!territories_assigned_to_fkey(id, name, email),
-        subdivisions(id, territory_id, completed, status, name)
-      `)
-      .order("number")
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true)
+      setErrorMsg("")
+      
+      const [terrRes, usersRes, campRes] = await Promise.all([
+        supabase
+          .from("territories")
+          .select(`
+            *,
+            group:groups(id, name, color),
+            assigned_to_user:profiles!territories_assigned_to_fkey(id, name, email),
+            campaign:campaigns(id, name),
+            subdivisions(id, territory_id, completed, status, name)
+          `)
+          .order("number"),
+        supabase
+          .from("profiles")
+          .select("*")
+          .in("role", ["admin", "dirigente", "publicador"])
+          .order("name"),
+        supabase
+          .from("campaigns")
+          .select("*")
+          .eq("active", true)
+          .order("name")
+      ])
 
-    if (!error && data) {
-      const territoriesData = data as unknown as TerritoryWithDetails[]
-      setTerritories(territoriesData)
+      if (terrRes.error) throw terrRes.error
+      if (usersRes.error) throw usersRes.error
+      if (campRes.error) throw campRes.error
 
-      // Calcula prioridades
-      const priorities = territoriesData
-        .map(t => calculatePriorityScore(t))
-        .sort((a, b) => b.score - a.score)
+      if (usersRes.data) setUsers(usersRes.data)
+      if (campRes.data) setCampaigns(campRes.data)
 
-      setPriorityTerritories(priorities)
+      if (terrRes.data) {
+        const territoriesData = terrRes.data as unknown as TerritoryWithDetails[]
+        const priorities = territoriesData
+          .map(t => calculatePriorityScore(t))
+          .sort((a, b) => b.score - a.score) // Ordena sempre por score por padrão
+        setPriorityTerritories(priorities)
+      }
+    } catch (err: any) {
+      console.error("Erro ao carregar dados:", err.message)
+      setErrorMsg("Falha ao carregar territórios. Verifique sua conexão.")
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
-  }
+  }, [supabase])
 
-  async function fetchUsers() {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .in("role", ["dirigente", "publicador"])
-      .order("name")
-    
-    if (data) setUsers(data)
-  }
-
-  async function fetchCampaigns() {
-    const { data } = await supabase
-      .from("campaigns")
-      .select("*")
-      .eq("active", true)
-      .order("name")
-    
-    if (data) setCampaigns(data)
-  }
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   const handleOpenAssignDialog = (territory: TerritoryWithDetails) => {
     setSelectedTerritory(territory)
     setSelectedUserId(null)
     setSelectedCampaignId(null)
     setSearchUser("")
+    setStartDate(formatToday())
+    setEndDate("")
     setAssignDialogOpen(true)
   }
 
   const handleAssign = async () => {
-    if (!selectedTerritory || !selectedUserId) return
+    if (!selectedTerritory || !selectedUserId || !startDate) return
     setAssigning(true)
 
     try {
-      // Create assignment
+      // Cria a designação convertendo datetimes ajustados
+      const startDateTime = new Date(`${startDate}T12:00:00Z`).toISOString()
+      const endDateTime = endDate ? new Date(`${endDate}T12:00:00Z`).toISOString() : null
+
+      const isCompleted = !!endDateTime
+
       const { error: assignError } = await supabase
         .from("assignments")
         .insert({
           territory_id: selectedTerritory.id,
           user_id: selectedUserId,
-          campaign_id: selectedCampaignId,
-          status: "active",
-          assigned_at: new Date().toISOString(),
+          campaign_id: selectedCampaignId || null,
+          status: isCompleted ? "completed" : "active",
+          assigned_at: startDateTime,
+          completed_at: endDateTime,
         })
 
       if (assignError) throw assignError
 
-      // Update territory assigned_to
+      // Atualiza o status do território
+      const territoryUpdates: any = {}
+      if (isCompleted) {
+        territoryUpdates.assigned_to = null
+        territoryUpdates.last_completed_at = endDateTime
+      } else {
+        territoryUpdates.assigned_to = selectedUserId
+      }
+
       const { error: updateError } = await supabase
         .from("territories")
-        .update({ assigned_to: selectedUserId })
+        .update(territoryUpdates)
         .eq("id", selectedTerritory.id)
 
       if (updateError) throw updateError
 
       setAssignDialogOpen(false)
-      fetchTerritories()
+      loadData()
     } catch (error: any) {
       alert("Erro ao designar território: " + error.message)
     } finally {
@@ -263,440 +316,350 @@ export default function TerritoriesPage() {
     u.email.toLowerCase().includes(searchUser.toLowerCase())
   )
 
-  const filteredTerritories = territories.filter(t =>
-    t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.number.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const handleOpenEdit = (territory: TerritoryWithDetails) => {
+    setEditingTerritory(territory)
+    setEditName(territory.name)
+    setEditNumber(territory.number)
+    setEditColor(territory.color || "#C65D3B")
+    setEditDialogOpen(true)
+  }
 
-  // Top 3 sugestões (territórios livres com maior prioridade)
-  const topSuggestions = priorityTerritories
-    .filter(p => !p.territory.assigned_to)
-    .slice(0, 3)
-
-  const getPriorityBadge = (priority: PriorityScore['priority']) => {
-    switch (priority) {
-      case 'critical':
-        return <Badge className="bg-red-600 text-white">Crítico</Badge>
-      case 'high':
-        return <Badge className="bg-orange-500 text-white">Alta</Badge>
-      case 'medium':
-        return <Badge className="bg-yellow-500 text-white">Média</Badge>
-      default:
-        return <Badge variant="outline">Baixa</Badge>
+  const handleSaveEdit = async () => {
+    if (!editingTerritory) return
+    setEditSaving(true)
+    try {
+      const { error } = await supabase
+        .from("territories")
+        .update({ name: editName, number: editNumber, color: editColor })
+        .eq("id", editingTerritory.id)
+      if (error) throw error
+      setEditDialogOpen(false)
+      loadData()
+    } catch (e: any) {
+      alert("Erro ao salvar: " + e.message)
+    } finally {
+      setEditSaving(false)
     }
   }
 
-  if (loading) {
+  // Aplica a busca comum
+  let results = priorityTerritories
+  if (searchTerm) {
+    results = priorityTerritories.filter(p =>
+      p.territory.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.territory.number.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  }
+
+  // Divisão para as Abas
+  const availableTerritories = results.filter(p => !p.territory.assigned_to)
+  const assignedTerritories = results.filter(p => !!p.territory.assigned_to)
+  const overdueTerritories = results.filter(p => p.priority === 'critical' || p.priority === 'high')
+
+  // Componente interno para reuso de Card
+  const TerritoryCard = ({ p }: { p: PriorityScore }) => {
+    const territory = p.territory
+    const stats = getProgressStats(territory.subdivisions)
+    const isOverdue = p.daysInactive > 180
+
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <Card className="group flex flex-col border border-slate-200 hover:border-primary hover:shadow-md transition-all bg-white h-full relative overflow-hidden">
+        <CardContent className="p-4 flex flex-col h-full relative z-10">
+          {/* Header */}
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <Badge variant="secondary" className="font-mono text-sm px-2 py-0.5 shadow-none bg-slate-100 text-slate-700">
+                #{territory.number}
+              </Badge>
+              <h3 className="font-bold text-base text-slate-800 line-clamp-1" title={territory.name}>
+                {territory.name}
+              </h3>
+            </div>
+            {getPriorityBadge(p.priority)}
+          </div>
+
+          {/* Usuário, Campanhas e Status Rápido */}
+          <div className="flex-1 space-y-3 mb-4">
+            {territory.campaign && (
+              <div className="mb-2">
+                <Badge variant="secondary" className="bg-primary/10 hover:bg-primary/20 text-primary border-primary/20 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5">
+                  🎯 {territory.campaign.name}
+                </Badge>
+              </div>
+            )}
+            
+            {territory.assigned_to_user ? (
+              <div className="flex items-center gap-2 text-sm">
+                <div className="bg-primary/10 text-primary p-1.5 rounded-full">
+                  <User className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="font-semibold text-slate-800 leading-none">
+                    {territory.assigned_to_user.name}
+                  </p>
+                  <p className="text-xs font-medium text-slate-600 mt-1">Em campo agora</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-sm">
+                <div className="bg-slate-100 text-slate-400 p-1.5 rounded-full">
+                  <MapPin className="h-4 w-4" />
+                </div>
+                <div className="leading-none text-muted-foreground font-normal">
+                  Disponível para designação
+                </div>
+              </div>
+            )}
+
+            {/* Progresso de Quadras */}
+            <div className="space-y-1.5 pt-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" /> Progresso
+                </span>
+                <span className="font-semibold text-slate-700">
+                  {stats.completed}/{stats.total}
+                </span>
+              </div>
+              {stats.total > 0 ? (
+                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full transition-all ${stats.percentage === 100 ? 'bg-green-500' : 'bg-primary'}`}
+                    style={{ width: `${stats.percentage}%` }}
+                  />
+                </div>
+              ) : (
+                <div className="h-2 bg-slate-50 border border-slate-100 rounded-full flex items-center justify-center">
+                  <span className="text-[8px] text-slate-400">Sem áreas mapeadas</span>
+                </div>
+              )}
+            </div>
+
+            {/* Histórico / Aviso Crítico */}
+            <div className="pt-1">
+              {isOverdue && !territory.assigned_to ? (
+                <div className="flex items-center gap-1.5 text-xs text-red-600 bg-red-50 p-2 rounded-md font-medium border border-red-100">
+                  <AlertTriangle className="h-4 w-4 shrink-0" />
+                  <span>{p.reason}</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 text-xs text-slate-700 font-medium bg-slate-50 p-2 rounded-md border border-slate-100">
+                  <Clock className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+                  <span>
+                    {!territory.last_completed_at && !territory.assigned_to ? "Nunca concluído" : 
+                    `${p.daysInactive} dias desde última conclusão`}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-2 mt-auto border-t border-slate-100">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 p-0 text-slate-400 hover:text-primary hover:bg-primary/10 flex-shrink-0"
+              onClick={(e) => { e.stopPropagation(); handleOpenEdit(territory) }}
+              title="Editar território"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 text-sm bg-muted hover:bg-muted/80 border-border text-foreground transition-colors"
+              asChild
+            >
+              <Link href={`/dashboard/territories/${territory.id}/map`}>
+                <Map className="mr-2 h-4 w-4 text-slate-500" />
+                Ver Mapa
+              </Link>
+            </Button>
+            
+            {!territory.assigned_to && (
+              <Button
+                size="sm"
+                className="flex-1 text-sm shadow-sm"
+                onClick={() => handleOpenAssignDialog(territory)}
+              >
+                <TrendingUp className="mr-2 h-4 w-4" />
+                Designar
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (loading && priorityTerritories.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-500">
+        <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+        <p>Carregando territórios...</p>
+      </div>
+    )
+  }
+
+  if (errorMsg) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] bg-red-50/50 rounded-xl border border-red-100 text-red-700 max-w-lg mx-auto p-6 text-center">
+        <AlertTriangle className="h-12 w-12 text-red-500 mb-4" />
+        <h2 className="text-xl font-bold mb-2">Ops! Ocorreu um erro.</h2>
+        <p className="text-sm">{errorMsg}</p>
+        <Button onClick={() => loadData()} variant="outline" className="mt-6">
+          Tentar Novamente
+        </Button>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-10">
+      {/* Header Secção */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Territórios</h1>
-          <p className="text-muted-foreground">
-            Dashboard estratégico de gerenciamento
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Territórios</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Gestão inteligente das quadras e designações.
           </p>
         </div>
-        <Button asChild>
-          <Link href="/dashboard/territories/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Território
-          </Link>
-        </Button>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-muted-foreground">Total</span>
-              <Map className="h-4 w-4 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{territories.length}</div>
-            <p className="text-xs text-muted-foreground">territórios cadastrados</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-muted-foreground">Designados</span>
-              <User className="h-4 w-4 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {territories.filter(t => t.assigned_to).length}
-            </div>
-            <p className="text-xs text-muted-foreground">em campo agora</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-muted-foreground">Disponíveis</span>
-              <MapPin className="h-4 w-4 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {territories.filter(t => !t.assigned_to).length}
-            </div>
-            <p className="text-xs text-muted-foreground">prontos para designação</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-muted-foreground">Críticos</span>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              {priorityTerritories.filter(p => p.priority === 'critical').length}
-            </div>
-            <p className="text-xs text-muted-foreground">&gt;6 meses inativos</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Sugestões de Designação */}
-      {topSuggestions.length > 0 && (
-        <Card className="border-primary/50 bg-primary/5">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">Sugestões de Designação</h2>
-              <Badge variant="secondary" className="ml-2">Top 3</Badge>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Territórios prioritários disponíveis para designação
-            </p>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {topSuggestions.map((priority, index) => {
-                const stats = getProgressStats(priority.territory.subdivisions)
-                
-                return (
-                  <Card key={priority.territory.id} className="border-2 hover:border-primary transition-colors">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs font-bold">
-                            {index + 1}
-                          </div>
-                          <Badge variant="outline" className="font-mono text-xs">
-                            #{priority.territory.number}
-                          </Badge>
-                        </div>
-                        {getPriorityBadge(priority.priority)}
-                      </div>
-                      
-                      <h3 className="font-semibold text-sm mb-1 truncate">
-                        {priority.territory.name}
-                      </h3>
-                      
-                      <p className="text-xs text-muted-foreground mb-3">
-                        {priority.reason}
-                      </p>
-
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
-                        <Clock className="h-3 w-3" />
-                        <span>{priority.daysInactive} dias inativo</span>
-                      </div>
-
-                      <div className="space-y-1 mb-3">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">Subdivisões</span>
-                          <span className="font-semibold">{stats.completed}/{stats.total}</span>
-                        </div>
-                        <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-green-600 transition-all"
-                            style={{ width: `${stats.percentage}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex gap-1">
-                        <Button
-                          size="sm"
-                          className="flex-1 h-8 text-xs"
-                          onClick={() => handleOpenAssignDialog(priority.territory)}
-                        >
-                          Designar
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-8 px-2"
-                          asChild
-                        >
-                          <Link href={`/dashboard/territories/${priority.territory.id}/map`}>
-                            <MapPin className="h-3.5 w-3.5" />
-                          </Link>
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Search */}
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por nome ou número..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9"
-          />
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2"
-            >
-              <X className="h-4 w-4 text-muted-foreground" />
-            </button>
-          )}
-        </div>
-        <span className="text-sm text-muted-foreground">
-          {filteredTerritories.length} resultado{filteredTerritories.length !== 1 ? 's' : ''}
-        </span>
-      </div>
-
-      {/* Grid de Territórios */}
-      {filteredTerritories.length === 0 ? (
-        <Card className="p-12 text-center">
-          <Map className="h-12 w-12 text-muted-foreground mb-4 mx-auto" />
-          <p className="text-lg font-medium">Nenhum território encontrado</p>
-          <p className="text-sm text-muted-foreground mb-4">
-            {searchTerm ? 'Tente uma busca diferente' : 'Crie seu primeiro território'}
-          </p>
-          {!searchTerm && (
-            <Button asChild>
-              <Link href="/dashboard/territories/new">
-                <Plus className="mr-2 h-4 w-4" />
-                Novo Território
-              </Link>
-            </Button>
-          )}
-        </Card>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredTerritories.map((territory) => {
-            const priority = priorityTerritories.find(p => p.territory.id === territory.id)
-            const stats = getProgressStats(territory.subdivisions)
-            const isOverdue = priority && priority.daysInactive > 180
-
-            return (
-              <Card 
-                key={territory.id} 
-                className={`
-                  hover:shadow-md transition-all
-                  ${isOverdue ? 'border-red-300 bg-red-50/30' : ''}
-                `}
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-64">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              placeholder="Buscar por nome ou Nº..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 bg-white border-slate-200"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 hover:bg-slate-100"
               >
-                <CardContent className="p-4">
-                  {/* Header */}
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <div 
-                        className="h-8 w-8 rounded-md flex-shrink-0"
-                        style={{ backgroundColor: territory.color }}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-1.5 mb-0.5">
-                          <Badge variant="outline" className="font-mono text-xs">
-                            #{territory.number}
-                          </Badge>
-                          {priority && getPriorityBadge(priority.priority)}
-                        </div>
-                        <h3 className="font-semibold text-sm truncate">
-                          {territory.name}
-                        </h3>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Alert se crítico */}
-                  {isOverdue && (
-                    <div className="flex items-center gap-2 mb-3 p-2 rounded-md bg-red-100 border border-red-200">
-                      <AlertTriangle className="h-3.5 w-3.5 text-red-600 flex-shrink-0" />
-                      <span className="text-xs text-red-700 font-medium">
-                        {priority.reason}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Group */}
-                  {territory.group && (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
-                      <div 
-                        className="h-2.5 w-2.5 rounded-sm flex-shrink-0"
-                        style={{ backgroundColor: territory.group.color }}
-                      />
-                      <span className="truncate">{territory.group.name}</span>
-                    </div>
-                  )}
-
-                  {/* Assigned User */}
-                  {territory.assigned_to_user ? (
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-50 border border-blue-200 flex-1 min-w-0">
-                        <User className="h-3 w-3 text-blue-600 flex-shrink-0" />
-                        <span className="text-xs font-medium text-blue-700 truncate">
-                          {territory.assigned_to_user.name}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-3 italic">
-                      <User className="h-3 w-3" />
-                      <span>Não designado</span>
-                    </div>
-                  )}
-
-                  {/* Progress */}
-                  <div className="space-y-1.5 mb-3">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground font-medium">
-                        Subdivisões
-                      </span>
-                      <span className="font-semibold">
-                        {stats.completed}/{stats.total}
-                        {stats.total > 0 && (
-                          <span className="text-muted-foreground ml-1">
-                            ({stats.percentage}%)
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                    
-                    {stats.total > 0 ? (
-                      <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full transition-all duration-500 ${
-                            stats.percentage === 100 
-                              ? 'bg-green-600' 
-                              : stats.percentage > 0 
-                              ? 'bg-blue-600' 
-                              : 'bg-slate-300'
-                          }`}
-                          style={{ width: `${stats.percentage}%` }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="h-2 bg-slate-200 rounded-full flex items-center justify-center">
-                        <span className="text-[8px] text-muted-foreground font-medium">
-                          Sem subdivisões
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Dias inativo */}
-                  {priority && (
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-3">
-                      <Clock className="h-3 w-3" />
-                      <span>
-                        {priority.daysInactive} dia{priority.daysInactive !== 1 ? 's' : ''} desde última conclusão
-                      </span>
-                    </div>
-                  )}
-
-                  <Separator className="my-3" />
-
-                  {/* Actions */}
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="default"
-                      className="flex-1 h-8 text-xs"
-                      asChild
-                    >
-                      <Link href={`/dashboard/territories/${territory.id}/map`}>
-                        <MapPin className="mr-1.5 h-3.5 w-3.5" />
-                        Abrir Mapa
-                      </Link>
-                    </Button>
-                    
-                    {!territory.assigned_to && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 text-xs"
-                        onClick={() => handleOpenAssignDialog(territory)}
-                      >
-                        <TrendingUp className="mr-1.5 h-3.5 w-3.5" />
-                        Designar
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
+                <X className="h-3 w-3 text-slate-500" />
+              </button>
+            )}
+          </div>
+          <Button asChild className="shrink-0 shadow-sm">
+            <Link href="/dashboard/territories/new">
+              <Plus className="mr-2 h-4 w-4" />
+              Novo
+            </Link>
+          </Button>
         </div>
-      )}
+      </div>
 
-      {/* Assignment Dialog */}
+      {/* Tabs e Lista */}
+      <Tabs defaultValue="available" className="w-full">
+        <div className="mb-6 w-full max-w-full overflow-x-auto pb-2 -mb-2">
+          <div className="inline-flex items-center bg-slate-100/50 p-1.5 rounded-lg border border-slate-200/60 w-max min-w-full sm:min-w-0 sm:w-fit">
+            <TabsList className="bg-transparent h-auto p-0 border-none flex-nowrap gap-1 w-full justify-start">
+              <TabsTrigger 
+                value="available" 
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground hover:bg-slate-200/60 data-[state=active]:shadow-sm rounded-md px-4 py-2 text-sm font-medium transition-all"
+              >
+                Disponíveis
+                <Badge variant="secondary" className="ml-2 bg-black/5 hover:bg-black/10 text-inherit border-none shadow-none">{availableTerritories.length}</Badge>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="assigned" 
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground hover:bg-slate-200/60 data-[state=active]:shadow-sm rounded-md px-4 py-2 text-sm font-medium transition-all"
+              >
+                Em Campo
+                <Badge variant="secondary" className="ml-2 bg-black/5 hover:bg-black/10 text-inherit border-none shadow-none">{assignedTerritories.length}</Badge>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="overdue" 
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground hover:bg-slate-200/60 data-[state=active]:shadow-sm rounded-md px-4 py-2 text-sm font-medium transition-all"
+              >
+                Prioritários
+                {overdueTerritories.length > 0 && (
+                  <Badge className="ml-2 bg-red-500/10 text-red-600 data-[state=active]:bg-black/10 data-[state=active]:text-inherit hover:bg-red-500/20 shadow-none border-none">{overdueTerritories.length}</Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger 
+                value="all" 
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground hover:bg-slate-200/60 data-[state=active]:shadow-sm rounded-md px-4 py-2 text-sm font-medium transition-all"
+              >
+                Todos
+                <Badge variant="secondary" className="ml-2 bg-black/5 hover:bg-black/10 text-inherit border-none shadow-none">{results.length}</Badge>
+              </TabsTrigger>
+            </TabsList>
+          </div>
+        </div>
+
+        {/* Content Áreas */}
+        <TabsContent value="all" className="mt-0 outline-none">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {results.map((p) => <TerritoryCard key={p.territory.id} p={p} />)}
+            {results.length === 0 && <p className="text-slate-500 py-10 col-span-full text-center">Nenhum território encontrado.</p>}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="available" className="mt-0 outline-none">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {availableTerritories.map((p) => <TerritoryCard key={p.territory.id} p={p} />)}
+            {availableTerritories.length === 0 && <p className="text-slate-500 py-10 col-span-full text-center">Parabéns! Nenhum território disponível (todos em campo).</p>}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="assigned" className="mt-0 outline-none">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {assignedTerritories.map((p) => <TerritoryCard key={p.territory.id} p={p} />)}
+            {assignedTerritories.length === 0 && <p className="text-slate-500 py-10 col-span-full text-center">Nenhum território sendo trabalhado no momento.</p>}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="overdue" className="mt-0 outline-none">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {overdueTerritories.map((p) => <TerritoryCard key={p.territory.id} p={p} />)}
+            {overdueTerritories.length === 0 && <p className="text-slate-500 py-10 col-span-full text-center">Ótimo trabalho! Sem territórios atrasados na fila de atenção.</p>}
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Modal Avançado de Designação / Histórico */}
       <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-        <DialogContent className="max-w-md z-[9999]">
-          <DialogHeader>
-            <DialogTitle>Designar Território</DialogTitle>
-            <DialogDescription>
-              {selectedTerritory?.number} - {selectedTerritory?.name}
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-0 shadow-2xl rounded-2xl z-[9999]">
+          <div className="bg-primary px-6 py-6 pb-8 rounded-t-2xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-8 opacity-10">
+              <MapPin className="w-24 h-24" />
+            </div>
+            <DialogHeader className="relative z-10">
+              <DialogTitle className="text-2xl text-white font-bold tracking-tight">
+                Designar Território
+              </DialogTitle>
+              <DialogDescription className="text-primary-foreground/80 pt-1 text-sm font-medium">
+                #{selectedTerritory?.number} - {selectedTerritory?.name}
+              </DialogDescription>
+            </DialogHeader>
+          </div>
 
-          <div className="space-y-4 py-4">
+          <div className="px-6 py-6 space-y-5 bg-white -mt-4 rounded-t-2xl relative border-t z-20">
             {/* User Search */}
             <div className="space-y-2">
-              <Label>Designar para *</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Label className="text-slate-700 font-semibold">Publicador Responsável *</Label>
+              <div className="relative group">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" />
                 <Input
-                  placeholder="Buscar dirigente ou publicador..."
+                  placeholder="Buscar pelo nome..."
                   value={searchUser}
                   onChange={(e) => setSearchUser(e.target.value)}
-                  className="pl-9"
+                  className="pl-9 border-slate-200 focus:ring-primary focus:border-primary shadow-sm"
                 />
                 {searchUser && (
-                  <button
-                    onClick={() => setSearchUser("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2"
-                  >
-                    <X className="h-4 w-4 text-muted-foreground" />
+                  <button onClick={() => setSearchUser("")} className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <X className="h-4 w-4 text-slate-400 hover:text-slate-600" />
                   </button>
                 )}
               </div>
 
               {searchUser && (
-                <div className="border rounded-md max-h-48 overflow-y-auto">
+                <div className="border border-slate-200 rounded-lg max-h-[160px] overflow-y-auto shadow-sm mt-1 animate-in fade-in slide-in-from-top-1">
                   {filteredUsers.length === 0 ? (
-                    <p className="p-3 text-sm text-muted-foreground text-center">
-                      Nenhum usuário encontrado
-                    </p>
+                    <p className="p-4 text-sm text-slate-500 text-center">Nenhum usuário encontrado</p>
                   ) : (
                     filteredUsers.map((user) => (
                       <button
@@ -705,12 +668,15 @@ export default function TerritoriesPage() {
                           setSelectedUserId(user.id)
                           setSearchUser(user.name)
                         }}
-                        className={`w-full text-left p-3 hover:bg-muted transition-colors ${
-                          selectedUserId === user.id ? "bg-muted" : ""
+                        className={`w-full text-left p-3 hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors flex items-center justify-between ${
+                          selectedUserId === user.id ? "bg-slate-50/80" : ""
                         }`}
                       >
-                        <p className="font-medium text-sm">{user.name}</p>
-                        <p className="text-xs text-muted-foreground">{user.email}</p>
+                        <div>
+                          <p className="font-semibold text-sm text-slate-800">{user.name}</p>
+                          <p className="text-xs text-slate-500 mt-0.5">{user.email}</p>
+                        </div>
+                        {selectedUserId === user.id && <CheckCircle2 className="h-4 w-4 text-primary" />}
                       </button>
                     ))
                   )}
@@ -718,15 +684,43 @@ export default function TerritoriesPage() {
               )}
             </div>
 
-            {/* Campaign (optional) */}
-            <div className="space-y-2">
-              <Label>Campanha (opcional)</Label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-slate-700 font-semibold flex items-center gap-1.5">
+                  <Calendar className="h-4 w-4 text-slate-400" /> Início *
+                </Label>
+                <Input 
+                  type="date" 
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="shadow-sm border-slate-200 text-sm"
+                  required
+                />
+                <p className="text-[10px] text-slate-500 leading-tight">Data de designação.</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-slate-700 font-semibold flex items-center gap-1.5">
+                  <CheckCircle2 className="h-4 w-4 text-slate-400" /> Fim (Opcional)
+                </Label>
+                <Input 
+                  type="date" 
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="shadow-sm border-slate-200 text-sm"
+                />
+                <p className="text-[10px] text-slate-500 leading-tight">Preencha para gerar histórico retroativo ou baixa imediata.</p>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-slate-100">
+              <Label className="text-slate-700 font-semibold">Campanha Específica (Opcional)</Label>
               <select
                 value={selectedCampaignId || ""}
                 onChange={(e) => setSelectedCampaignId(e.target.value || null)}
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none"
               >
-                <option value="">Nenhuma campanha</option>
+                <option value="">Nenhuma / Designação Regular</option>
                 {campaigns.map((campaign) => (
                   <option key={campaign.id} value={campaign.id}>
                     {campaign.name}
@@ -736,22 +730,78 @@ export default function TerritoriesPage() {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>
+          <DialogFooter className="bg-slate-50 px-6 py-4 border-t border-slate-100">
+            <Button variant="ghost" onClick={() => setAssignDialogOpen(false)} className="text-slate-600 hover:text-slate-900">
               Cancelar
             </Button>
             <Button 
               onClick={handleAssign} 
-              disabled={!selectedUserId || assigning}
+              disabled={!selectedUserId || assigning || !startDate}
+              className="px-6 shadow-sm"
             >
               {assigning ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Designando...
+                  Processando...
                 </>
+              ) : endDate ? (
+                "Finalizar e Salvar Histórico"
               ) : (
-                "Designar"
+                "Designar Agora"
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Edit Territory Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-xs">
+          <DialogHeader>
+            <DialogTitle>Editar Território</DialogTitle>
+            <DialogDescription>
+              Altere nome, número ou cor do território.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-number">Número</Label>
+              <Input
+                id="edit-number"
+                value={editNumber}
+                onChange={(e) => setEditNumber(e.target.value)}
+                placeholder="Ex: 42"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-name">Nome</Label>
+              <Input
+                id="edit-name"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Nome do território"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-color">Cor</Label>
+              <div className="flex items-center gap-3">
+                <input
+                  id="edit-color"
+                  type="color"
+                  value={editColor}
+                  onChange={(e) => setEditColor(e.target.value)}
+                  className="h-9 w-14 rounded border border-slate-200 cursor-pointer p-0.5"
+                />
+                <span className="text-sm text-slate-600 font-mono">{editColor}</span>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditDialogOpen(false)} disabled={editSaving}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={editSaving || !editName || !editNumber}>
+              {editSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Salvar
             </Button>
           </DialogFooter>
         </DialogContent>

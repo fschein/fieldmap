@@ -7,8 +7,8 @@ import { AuthProvider } from "@/providers/auth-provider"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Territórios - Sistema de Gestão",
-  description: "Sistema de gestão de territórios de pregação",
+  title: "FieldMap",
+  description: "Gestão inteligente de territórios",
 }
 
 export default function RootLayout({

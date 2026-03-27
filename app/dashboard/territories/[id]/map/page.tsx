@@ -506,7 +506,7 @@ export default function TerritoryMapPage({
           {territory.assigned_to && (
             <div className="p-3 border-t bg-slate-50">
               <p className="text-xs text-muted-foreground mb-1">Designado para:</p>
-              <p className="font-medium text-sm">{territory.assigned_to}</p>
+              <p className="font-medium text-sm">{territory.assigned_to_user?.name || territory.assigned_to}</p>
             </div>
           )}
         </div>

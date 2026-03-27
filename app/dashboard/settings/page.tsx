@@ -14,8 +14,8 @@ import { Loader2, Settings, User, Lock, CheckCircle } from "lucide-react"
 
 export default function SettingsPage() {
   const { profile, isAdmin } = useAuth()
-  const [fullName, setFullName] = useState(profile?.name || "")
-  const [phone, setPhone] = useState(profile?.phone || "")
+  const [fullName, setFullName] = useState("")
+  const [phone, setPhone] = useState("")
   const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -25,6 +25,14 @@ export default function SettingsPage() {
   const [passwordSuccess, setPasswordSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const supabase = getSupabaseBrowserClient()
+
+  // Preenche os campos quando o perfil carregar (carrega de forma assíncrona)
+  React.useEffect(() => {
+    if (profile) {
+      setFullName(profile.name || "")
+      setPhone((profile as any).phone || "")
+    }
+  }, [profile])
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -60,19 +68,27 @@ export default function SettingsPage() {
       return
     }
 
-    if (newPassword.length < 6) {
-      setError("A nova senha deve ter pelo menos 6 caracteres")
+    // Validação de senha forte: 8+ carac, letra, número, especial
+    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$/
+    if (!passwordRegex.test(newPassword)) {
+      setError("A senha deve ter no mínimo 8 caracteres, incluindo letras, números e um caractere especial.")
       setPasswordLoading(false)
       return
     }
 
-    const { error } = await supabase.auth.updateUser({
+    const { error: authError } = await supabase.auth.updateUser({
       password: newPassword,
     })
 
-    if (error) {
-      setError(error.message)
+    if (authError) {
+      setError(authError.message)
     } else {
+      // Se a senha foi alterada com sucesso, removemos a obrigatoriedade de troca
+      await supabase
+        .from("profiles")
+        .update({ must_change_password: false })
+        .eq("id", profile?.id)
+
       setPasswordSuccess(true)
       setCurrentPassword("")
       setNewPassword("")
@@ -85,8 +101,8 @@ export default function SettingsPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Configurações</h1>
-          <p className="text-muted-foreground">Gerencie seu perfil</p>
+          <h1 className="text-3xl font-bold">Meu Perfil</h1>
+          <p className="text-muted-foreground">Gerencie suas informações</p>
         </div>
 
         <Card>
@@ -110,10 +126,7 @@ export default function SettingsPage() {
                   <AlertDescription>Perfil atualizado com sucesso!</AlertDescription>
                 </Alert>
               )}
-              <div className="space-y-2">
-                <Label htmlFor="email">E-mail</Label>
-                <Input id="email" value={profile?.email || ""} disabled />
-              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="fullName">Nome completo</Label>
                 <Input

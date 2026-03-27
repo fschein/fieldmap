@@ -76,7 +76,7 @@ if (!isReady) return <Loader2 className="animate-spin" />
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary">
             <MapPin className="h-6 w-6 text-primary-foreground" />
           </div>
-          <CardTitle className="text-2xl">Territórios</CardTitle>
+          <CardTitle className="text-2xl">FieldMap</CardTitle>
           <CardDescription>
             Entre com suas credenciais para acessar o sistema
           </CardDescription>

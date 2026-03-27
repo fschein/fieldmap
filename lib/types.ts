@@ -8,6 +8,8 @@ export interface Profile {
   name: string
   email: string
   role: UserRole
+  gender?: "M" | "F"
+  must_change_password?: boolean
   created_at: string
   updated_at: string
 }
@@ -58,6 +60,8 @@ export interface Territory {
   assigned_to: string | null
   campaign_id: string | null
   geometry: GeoJSON.Polygon | null
+  last_completed_at: string | null
+  notes: string | null
   created_at: string
   updated_at: string
 }
@@ -65,6 +69,11 @@ export interface Territory {
 export interface TerritoryWithSubdivisions extends Territory {
   subdivisions?: Subdivision[]
   campaign?: Campaign
+  assigned_to_user?: {
+    id: string
+    name: string
+    email: string
+  } | null
 }
 
 export interface Assignment {

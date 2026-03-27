@@ -64,143 +64,141 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const supabase = getSupabaseBrowserClient()
 
-  useEffect(() => {
-    // Só busca dados quando a autenticação estiver pronta e houver usuário
-    if (!isReady || !user || !profile) {
-      setLoading(false)
-      return
-    }
-
+  // Function to fetch all dashboard data
+  const fetchDashboardData = async () => {
     let mounted = true
+    try {
+      setLoading(true)
 
-    const fetchData = async () => {
-      try {
-        setLoading(true)
+      // Busca campanhas
+      const { data: campaignsData } = await supabase
+        .from("campaigns")
+        .select("id, name, active")
+        .eq("active", true)
 
-        // Busca campanhas
-        const { data: campaignsData } = await supabase
-          .from("campaigns")
-          .select("id, name, active")
-          .eq("active", true)
+      // Busca territórios
+      const { data: territoriesData } = await supabase
+        .from("territories")
+        .select("id, name, number, color, campaign_id")
+        .order("number", { ascending: true })
 
-        // Busca territórios
-        const { data: territoriesData } = await supabase
-          .from("territories")
-          .select("id, name, number, color, campaign_id")
-          .order("number", { ascending: true })
+      // Busca assignments
+      const { data: assignmentsData } = await supabase
+        .from("assignments")
+        .select(`
+          id, status, assigned_at, completed_at, returned_at,
+          territory_id, user_id,
+          territories ( name, number ),
+          profiles!assignments_user_id_fkey ( name )
+        `)
+        .order("assigned_at", { ascending: false })
+        .limit(100)
 
-        // Busca assignments
-        const { data: assignmentsData } = await supabase
-          .from("assignments")
-          .select(`
-            id, status, assigned_at, completed_at, returned_at,
-            territory_id, user_id,
-            territories ( name, number ),
-            profiles!assignments_user_id_fkey ( name )
-          `)
-          .order("assigned_at", { ascending: false })
-          .limit(100)
+      // Busca publicadores
+      const { data: publishersData } = await supabase
+        .from("profiles")
+        .select("id, name")
+        .eq("role", "publicador")
 
-        // Busca publicadores
-        const { data: publishersData } = await supabase
-          .from("profiles")
-          .select("id, name")
-          .eq("role", "publicador")
+      if (!mounted || !territoriesData || !assignmentsData) {
+        return
+      }
 
-        if (!mounted || !territoriesData || !assignmentsData) {
-          return
+      // Calcula estatísticas
+      const activeAssignments = assignmentsData.filter((a: { status: string }) => a.status === 'active')
+      const completedAssignments = assignmentsData.filter((a: { status: string }) => a.status === 'completed')
+
+      // Calcula dias médios em campo
+      const completedWithDays = completedAssignments
+        .filter((a: { completed_at: any }) => a.completed_at)
+        .map((a: { assigned_at: string | number | Date; completed_at: string | number | Date }) => {
+          const start = new Date(a.assigned_at)
+          const end = new Date(a.completed_at!)
+          return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+        })
+      
+      const avgDays = completedWithDays.length > 0
+        ? Math.round(completedWithDays.reduce((a: any, b: any) => a + b, 0) / completedWithDays.length)
+        : 0
+
+      // Calcula atrasados (>90 dias)
+      const overdueCount = activeAssignments.filter((a: { assigned_at: string | number | Date }) => {
+        const days = Math.ceil((new Date().getTime() - new Date(a.assigned_at).getTime()) / (1000 * 60 * 60 * 24))
+        return days > 90
+      }).length
+
+      // Taxa de conclusão
+      const totalAssignments = assignmentsData.length
+      const completionRate = totalAssignments > 0
+        ? Math.round((completedAssignments.length / totalAssignments) * 100)
+        : 0
+
+      // Mapeia territórios com suas estatísticas
+      const territoriesWithStats: TerritoryWithStats[] = territoriesData.map((t: { id: any }) => {
+        const territoryAssignments = assignmentsData.filter((a: { territory_id: any }) => a.territory_id === t.id)
+        const activeAssignment = territoryAssignments.find((a: { status: string }) => a.status === 'active')
+        const daysInField = activeAssignment 
+          ? Math.ceil((new Date().getTime() - new Date(activeAssignment.assigned_at).getTime()) / (1000 * 60 * 60 * 24))
+          : undefined
+
+        return {
+          ...t,
+          assignmentCount: territoryAssignments.filter((a: { status: string }) => a.status === 'completed').length,
+          lastAssignment: territoryAssignments[0],
+          isActive: !!activeAssignment,
+          daysInField
         }
+      })
 
-        // Calcula estatísticas
-        const activeAssignments = assignmentsData.filter((a: { status: string }) => a.status === 'active')
-        const completedAssignments = assignmentsData.filter((a: { status: string }) => a.status === 'completed')
+      // Atividades recentes (últimas 5)
+      const activities: RecentActivity[] = assignmentsData.slice(0, 5).map((a: { id: any; status: string; territories: any; profiles: any; completed_at: any; returned_at: any; assigned_at: any }) => ({
+        id: a.id,
+        type: a.status === 'completed' ? 'completed' : a.status === 'returned' ? 'returned' : 'assigned',
+        territory: (a.territories as any)?.name || 'Território',
+        publisher: (a.profiles as any)?.name || 'Publicador',
+        date: a.completed_at || a.returned_at || a.assigned_at
+      }))
 
-        // Calcula dias médios em campo
-        const completedWithDays = completedAssignments
-          .filter((a: { completed_at: any }) => a.completed_at)
-          .map((a: { assigned_at: string | number | Date; completed_at: string | number | Date }) => {
-            const start = new Date(a.assigned_at)
-            const end = new Date(a.completed_at!)
-            return Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
-          })
-        
-        const avgDays = completedWithDays.length > 0
-          ? Math.round(completedWithDays.reduce((a: any, b: any) => a + b, 0) / completedWithDays.length)
-          : 0
-
-        // Calcula atrasados (>90 dias)
-        const overdueCount = activeAssignments.filter((a: { assigned_at: string | number | Date }) => {
-          const days = Math.ceil((new Date().getTime() - new Date(a.assigned_at).getTime()) / (1000 * 60 * 60 * 24))
-          return days > 90
-        }).length
-
-        // Taxa de conclusão
-        const totalAssignments = assignmentsData.length
-        const completionRate = totalAssignments > 0
-          ? Math.round((completedAssignments.length / totalAssignments) * 100)
-          : 0
-
-        // Mapeia territórios com suas estatísticas
-        const territoriesWithStats: TerritoryWithStats[] = territoriesData.map((t: { id: any }) => {
-          const territoryAssignments = assignmentsData.filter((a: { territory_id: any }) => a.territory_id === t.id)
-          const activeAssignment = territoryAssignments.find((a: { status: string }) => a.status === 'active')
-          const daysInField = activeAssignment 
-            ? Math.ceil((new Date().getTime() - new Date(activeAssignment.assigned_at).getTime()) / (1000 * 60 * 60 * 24))
-            : undefined
-
-          return {
-            ...t,
-            assignmentCount: territoryAssignments.filter((a: { status: string }) => a.status === 'completed').length,
-            lastAssignment: territoryAssignments[0],
-            isActive: !!activeAssignment,
-            daysInField
-          }
+      if (mounted) {
+        setStats({
+          totalTerritories: territoriesData.length,
+          activeTerritories: activeAssignments.length,
+          completedAssignments: completedAssignments.length,
+          activeAssignments: activeAssignments.length,
+          returnedAssignments: assignmentsData.filter((a: { status: string }) => a.status === 'returned').length,
+          activeCampaigns: campaignsData?.length || 0,
+          totalPublishers: publishersData?.length || 0,
+          averageDaysInField: avgDays,
+          overdueAssignments: overdueCount,
+          completionRate
         })
 
-        // Atividades recentes (últimas 5)
-        const activities: RecentActivity[] = assignmentsData.slice(0, 5).map((a: { id: any; status: string; territories: any; profiles: any; completed_at: any; returned_at: any; assigned_at: any }) => ({
-          id: a.id,
-          type: a.status === 'completed' ? 'completed' : a.status === 'returned' ? 'returned' : 'assigned',
-          territory: (a.territories as any)?.name || 'Território',
-          publisher: (a.profiles as any)?.name || 'Publicador',
-          date: a.completed_at || a.returned_at || a.assigned_at
-        }))
+        setTerritories(territoriesWithStats)
+        setRecentActivity(activities)
+      }
 
-        if (mounted) {
-          setStats({
-            totalTerritories: territoriesData.length,
-            activeTerritories: activeAssignments.length,
-            completedAssignments: completedAssignments.length,
-            activeAssignments: activeAssignments.length,
-            returnedAssignments: assignmentsData.filter((a: { status: string }) => a.status === 'returned').length,
-            activeCampaigns: campaignsData?.length || 0,
-            totalPublishers: publishersData?.length || 0,
-            averageDaysInField: avgDays,
-            overdueAssignments: overdueCount,
-            completionRate
-          })
-
-          setTerritories(territoriesWithStats)
-          setRecentActivity(activities)
-        }
-
-      } catch (error) {
-        console.error("Dashboard - Error fetching data:", error)
-      } finally {
-        if (mounted) {
-          setLoading(false)
-        }
+    } catch (error) {
+      console.error("Dashboard - Error fetching data:", error)
+    } finally {
+      if (mounted) {
+        setLoading(false)
       }
     }
+    return () => { mounted = false }
+  }
 
-    fetchData()
-
-    return () => {
-      mounted = false
+  useEffect(() => {
+    // Redirecionamento RBAC: Dirigentes e Publicadores pulam o Dashboard geral
+    if (isReady && profile && profile.role !== "admin") {
+      window.location.href = "/dashboard/my-assignments"
+    } else if (isReady && profile?.role === "admin") {
+      fetchDashboardData()
     }
-  }, [isReady, user, profile, supabase])
+    
+    // Cleanup simple when component unmounts is handled by the data fetcher states
+  }, [isReady, profile, supabase]) // Added supabase to dependencies for fetchDashboardData
 
-  if (loading) {
+  if (loading || !isReady || (profile && profile.role !== "admin")) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center space-y-4">
@@ -234,66 +232,46 @@ export default function DashboardPage() {
         <p className="text-muted-foreground">Bem-vindo, {profile?.name || "Usuário"}!</p>
       </div>
 
-      {/* Stats Grid Principal */}
+      {/* Stats Consolidado (Mobile-First 2x2 Grid) */}
       {stats && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatsCard 
-            title="Territórios Ativos" 
-            value={stats.activeTerritories}
-            description={`de ${stats.totalTerritories} territórios`}
-            icon={Map}
-          />
-          <StatsCard 
-            title="Concluídos" 
-            value={stats.completedAssignments}
-            description={`Taxa: ${stats.completionRate}%`}
-            icon={CheckCircle}
-          />
-          <StatsCard 
-            title="Média em Campo"
-            value={`${stats.averageDaysInField}d`}
-            description="dias por território"
-            icon={Clock}
-          />
-          <StatsCard 
-            title="Publicadores"
-            value={stats.totalPublishers}
-            description={`${stats.activeCampaigns} campanha${stats.activeCampaigns !== 1 ? 's' : ''} ativa${stats.activeCampaigns !== 1 ? 's' : ''}`}
-            icon={Users}
-          />
-        </div>
-      )}
-
-      {/* Stats Secundários */}
-      {stats && (
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Activity className="h-4 w-4 text-blue-600" />
-                Em Campo Agora
+        <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+          <Card className={stats.overdueAssignments > 0 ? "border-orange-200 bg-orange-50/30" : ""}>
+            <CardHeader className="p-3 pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Activity className="h-4 w-4 text-blue-600" />
+                  <span className="hidden sm:inline">Em Campo</span>
+                  <span className="sm:hidden">Ativos</span>
+                </span>
+                {stats.overdueAssignments > 0 && (
+                  <AlertCircle className="h-4 w-4 text-orange-600" />
+                )}
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.activeAssignments}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                designações ativas
+            <CardContent className="p-3 pt-0">
+              <div className="text-xl sm:text-2xl font-bold">{stats.activeAssignments}</div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
+                {stats.overdueAssignments > 0 ? (
+                  <span className="text-orange-600 font-medium">{stats.overdueAssignments} atrasados</span>
+                ) : (
+                  <span>de {stats.totalTerritories} territórios</span>
+                )}
               </p>
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <CardHeader className="p-3 pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
                 <TrendingUp className="h-4 w-4 text-green-600" />
-                Taxa de Conclusão
+                Eficiência
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.completionRate}%</div>
-              <div className="mt-2 h-2 bg-slate-200 rounded-full overflow-hidden">
+            <CardContent className="p-3 pt-0">
+              <div className="text-xl sm:text-2xl font-bold">{stats.completionRate}%</div>
+              <div className="mt-1 h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-green-600 transition-all duration-500"
+                  className="h-full bg-green-500 transition-all duration-500"
                   style={{ width: `${stats.completionRate}%` }}
                 />
               </div>
@@ -301,16 +279,31 @@ export default function DashboardPage() {
           </Card>
 
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 text-orange-600" />
-                Atrasados
+            <CardHeader className="p-3 pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
+                <Clock className="h-4 w-4 text-slate-500" />
+                Ritmo
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.overdueAssignments}</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                mais de 90 dias
+            <CardContent className="p-3 pt-0">
+              <div className="text-xl sm:text-2xl font-bold">{stats.averageDaysInField}d</div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
+                média em campo
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="p-3 pb-2">
+              <CardTitle className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
+                <Users className="h-4 w-4 text-slate-500" />
+                Equipe
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-3 pt-0">
+              <div className="text-xl sm:text-2xl font-bold">{stats.totalPublishers}</div>
+              <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
+                publicadores
               </p>
             </CardContent>
           </Card>

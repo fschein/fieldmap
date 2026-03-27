@@ -295,12 +295,12 @@ export default function CampaignsPage() {
                   <div className="text-sm text-muted-foreground">
                     <p>
                       Início: {campaign.start_date
-                        ? new Date(campaign.start_date).toLocaleDateString("pt-BR")
+                        ? new Date(`${campaign.start_date}T12:00:00Z`).toLocaleDateString("pt-BR")
                         : "Não definida"}
                     </p>
                     {campaign.end_date && (
                       <p>
-                        Término: {new Date(campaign.end_date).toLocaleDateString("pt-BR")}
+                        Término: {new Date(`${campaign.end_date}T12:00:00Z`).toLocaleDateString("pt-BR")}
                       </p>
                     )}
                   </div>

@@ -112,6 +112,9 @@ export function TerritoryMap({
       attributionControl: true,
     }).setView(mapCenter, mapZoom)
 
+    // Remover a bandeira da Ucrânia do prefixo padrão do Leaflet
+    map.attributionControl.setPrefix('<a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a>')
+
     mapInstanceRef.current = map
 
     // Add tile layer

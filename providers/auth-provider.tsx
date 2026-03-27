@@ -1,9 +1,9 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState, useCallback, SetStateAction } from "react"
+import { createContext, useContext, useEffect, useState, useCallback } from "react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import type { User } from "@supabase/supabase-js"
+import type { User, AuthChangeEvent, Session } from "@supabase/supabase-js"
 import type { Profile } from "@/lib/types"
 
 type AuthContextType = {
@@ -20,54 +20,54 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
+// Singleton fora do componente — referência 100% estável entre renders
+const supabase = getSupabaseBrowserClient()
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [isReady, setIsReady] = useState(false)
   const [loading, setLoading] = useState(true)
-  
-  const supabase = getSupabaseBrowserClient()
   const router = useRouter()
 
   const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
     try {
+      // Select explícito para evitar erro se colunas opcionais ainda não existirem no BD
       const { data, error } = await supabase
         .from("profiles")
-        .select("*")
+        .select("id, name, email, role, phone")
         .eq("id", userId)
         .single()
 
       if (error) {
-        console.error("Error fetching profile:", error)
+        // Ignora erro de perfil não encontrado (novo usuário) silenciosamente
+        if (error.code !== 'PGRST116') {
+          console.warn("Error fetching profile:", error.message)
+        }
         return null
       }
-      
       return data as Profile
     } catch (err) {
-      console.error("Exception fetching profile:", err)
+      console.warn("Exception fetching profile:", err)
       return null
     }
-  }, [supabase])
+  }, [])
 
   const refreshProfile = useCallback(async () => {
-    if (user) {
-      const userProfile = await fetchProfile(user.id)
-      setProfile(userProfile)
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    if (currentUser) {
+      const p = await fetchProfile(currentUser.id)
+      setProfile(p)
     }
-  }, [user, fetchProfile])
+  }, [fetchProfile])
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-    
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (data.user && !error) {
       setUser(data.user)
-      const userProfile = await fetchProfile(data.user.id)
-      setProfile(userProfile)
+      const p = await fetchProfile(data.user.id)
+      setProfile(p)
     }
-    
     return { data, error }
   }
 
@@ -85,49 +85,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true
 
-    const initializeAuth = async () => {
-      try {
-        // Busca a sessão atual
-        const { data: { session }, error } = await supabase.auth.getSession()
-        
-        if (error) {
-          console.error("Error getting session:", error)
-        }
-
-        if (session?.user && mounted) {
-          setUser(session.user)
-          const userProfile = await fetchProfile(session.user.id)
-          if (mounted) {
-            setProfile(userProfile)
-          }
-        }
-      } catch (error) {
-        console.error("Error initializing auth:", error)
-      } finally {
-        if (mounted) {
-          setIsReady(true)
-          setLoading(false)
-        }
-      }
-    }
-
-    initializeAuth()
-
-    // Listener para mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: string, session: any) => {
+      (event: AuthChangeEvent, session: Session | null) => {
         if (!mounted) return
 
-        console.log("Auth state change:", event)
+        console.log("Auth event:", event)
+
+        if (event === "INITIAL_SESSION") {
+          // ✅ LOCK RESOLVIDO AQUI: isReady e loading são definidos PRIMEIRO,
+          // de forma síncrona, ANTES de qualquer fetch de dados.
+          // Isso garante que o spinner NUNCA fica preso esperando a rede.
+          if (session?.user) {
+            setUser(session.user)
+          } else {
+            setUser(null)
+            setProfile(null)
+          }
+
+          // Desbloqueia a UI imediatamente
+          setIsReady(true)
+          setLoading(false)
+
+          // Busca o profile de forma assíncrona e não-bloqueante
+          if (session?.user) {
+            fetchProfile(session.user.id).then(p => {
+              if (mounted) setProfile(p)
+            })
+          }
+          return
+        }
 
         if (event === "SIGNED_IN" && session?.user) {
           setUser(session.user)
-          const userProfile = await fetchProfile(session.user.id)
-          if (mounted) {
-            setProfile(userProfile)
-            setIsReady(true)
-            setLoading(false)
-          }
+          setIsReady(true)
+          setLoading(false)
+          fetchProfile(session.user.id).then(p => {
+            if (mounted) setProfile(p)
+          })
+          return
         }
 
         if (event === "SIGNED_OUT") {
@@ -135,11 +130,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setProfile(null)
           setIsReady(true)
           setLoading(false)
+          return
         }
 
         if (event === "TOKEN_REFRESHED" && session?.user) {
           setUser(session.user)
-          // Não busca profile novamente no refresh, já temos
         }
       }
     )
@@ -148,20 +143,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [supabase, fetchProfile])
+  }, [fetchProfile])
 
   const isAdmin = profile?.role === "admin"
   const isDirigente = profile?.role === "dirigente" || isAdmin
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      profile, 
-      isReady, 
-      loading, 
-      isAdmin, 
-      isDirigente, 
-      signIn, 
+    <AuthContext.Provider value={{
+      user,
+      profile,
+      isReady,
+      loading,
+      isAdmin,
+      isDirigente,
+      signIn,
       signOut,
       refreshProfile
     }}>

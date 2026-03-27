@@ -30,14 +30,45 @@ export async function middleware(request: NextRequest) {
 
   const isDashboardPage = request.nextUrl.pathname.startsWith('/dashboard')
   const isLoginPage = request.nextUrl.pathname.startsWith('/login')
+  const isAuthPage = request.nextUrl.pathname.startsWith('/auth')
 
   // 4. Lógica de Redirecionamento
+  // Libera as rotas /auth/* para permitir links de reset de senha e callbacks
+  if (isAuthPage) {
+    return response
+  }
+
   if (!user && isDashboardPage) {
-    return NextResponse.redirect(new URL('/login', request.url))
+    const redirectResponse = NextResponse.redirect(new URL('/login', request.url))
+    response.cookies.getAll().forEach(cookie => {
+      redirectResponse.cookies.set(cookie)
+    })
+    return redirectResponse
   }
 
   if (user && isLoginPage) {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
+    const redirectResponse = NextResponse.redirect(new URL('/dashboard', request.url))
+    response.cookies.getAll().forEach(cookie => {
+      redirectResponse.cookies.set(cookie)
+    })
+    return redirectResponse
+  }
+
+  // 5. Verificar se a troca de senha é obrigatória (Apenas para rotas do Dashboard)
+  if (user && isDashboardPage && !request.nextUrl.pathname.startsWith('/dashboard/settings')) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('must_change_password')
+      .eq('id', user.id)
+      .single()
+
+    if (profile?.must_change_password) {
+      const redirectResponse = NextResponse.redirect(new URL('/dashboard/settings?force=true', request.url))
+      response.cookies.getAll().forEach(cookie => {
+        redirectResponse.cookies.set(cookie)
+      })
+      return redirectResponse
+    }
   }
 
   return response
