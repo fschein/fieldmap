@@ -6,9 +6,10 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { useAuth } from "@/hooks/use-auth"
 import { TerritoryWithSubdivisions, Subdivision } from "@/lib/types"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Loader2, CheckCircle2, MapPin } from "lucide-react"
+import { ArrowLeft, Loader2, CheckCircle2, MapPin, MapPinOff, Navigation } from "lucide-react"
 import { SubdivisionDrawer } from "@/components/my-assignments/subdivision-drawer"
 import { CompleteAssignmentDialog } from "@/components/my-assignments/complete-assignment-dialog"
+import { AddDoNotVisitDialog } from "@/components/my-assignments/add-do-not-visit-dialog"
 import dynamic from "next/dynamic"
 
 // Importar o mapa dinamicamente para evitar problemas de SSR
@@ -33,6 +34,9 @@ export default function TerritoryMapPage() {
   const [loading, setLoading] = useState(true)
   const [selectedSubdivision, setSelectedSubdivision] = useState<Subdivision | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [pinMode, setPinMode] = useState(false)
+  const [dnvDialogOpen, setDnvDialogOpen] = useState(false)
+  const [dnvCoords, setDnvCoords] = useState<{lat: number, lng: number} | null>(null)
   const supabase = getSupabaseBrowserClient()
 
   const territoryId = params.id as string
@@ -48,7 +52,8 @@ export default function TerritoryMapPage() {
           *,
           campaign:campaigns(*),
           subdivisions(*),
-          assignments(*)
+          assignments(*),
+          do_not_visits(*)
         `)
         .eq("id", territoryId)
         .eq("assigned_to", user.id)
@@ -113,6 +118,31 @@ export default function TerritoryMapPage() {
 
       if (assignmentError) throw assignmentError
 
+      // Insert notification for returned/completed territory
+      const userName = (user as any)?.user_metadata?.name || user?.email || "Um publicador"
+      await supabase.from("notifications").insert({
+        type: "returned",
+        title: isFullyCompleted ? "Território Concluído" : "Território Devolvido",
+        message: `${userName} ${isFullyCompleted ? 'concluiu' : 'devolveu'} o Território ${territory.number}.`,
+        created_by: user?.id,
+        territory_id: territory.id,
+      })
+
+      // Check if the user now has no remaining active territories -> idle notification
+      const { count } = await supabase
+        .from("territories")
+        .select("id", { count: "exact", head: true })
+        .eq("assigned_to", user?.id)
+
+      if ((count ?? 1) === 0) {
+        await supabase.from("notifications").insert({
+          type: "idle",
+          title: "Publicador sem Território",
+          message: `${userName} ficou sem territórios após devolver o Território ${territory.number}.`,
+          created_by: user?.id,
+        })
+      }
+
       router.push("/dashboard/my-assignments")
     } catch (error: any) {
       console.error("Erro ao processar devolução:", error?.message || error)
@@ -123,6 +153,16 @@ export default function TerritoryMapPage() {
   const handleSubdivisionClick = (subdivision: Subdivision) => {
     setSelectedSubdivision(subdivision)
     setDrawerOpen(true)
+  }
+
+  const handlePinConfirm = (latlng: any) => {
+    setPinMode(false)
+    setDnvCoords({ lat: latlng.lat, lng: latlng.lng })
+    setDnvDialogOpen(true)
+  }
+
+  const handlePinCancel = () => {
+    setPinMode(false)
   }
 
   const handleToggleSubdivision = async (subdivision: Subdivision) => {
@@ -147,6 +187,27 @@ export default function TerritoryMapPage() {
     } catch (error: any) {
       console.error("Erro ao atualizar quadra:", error?.message || error)
       alert("Erro ao atualizar quadra. Tente novamente.")
+    }
+  }
+
+  const handleAddDnvClick = () => {
+    // Tenta pegar a localização atual primeiro
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setDnvCoords({ lat: position.coords.latitude, lng: position.coords.longitude })
+          setDnvDialogOpen(true)
+        },
+        (error) => {
+          console.warn("Geolocalização indisponível, ativando Pin Mode", error)
+          // Falha ou negado, ativa Pin Mode
+          // Falha ou negado, ativa Pin Mode no mapa
+          setPinMode(true)
+        },
+        { enableHighAccuracy: true, timeout: 5000 }
+      )
+    } else {
+      setPinMode(true)
     }
   }
 
@@ -175,55 +236,77 @@ export default function TerritoryMapPage() {
   ).length || 0
   const totalCount = territory.subdivisions?.length || 0
   const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
+  const isFullyCompleted = progress === 100
 
   return (
-    <div className="-mx-6 -mt-20 md:-mt-6 flex flex-col bg-slate-50" style={{ height: '100dvh' }}>
-      <div className="flex flex-col flex-1 min-h-0 p-2 sm:p-4 gap-2 pt-[4.5rem] md:pt-2">
-      {/* Header Compacto */}
-      <div className="flex items-center justify-between bg-white px-3 py-2 rounded-lg shadow-sm border border-slate-200">
-        <div className="flex items-center gap-2">
+    <div className="-mx-6 -mb-6 -mt-20 md:-mt-6 flex flex-col bg-slate-50 overflow-hidden relative" style={{ height: '100dvh' }}>
+      {/* Header Fixo Sólido (Mobile) / Flutuante (Desktop) */}
+      <div className="absolute top-0 left-0 right-0 h-16 z-[40] bg-white shadow-sm flex items-center justify-between pr-4 pl-[4.5rem] md:relative md:h-auto md:bg-transparent md:shadow-none md:px-4 md:pt-4 md:pl-4">
+        
+        {/* Lado Esquerdo (Voltar + Nome do Território) */}
+        <div className="flex items-center gap-2 overflow-hidden">
           <Button
-            variant="ghost"
+            variant="outline"
             size="icon"
-            className="h-8 w-8 -ml-1 text-slate-500 hover:text-slate-900"
+            className="h-9 w-9 text-slate-500 hover:text-slate-900 hidden md:flex flex-shrink-0 bg-white shadow-sm border-slate-200 rounded-full"
             onClick={() => router.push("/dashboard/my-assignments")}
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0 md:bg-white/95 md:backdrop-blur-sm md:px-3 md:py-1.5 md:rounded-full md:shadow-sm md:border md:border-slate-200">
             <div
               className="w-3 h-3 rounded-full ring-2 ring-slate-100 flex-shrink-0"
               style={{ backgroundColor: territory.color }}
             />
-            <h1 className="text-base sm:text-lg font-bold leading-tight line-clamp-1 text-slate-800">
+            <h1 className="text-sm sm:text-base font-bold leading-tight truncate text-slate-800">
               Território {territory.number}
-              <span className="hidden sm:inline font-normal text-slate-500 ml-2">
-                {territory.name}
-              </span>
             </h1>
           </div>
         </div>
 
-        <div className="bg-slate-100 px-2.5 py-1 rounded text-sm font-bold text-slate-700">
-          {progress}%
+        {/* Lado Direito (% de Conclusão) */}
+        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+          <div className="text-slate-700 font-bold md:bg-white/95 md:backdrop-blur-sm md:border md:border-slate-200 md:px-3 md:py-1.5 md:rounded-full text-sm md:shadow-sm">
+            {progress}%
+          </div>
         </div>
       </div>
 
-      {/* Mapa (Ocupa o resto do espaço - flex-1) */}
-      <div className="flex-1 min-h-0 rounded-xl border border-slate-200 overflow-hidden shadow-sm relative">
-        <TerritoryMapViewer
-          territory={territory}
+      <div className="flex flex-col flex-1 min-h-0 pt-16 md:pt-4 relative w-full">
+
+      {/* Mapa (Edge-to-Edge no mobile) */}
+      <div className={`flex-1 min-h-0 shrink-0 border-y-0 md:border md:rounded-xl overflow-hidden shadow-sm relative z-0 ${pinMode ? 'border-red-500 ring-inset ring-4 ring-red-500/30 cursor-crosshair' : 'border-slate-200'}`}>
+        <TerritoryMapViewer 
+          territory={territory} 
           onSubdivisionClick={handleSubdivisionClick}
+          pinMode={pinMode}
+          onPinConfirm={handlePinConfirm}
+          onPinCancel={handlePinCancel}
         />
       </div>
 
-      {/* Botão de Conclusão Colado Embaixo */}
-      <Button 
-        className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold h-12 text-base shadow-sm mt-1 sm:mt-2"
-        onClick={() => setShowCompleteDialog(true)}
-      >
-        Devolver Território
-      </Button>
+      {/* Botões Bottom/Native Bar */}
+      <div className="flex gap-2 p-4 pb-6 md:pb-4 bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.05)] z-[40] relative shrink-0">
+        <Button 
+          variant="outline"
+          className={`flex-1 min-h-[48px] border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 font-bold ${pinMode ? 'bg-red-50 animate-pulse' : 'bg-white'}`}
+          onClick={handleAddDnvClick}
+          disabled={pinMode}
+        >
+          <MapPinOff className="h-4 w-4 mr-2" />
+          Não Visitar
+        </Button>
+        <Button 
+          className={`flex-1 min-h-[48px] text-white font-bold shadow-sm ${
+            isFullyCompleted 
+            ? 'bg-green-600 hover:bg-green-700' 
+            : 'bg-orange-600 hover:bg-orange-700'
+          }`}
+          onClick={() => setShowCompleteDialog(true)}
+        >
+          {isFullyCompleted ? 'Concluir' : 'Devolver'}
+        </Button>
+      </div>
 
       {/* Drawer para Subdivisão Selecionada */}
       {selectedSubdivision && (
@@ -242,6 +325,16 @@ export default function TerritoryMapPage() {
         territory={territory}
         activeAssignmentDate={(territory as any).assignments?.find((a: any) => a.status === 'active')?.assigned_at}
         onConfirm={handleConfirmCompletion}
+      />
+
+      {/* Dialog para Adicionar Não Visitar */}
+      <AddDoNotVisitDialog
+        open={dnvDialogOpen}
+        onOpenChange={setDnvDialogOpen}
+        territoryId={territory.id}
+        latitude={dnvCoords?.lat || null}
+        longitude={dnvCoords?.lng || null}
+        onSuccess={() => fetchTerritory()}
       />
       </div>
     </div>

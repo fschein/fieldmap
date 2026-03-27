@@ -4,18 +4,30 @@ import { useEffect, useRef } from "react"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import { TerritoryWithSubdivisions, Subdivision } from "@/lib/types"
+import { MapPinOff } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 interface TerritoryMapViewerProps {
   territory: TerritoryWithSubdivisions
   onSubdivisionClick: (subdivision: Subdivision) => void
+  onMapClick?: (latlng: L.LatLng) => void
+  pinMode?: boolean
+  onPinConfirm?: (latlng: L.LatLng) => void
+  onPinCancel?: () => void
 }
 
 export default function TerritoryMapViewer({
   territory,
   onSubdivisionClick,
+  onMapClick,
+  pinMode = false,
+  onPinConfirm,
+  onPinCancel,
 }: TerritoryMapViewerProps) {
   const mapRef = useRef<L.Map | null>(null)
   const mapContainerRef = useRef<HTMLDivElement>(null)
+  const userMarkerRef = useRef<L.Marker | null>(null)
+  const userRadiusRef = useRef<L.Circle | null>(null)
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
@@ -176,6 +188,34 @@ export default function TerritoryMapViewer({
 
     console.log(`\n=== RESUMO: ${polygons.length} polígonos renderizados ===\n`)
 
+    // Adicionar marcadores de Não Visitar (Filtrando os maiores que 1 ano)
+    const activeDoNotVisits = territory.do_not_visits?.filter((dnv) => {
+      if (!dnv.created_at) return true;
+      const date = new Date(dnv.created_at);
+      const isExpired = new Date().getTime() - date.getTime() > 365 * 24 * 60 * 60 * 1000;
+      return !isExpired;
+    }) || [];
+
+    activeDoNotVisits.forEach((dnv) => {
+      if (dnv.latitude && dnv.longitude) {
+        const marker = L.circleMarker([dnv.latitude, dnv.longitude], {
+          color: '#dc2626',
+          fillColor: '#ef4444',
+          fillOpacity: 0.8,
+          radius: 8,
+          weight: 2
+        });
+
+        const tooltipContent = `
+          <div class="text-sm font-semibold text-red-700 mb-1">🛑 Não Visitar</div>
+          ${dnv.address ? `<div class="text-xs mb-1"><strong>Endereço:</strong> ${dnv.address}</div>` : ''}
+          ${dnv.notes ? `<div class="text-xs text-slate-600"><strong>Obs:</strong> ${dnv.notes}</div>` : ''}
+        `
+        marker.bindTooltip(tooltipContent, { className: "custom-tooltip" })
+        marker.addTo(map)
+      }
+    })
+
     // Ajustar zoom para mostrar todos os polígonos
     if (hasValidPolygons && polygons.length > 0) {
       const group = L.featureGroup(polygons)
@@ -186,52 +226,172 @@ export default function TerritoryMapViewer({
       console.log("⚠️ Nenhum polígono válido, mantendo centro padrão")
       map.setView([-27.0945, -52.6166], 15)
     }
-  }, [territory, onSubdivisionClick])
+
+    // Remover evento de clique no mapa quando em Pin Mode para evitar abrir quadras acidentalmente!
+    // E quando não está em Pin Mode, usar onMapClick se provido
+    const handleMapClick = (e: L.LeafletMouseEvent) => {
+      if (!pinMode && onMapClick) {
+        onMapClick(e.latlng)
+      }
+    }
+    
+    map.on('click', handleMapClick)
+
+    return () => {
+      map.off('click', handleMapClick)
+    }
+  }, [territory, onSubdivisionClick, onMapClick, pinMode])
+
+  // Efeito independente para Geolocalização (watchPosition)
+  useEffect(() => {
+    if (!mapRef.current) return
+    const map = mapRef.current
+
+    let watchId: number
+
+    if ('geolocation' in navigator) {
+      watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const lat = position.coords.latitude
+          const lng = position.coords.longitude
+          const accuracy = position.coords.accuracy
+
+          // Criar ícone pulsante usando CSS
+          const blueDotIcon = L.divIcon({
+            className: 'user-location-marker',
+            html: '<div class="pulse-dot"></div>',
+            iconSize: [16, 16],
+            iconAnchor: [8, 8]
+          })
+
+          if (!userMarkerRef.current) {
+            userMarkerRef.current = L.marker([lat, lng], { icon: blueDotIcon, zIndexOffset: 1000 }).addTo(map)
+            userRadiusRef.current = L.circle([lat, lng], {
+              radius: accuracy,
+              color: '#3b82f6',
+              fillColor: '#3b82f6',
+              fillOpacity: 0.1,
+              weight: 1
+            }).addTo(map)
+
+            // Centraliza no usuário apenas na primeira vez que recebe a localização e o PinMode NÃO estiver ativo
+            if (!pinMode) {
+              map.setView([lat, lng], Math.max(map.getZoom(), 16))
+            }
+          } else {
+            userMarkerRef.current.setLatLng([lat, lng])
+            if (userRadiusRef.current) {
+              userRadiusRef.current.setLatLng([lat, lng])
+              userRadiusRef.current.setRadius(accuracy)
+            }
+          }
+        },
+        (error) => {
+          console.warn("Geolocalização erro:", error)
+        },
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+      )
+    }
+
+    return () => {
+      if (watchId !== undefined && 'geolocation' in navigator) {
+        navigator.geolocation.clearWatch(watchId)
+      }
+    }
+  }, [pinMode])
 
   return (
-    <div className="relative">
+    <div className="relative w-full h-full min-h-[500px]">
       <div
         ref={mapContainerRef}
         className="w-full h-[calc(100vh-12rem)] md:h-[calc(100vh-14rem)] rounded-lg z-0"
         style={{ minHeight: "500px" }}
       />
 
-      {/* Legenda */}
-      <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-4 z-[1000] border">
-        <h3 className="text-sm font-semibold mb-3">Legenda</h3>
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded border-2" style={{
-              backgroundColor: territory.color || "#3b82f6",
-              borderColor: territory.color || "#2563eb",
-              opacity: 0.5,
-            }} />
-            <span className="text-xs">Quadra Pendente</span>
+      {/* Crosshair do Pin Mode */}
+      {pinMode && (
+        <>
+          {/* Target mark (crosshair) */}
+          <div className="absolute top-[calc(50%-16px)] left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none drop-shadow-md">
+            <MapPinOff className="w-8 h-8 text-red-600 animate-bounce" />
+            <div className="w-2 h-2 bg-red-600 rounded-full mx-auto mt-1 opacity-70"></div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded border-2 border-green-600 bg-green-500 opacity-60" />
-            <span className="text-xs">Quadra Concluída</span>
+          
+          {/* Botões do Pin Mode */}
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] drop-shadow-lg flex flex-col gap-2 w-[85%] max-w-xs">
+            <Button 
+              size="lg"
+              className="bg-red-600 hover:bg-red-700 text-white font-bold h-12 w-full text-[15px] sm:text-base whitespace-normal text-center leading-tight shadow-md"
+              onClick={() => {
+                if (mapRef.current && onPinConfirm) {
+                  onPinConfirm(mapRef.current.getCenter())
+                }
+              }}
+            >
+              Confirmar Local
+            </Button>
+            <Button 
+              size="lg"
+              variant="secondary" 
+              className="h-12 w-full bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 font-semibold shadow-md"
+              onClick={onPinCancel}
+            >
+              Cancelar
+            </Button>
+          </div>
+          
+          {/* Header instructions for Pin Mode */}
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-white/95 px-4 py-2 rounded-full shadow-md border text-sm font-medium text-slate-800 flex items-center gap-2 whitespace-nowrap">
+            <MapPinOff className="w-4 h-4 text-red-600" />
+            Mova o mapa para apontar o local
+          </div>
+        </>
+      )}
+
+      {/* Legenda (Esconde no Pin Mode) */}
+      {!pinMode && (
+        <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-3 sm:p-4 z-[900] border max-w-[150px] sm:max-w-none">
+          <h3 className="text-xs sm:text-sm font-semibold mb-2 sm:mb-3">Legenda</h3>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 sm:w-4 sm:h-4 rounded border-2" style={{
+                backgroundColor: territory.color || "#3b82f6",
+                borderColor: territory.color || "#2563eb",
+                opacity: 0.5,
+              }} />
+              <span className="text-[10px] sm:text-xs leading-tight">Quadra Pendente</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 sm:w-4 sm:h-4 rounded border-2 border-green-600 bg-green-500 opacity-60" />
+              <span className="text-[10px] sm:text-xs leading-tight">Quadra Concluída</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2 border-red-700 bg-red-600 opacity-80" />
+              <span className="text-[10px] sm:text-xs leading-tight text-red-700 font-medium">Não Visitar</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Estatísticas no Mapa */}
-      <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg p-4 z-[1000] border">
-        <div className="grid grid-cols-2 gap-4 text-center">
-          <div>
-            <div className="text-2xl font-bold text-slate-900">
-              {territory.subdivisions?.filter(s => s.completed || s.status === 'completed').length || 0}
+      {!pinMode && (
+        <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg p-3 sm:p-4 z-[900] border">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 text-center">
+            <div>
+              <div className="text-xl sm:text-2xl font-bold text-slate-900">
+                {territory.subdivisions?.filter(s => s.completed || s.status === 'completed').length || 0}
+              </div>
+              <div className="text-[10px] sm:text-xs text-slate-500">Concluídas</div>
             </div>
-            <div className="text-xs text-slate-500">Concluídas</div>
-          </div>
-          <div>
-            <div className="text-2xl font-bold text-slate-900">
-              {territory.subdivisions?.filter(s => !s.completed && s.status !== 'completed').length || 0}
+            <div>
+              <div className="text-xl sm:text-2xl font-bold text-slate-900">
+                {territory.subdivisions?.filter(s => !s.completed && s.status !== 'completed').length || 0}
+              </div>
+              <div className="text-[10px] sm:text-xs text-slate-500">Pendentes</div>
             </div>
-            <div className="text-xs text-slate-500">Pendentes</div>
           </div>
         </div>
-      </div>
+      )}
 
 
 
@@ -279,6 +439,32 @@ export default function TerritoryMapViewer({
         .leaflet-control-zoom,
         .leaflet-control-attribution {
           z-index: 1000 !important;
+        }
+
+        .user-location-marker {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .pulse-dot {
+          width: 14px;
+          height: 14px;
+          background-color: #2563eb;
+          border-radius: 50%;
+          border: 2px solid white;
+          box-shadow: 0 0 0 rgba(37, 99, 235, 0.4);
+          animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+          0% {
+            box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7);
+          }
+          70% {
+            box-shadow: 0 0 0 10px rgba(37, 99, 235, 0);
+          }
+          100% {
+            box-shadow: 0 0 0 0 rgba(37, 99, 235, 0);
+          }
         }
       `}</style>
     </div>

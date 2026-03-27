@@ -47,7 +47,7 @@ WITH CHECK (
         SELECT 1 FROM assignments 
         WHERE territory_id = do_not_visits.territory_id 
         AND user_id = auth.uid() 
-        AND status = 'in_progress'
+        AND status = 'active'
     )
 );
 

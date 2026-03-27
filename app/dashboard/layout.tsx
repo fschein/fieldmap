@@ -5,13 +5,14 @@ import { useRouter, usePathname } from "next/navigation"
 import { useAuth } from "@/hooks/use-auth"
 import { Sidebar } from "@/components/dashboard/sidebar"
 import { Loader2 } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const { loading, user, isReady } = useAuth()
+  const { loading, user, profile, isReady } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
   const [shouldRender, setShouldRender] = useState(false)
@@ -26,9 +27,22 @@ export default function DashboardLayout({
       return
     }
 
+    // REDIRECIONAMENTO PARA TROCA DE SENHA OBRIGATÓRIA
+    // Se o perfil carregou e deve trocar a senha, mas não está na página de setup
+    if (profile?.must_change_password && pathname !== "/dashboard/setup-password") {
+      router.replace("/dashboard/setup-password")
+      return
+    }
+
+    // Se NÃO precisa trocar a senha mas está na página de setup, sai de lá
+    if (profile && !profile.must_change_password && pathname === "/dashboard/setup-password") {
+      router.replace("/dashboard/my-assignments")
+      return
+    }
+
     // Se há usuário, pode renderizar
     setShouldRender(true)
-  }, [isReady, user, router])
+  }, [isReady, user, profile, pathname, router])
 
   // Estado de carregamento inicial
   if (!isReady || loading) {
@@ -51,11 +65,16 @@ export default function DashboardLayout({
     )
   }
 
+  const isSetupPage = pathname === "/dashboard/setup-password"
+
   return (
     <div className="min-h-screen bg-muted/30">
-      <Sidebar />
-      <main className="md:ml-64">
-        <div className="container mx-auto p-6 pt-20 md:pt-6">
+      {!isSetupPage && <Sidebar />}
+      <main className={cn(!isSetupPage && "md:ml-64")}>
+        <div className={cn(
+          "container mx-auto p-6 pt-20 md:pt-6",
+          isSetupPage && "pt-6"
+        )}>
           {children}
         </div>
       </main>

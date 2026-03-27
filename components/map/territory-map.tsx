@@ -18,6 +18,7 @@ interface TerritoryMapProps {
   onSubdivisionUpdate?: (subdivisionId: string, coordinates: [number, number][][]) => void
   onSubdivisionDelete?: (subdivisionId: string) => void
   onSubdivisionSelect?: (subdivision: Subdivision) => void
+  onDnvClick?: (dnv: any) => void
 }
 
 const STATUS_COLORS = {
@@ -41,6 +42,7 @@ export function TerritoryMap({
   onSubdivisionUpdate,
   onSubdivisionDelete,
   onSubdivisionSelect,
+  onDnvClick,
 }: TerritoryMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
@@ -262,11 +264,7 @@ export function TerritoryMap({
     const map = mapInstanceRef.current
     const drawnItems = drawnItemsRef.current
 
-    // Clear existing layers
-    drawnItems.clearLayers()
-    subdivisionLayersRef.current.clear()
-
-    // Add subdivisions to map
+    // Add subdivisions to map (Primeiro, para ficarem under)
     subdivisions.forEach((subdivision) => {
       if (!subdivision.coordinates || subdivision.coordinates.length === 0) return
 
@@ -301,6 +299,34 @@ export function TerritoryMap({
       drawnItems.addLayer(polygon)
       subdivisionLayersRef.current.set(subdivision.id, polygon)
     })
+
+    // Add DNV markers to the Admin Map (Depois, para ficarem on top)
+    if ((territory as any).do_not_visits) {
+      ;(territory as any).do_not_visits.forEach((dnv: any) => {
+        if (dnv.latitude && dnv.longitude) {
+          const marker = L.circleMarker([dnv.latitude, dnv.longitude], {
+            color: '#dc2626',
+            fillColor: '#ef4444',
+            fillOpacity: 1, // Torna mais visível
+            radius: 8, // Aumenta o tamanho
+            weight: 2
+          });
+
+          // Check if expired
+          const date = new Date(dnv.created_at);
+          const isExpired = new Date().getTime() - date.getTime() > 365 * 24 * 60 * 60 * 1000;
+
+          const tooltipContent = `
+            <div class="text-sm font-semibold text-red-700 mb-1">🛑 Não Visitar ${isExpired ? '<span class="text-orange-600">(Expirado)</span>' : ''}</div>
+            ${dnv.address ? `<div class="text-xs mb-1"><strong>Endereço:</strong> ${dnv.address}</div>` : ''}
+            ${dnv.notes ? `<div class="text-xs text-slate-600"><strong>Obs:</strong> ${dnv.notes}</div>` : ''}
+          `
+          marker.bindTooltip(tooltipContent, { className: "bg-white p-2 rounded shadow border" })
+          
+          drawnItems.addLayer(marker)
+        }
+      })
+    }
 
     // AUTO-FIT: Fit bounds if there are subdivisions (APENAS UMA VEZ no início)
     if (subdivisions.length > 0 && subdivisions.some((s) => s.coordinates) && !initialFitDone) {

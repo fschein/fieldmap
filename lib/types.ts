@@ -9,6 +9,7 @@ export interface Profile {
   email: string
   role: UserRole
   gender?: "M" | "F"
+  phone?: string | null
   must_change_password?: boolean
   created_at: string
   updated_at: string
@@ -66,9 +67,21 @@ export interface Territory {
   updated_at: string
 }
 
+export interface DoNotVisit {
+  id: string
+  territory_id: string
+  latitude: number
+  longitude: number
+  address: string | null
+  notes: string | null
+  created_at: string
+  created_by: string | null
+}
+
 export interface TerritoryWithSubdivisions extends Territory {
   subdivisions?: Subdivision[]
   campaign?: Campaign
+  do_not_visits?: DoNotVisit[]
   assigned_to_user?: {
     id: string
     name: string

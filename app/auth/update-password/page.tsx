@@ -95,9 +95,10 @@ export default function UpdatePasswordPage() {
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-terracotta/10">
             <Lock className="h-6 w-6 text-terracotta" />
           </div>
-          <CardTitle>Criar nova senha</CardTitle>
-          <CardDescription>
-            Escolha uma senha segura para proteger sua conta.
+          <CardTitle>Crie sua senha definitiva</CardTitle>
+          <CardDescription className="text-sm font-medium text-slate-600 mt-2">
+            Como este é seu primeiro acesso (ou sua senha foi redefinida), 
+            você <span className="text-terracotta font-bold">precisa criar uma nova senha</span> agora para continuar.
           </CardDescription>
         </CardHeader>
         <CardContent>

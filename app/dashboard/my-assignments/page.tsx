@@ -6,10 +6,11 @@ import { useAuth } from "@/hooks/use-auth"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, MapPin, CheckCircle2, Calendar, TrendingUp, AlertCircle } from "lucide-react"
+import { Loader2, MapPin, CheckCircle2, Calendar, TrendingUp, AlertCircle, ChevronRight } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { CompleteAssignmentDialog } from "@/components/my-assignments/complete-assignment-dialog"
 import { TerritoryWithSubdivisions, Subdivision } from "@/lib/types"
+import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 
 interface TerritoryAssignment extends TerritoryWithSubdivisions {
   assignments: { assigned_at: string; status: string }[]
@@ -20,8 +21,8 @@ export default function MyAssignmentsPage() {
   const { user, profile, isReady } = useAuth()
   const [territories, setTerritories] = useState<TerritoryAssignment[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedTerritory, setSelectedTerritory] = useState<TerritoryAssignment | null>(null)
-  const [showCompleteDialog, setShowCompleteDialog] = useState(false)
+  const [requesting, setRequesting] = useState(false)
+  const [cooldown, setCooldown] = useState(0)
   const router = useRouter()
   const supabase = getSupabaseBrowserClient()
 
@@ -58,8 +59,25 @@ export default function MyAssignmentsPage() {
   useEffect(() => {
     if (isReady) {
       fetchMyAssignments()
+      
+      // Cooldown check
+      const lastRequest = localStorage.getItem("last_territory_request")
+      if (lastRequest) {
+        const diff = Date.now() - parseInt(lastRequest)
+        const fiveMin = 5 * 60 * 1000
+        if (diff < fiveMin) {
+          setCooldown(Math.ceil((fiveMin - diff) / 1000))
+        }
+      }
     }
   }, [isReady, fetchMyAssignments])
+
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [cooldown])
 
   const calculateDaysWithTerritory = (territory: TerritoryAssignment) => {
     const activeAssignment = territory.assignments?.find(a => a.status === 'active')
@@ -87,56 +105,24 @@ export default function MyAssignmentsPage() {
     router.push(`/dashboard/my-assignments/${territory.id}/map`)
   }
 
-  const handleCompleteTerritory = (territory: TerritoryAssignment) => {
-    setSelectedTerritory(territory)
-    setShowCompleteDialog(true)
-  }
-
-  const handleConfirmComplete = async (reason?: string) => {
-    if (!selectedTerritory) return
-
-    // Verificar se todas as quadras estão concluídas para decidir o status final
-    const completedSubdivisions = selectedTerritory.subdivisions?.filter(
-      s => s.completed || s.status === 'completed'
-    ).length || 0
-    const totalSubdivisions = selectedTerritory.subdivisions?.length || 0
-    const isFullyCompleted = completedSubdivisions === totalSubdivisions
-    const finalStatus = isFullyCompleted ? "completed" : "returned"
-
+  const handleRequestTerritory = async () => {
+    if (!user?.id || !profile?.name || requesting || cooldown > 0) return
+    setRequesting(true)
     try {
-      // 1. Atualizar o território
-      const { error: territoryError } = await supabase
-        .from("territories")
-        .update({
-          status: finalStatus,
-          last_completed_at: isFullyCompleted ? new Date().toISOString() : selectedTerritory.last_completed_at,
-        })
-        .eq("id", selectedTerritory.id)
-
-      if (territoryError) throw territoryError
-
-      // 2. Atualizar o assignment correspondente
-      const { error: assignmentError } = await supabase
-        .from("assignments")
-        .update({
-          status: finalStatus,
-          completed_at: isFullyCompleted ? new Date().toISOString() : null,
-          returned_at: !isFullyCompleted ? new Date().toISOString() : null,
-          notes: reason ? (selectedTerritory.notes ? `${selectedTerritory.notes}\n\nMotivo da devolução: ${reason}` : `Motivo da devolução: ${reason}`) : selectedTerritory.notes
-        })
-        .eq("territory_id", selectedTerritory.id)
-        .eq("user_id", user?.id)
-        .eq("status", "active")
-
-      if (assignmentError) throw assignmentError
-
-      // Recarregar a lista
-      await fetchMyAssignments()
-      setShowCompleteDialog(false)
-      setSelectedTerritory(null)
-    } catch (error: any) {
-      console.error("Erro ao processar devolução:", error?.message || error)
-      alert("Erro ao processar devolução. Tente novamente.")
+      const { error } = await supabase.from("notifications").insert({
+        type: "request",
+        title: "Pedido de Território",
+        message: `${profile.name} está solicitando um novo território para trabalhar.`,
+        created_by: user.id,
+      })
+      if (error) throw error
+      localStorage.setItem("last_territory_request", Date.now().toString())
+      setCooldown(300) // 5 minutes
+      toast.success("Pedido enviado! O administrador será notificado.")
+    } catch (e: any) {
+      toast.error("Não foi possível enviar o pedido. Tente novamente.")
+    } finally {
+      setRequesting(false)
     }
   }
 
@@ -155,72 +141,90 @@ export default function MyAssignmentsPage() {
           <MapPin className="h-12 w-12 text-slate-400" />
         </div>
         <div className="text-center space-y-2">
-          <h3 className="text-lg font-semibold text-slate-900">Nenhum território designado</h3>
-          <p className="text-sm text-slate-500 max-w-md">
-            Você não possui territórios atribuídos no momento. Entre em contato com um administrador ou dirigente para receber uma designação.
+          <h3 className="text-xl font-semibold text-slate-900">Nenhum território designado</h3>
+          <p className="text-base text-slate-500 max-w-md">
+            Você não possui territórios atribuídos no momento.
           </p>
         </div>
+        <Button 
+          onClick={handleRequestTerritory} 
+          disabled={requesting || cooldown > 0} 
+          className="mt-2 bg-[#C65D3B] hover:bg-[#A84F32] text-white border-none shadow-md"
+        >
+          {requesting ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <AlertCircle className="h-4 w-4 mr-2" />
+          )}
+          {cooldown > 0 ? `Aguarde ${Math.floor(cooldown / 60)}:${(cooldown % 60).toString().padStart(2, '0')}` : "Pedir Novo Território"}
+        </Button>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold tracking-tight">Minhas Designações</h1>
-        <p className="text-muted-foreground">
-          Gerencie seus territórios e acompanhe o progresso de cada quadra
-        </p>
+    <div className="space-y-4 p-4 md:p-6">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="space-y-1">
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Minhas Designações</h1>
+          <p className="text-base text-muted-foreground">
+            Acompanhe o progresso de cada território
+          </p>
+        </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={handleRequestTerritory} 
+          disabled={requesting || cooldown > 0}
+          className={cn(
+            "border-primary text-primary hover:bg-primary/5 font-semibold transition-all",
+            cooldown > 0 && "opacity-50 cursor-not-allowed"
+          )}
+        >
+          {requesting ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <AlertCircle className="h-4 w-4 mr-2" />
+          )}
+          {cooldown > 0 ? `Pedido enviado (${Math.floor(cooldown / 60)}:${(cooldown % 60).toString().padStart(2, '0')})` : "Pedir Novo Território"}
+        </Button>
       </div>
 
       {/* Estatísticas Rápidas */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Territórios Ativos</CardTitle>
-            <MapPin className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{territories.length}</div>
-            <p className="text-xs text-muted-foreground">
-              {territories.length === 1 ? 'território designado' : 'territórios designados'}
-            </p>
+      <div className="grid gap-3 md:grid-cols-2">
+        <Card className="shadow-sm border-slate-200">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-500 mb-1">Progresso Médio</p>
+              <div className="text-2xl font-bold text-slate-900">
+                {territories.length > 0 ? Math.round(
+                  territories.reduce((acc, t) => acc + calculateProgress(t.subdivisions), 0) / territories.length
+                ) : 0}%
+              </div>
+            </div>
+            <div className="h-10 w-10 bg-blue-50/50 rounded-full flex items-center justify-center border border-blue-100">
+              <TrendingUp className="h-5 w-5 text-blue-600" />
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Progresso Médio</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {Math.round(
-                territories.reduce((acc, t) => acc + calculateProgress(t.subdivisions), 0) /
-                  territories.length
-              )}%
+        <Card className="shadow-sm border-slate-200">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-500 mb-1">Quadras Concluídas</p>
+              <div className="text-2xl font-bold text-slate-900">
+                {territories.reduce(
+                  (acc, t) => acc + (t.subdivisions?.filter(s => s.completed || s.status === 'completed').length || 0),
+                  0
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                de {territories.reduce((acc, t) => acc + (t.subdivisions?.length || 0), 0)} totais
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground">de conclusão geral</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Quadras Totais</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {territories.reduce((acc, t) => acc + (t.subdivisions?.length || 0), 0)}
+            <div className="h-10 w-10 bg-green-50/50 rounded-full flex items-center justify-center border border-green-100">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
             </div>
-            <p className="text-xs text-muted-foreground">
-              {territories.reduce(
-                (acc, t) => acc + (t.subdivisions?.filter(s => s.completed || s.status === 'completed').length || 0),
-                0
-              )}{' '}
-              concluídas
-            </p>
           </CardContent>
         </Card>
       </div>
@@ -237,95 +241,60 @@ export default function MyAssignmentsPage() {
           const totalSubdivisions = territory.subdivisions?.length || 0
 
           return (
-            <Card key={territory.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
+            <Card 
+              key={territory.id} 
+              className="hover:shadow-md transition-all shadow-sm flex flex-col cursor-pointer border-slate-200 hover:border-slate-300 relative overflow-hidden group active:scale-[0.98]"
+              onClick={() => handleOpenMap(territory)}
+            >
+              {/* Seta indicadora à direita (Terracota) */}
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 text-primary/50 group-hover:text-primary transition-colors transform group-hover:-translate-x-1">
+                <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
+              </div>
+              
+              {/* Highlight Esquerdo (Terracota) */}
+              <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-primary/20 group-hover:bg-primary transition-colors" />
+
+              <CardHeader className="p-4 pl-5 pb-2 pr-12">
                 <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-3 h-3 rounded-full ring-2 ring-slate-200"
-                      style={{ backgroundColor: territory.color }}
-                    />
-                    <div>
-                      <CardTitle className="text-lg">
-                        Território {territory.number}
-                      </CardTitle>
-                      <CardDescription>{territory.name}</CardDescription>
-                    </div>
+                  <div className="min-w-0 pr-2">
+                    <CardTitle className="text-lg sm:text-xl text-slate-800">
+                      Território {territory.number}
+                    </CardTitle>
+                    {territory.name && <CardDescription className="text-sm line-clamp-1">{territory.name}</CardDescription>}
                   </div>
-                  {isOverdue && (
-                    <Badge variant="destructive" className="gap-1">
-                      <AlertCircle className="h-3 w-3" />
-                      Atrasado
-                    </Badge>
-                  )}
+                  <div className="text-right shrink-0">
+                    <span className="font-bold text-lg text-slate-700">{progress}%</span>
+                  </div>
                 </div>
               </CardHeader>
 
-              <CardContent className="space-y-4">
-                {/* Informações de Tempo */}
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="h-4 w-4" />
-                  <span>
-                    {days} {days === 1 ? 'dia' : 'dias'} com o território
-                  </span>
+              <CardContent className="p-4 pl-5 pt-0 space-y-3 flex-1 flex flex-col justify-end pr-12">
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  <div className="flex items-center gap-1.5 text-sm font-medium text-slate-600">
+                    <Calendar className="h-3.5 w-3.5" />
+                    <span>{days} {days === 1 ? 'dia' : 'dias'}</span>
+                    {isOverdue && <span className="text-red-500 font-bold ml-1 text-xs uppercase tracking-wider">Atraso</span>}
+                  </div>
+                  {territory.campaign && (
+                    <Badge variant="outline" className="text-[10px] sm:text-xs bg-slate-50 border-slate-200 text-slate-600">
+                      {territory.campaign.name}
+                    </Badge>
+                  )}
                 </div>
 
-                {/* Barra de Progresso */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Progresso</span>
-                    <span className="font-semibold">{progress}%</span>
+                <div className="space-y-1.5 mt-2">
+                  <div className="w-full h-2 rounded-full overflow-hidden bg-slate-100">
+                    <div className="h-full bg-green-500 transition-all rounded-full" style={{ width: `${progress}%` }} />
                   </div>
-                  <div className="w-full h-2 rounded-full overflow-hidden bg-slate-200">
-                    <div className="h-full bg-green-500 transition-all" style={{ width: `${progress}%` }} />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {completedSubdivisions} de {totalSubdivisions} quadras concluídas
+                  <p className="text-xs text-slate-500 font-medium tracking-tight">
+                    {completedSubdivisions} de {totalSubdivisions} quadras finalizadas
                   </p>
                 </div>
-
-                {/* Campanha (se houver) */}
-                {territory.campaign && (
-                  <Badge variant="outline" className="w-fit">
-                    {territory.campaign.name}
-                  </Badge>
-                )}
               </CardContent>
-
-              <CardFooter className="flex gap-2">
-                <Button
-                  onClick={() => handleOpenMap(territory)}
-                  className="flex-1"
-                  variant="default"
-                >
-                  <MapPin className="mr-2 h-4 w-4" />
-                  Abrir Mapa
-                </Button>
-                <Button
-                  onClick={() => handleCompleteTerritory(territory)}
-                  variant="outline"
-                  className="flex-1"
-                  disabled={progress < 100}
-                >
-                  <CheckCircle2 className="mr-2 h-4 w-4" />
-                  Concluir
-                </Button>
-              </CardFooter>
             </Card>
           )
         })}
       </div>
-
-      {/* Dialog de Confirmação */}
-      {selectedTerritory && (
-        <CompleteAssignmentDialog
-          open={showCompleteDialog}
-          onOpenChange={setShowCompleteDialog}
-          territory={selectedTerritory}
-          activeAssignmentDate={selectedTerritory.assignments?.find(a => a.status === 'active')?.assigned_at}
-          onConfirm={handleConfirmComplete}
-        />
-      )}
     </div>
   )
 }

@@ -45,12 +45,23 @@ interface Block {
   completed: boolean
 }
 
+interface DoNotVisit {
+  id: string
+  territory_id: string
+  latitude?: number
+  longitude?: number
+  address?: string
+  notes?: string
+  created_at: string
+}
+
 interface TerritoryWithDetails {
   id: string
   number: string
   name: string
   group?: { id: string; name: string; color: string }
   subdivisions?: Block[]
+  do_not_visits?: DoNotVisit[]
   assigned_to_user?: Profile
 }
 
@@ -69,6 +80,12 @@ export default function TerritoryDetailPage({
   const [selectedBlock, setSelectedBlock] = useState<Block | null>(null)
   const [formData, setFormData] = useState({
     name: "",
+    notes: "",
+  })
+  const [dnvDialogOpen, setDnvDialogOpen] = useState(false)
+  const [editingDnv, setEditingDnv] = useState<DoNotVisit | null>(null)
+  const [dnvFormData, setDnvFormData] = useState({
+    address: "",
     notes: "",
   })
   const [assignData, setAssignData] = useState({
@@ -92,6 +109,7 @@ export default function TerritoryDetailPage({
           .select(`
       *,
       subdivisions(*),
+      do_not_visits(*),
       group:groups(id, name, color),
       assigned_to_user:profiles!territories_assigned_to_fkey(id, name, email)
     `)
@@ -230,6 +248,43 @@ export default function TerritoryDetailPage({
       fetchData()
     } catch (error: any) {
       alert("Erro ao excluir: " + error.message)
+    }
+  }
+
+  const handleDeleteDnv = async (dnvId: string) => {
+    if (!confirm("Tem certeza que deseja excluir este registro de 'Não Visitar'?")) return
+
+    try {
+      const { error } = await supabase.from("do_not_visits").delete().eq("id", dnvId)
+      if (error) throw error
+      fetchData()
+    } catch (error: any) {
+      alert("Erro ao excluir Não Visitar: " + error.message)
+    }
+  }
+
+  const handleEditDnv = (dnv: DoNotVisit) => {
+    setEditingDnv(dnv)
+    setDnvFormData({ address: dnv.address || "", notes: dnv.notes || "" })
+    setDnvDialogOpen(true)
+  }
+
+  const handleDnvSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingDnv) return
+    setSubmitting(true)
+    try {
+      const { error } = await supabase.from("do_not_visits").update({
+        address: dnvFormData.address,
+        notes: dnvFormData.notes,
+      }).eq("id", editingDnv.id)
+      if (error) throw error
+      setDnvDialogOpen(false)
+      fetchData()
+    } catch (error: any) {
+      alert("Erro ao atualizar Não Visitar: " + error.message)
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -471,6 +526,105 @@ export default function TerritoryDetailPage({
           ))}
         </div>
       )}
+
+      {/* Seção Não Visitar */}
+      <div className="flex items-center justify-between mt-10 pt-6 border-t">
+        <h2 className="text-xl font-semibold">Casas &quot;Não Visitar&quot;</h2>
+      </div>
+
+      {!territory.do_not_visits || territory.do_not_visits.length === 0 ? (
+        <Card className="bg-slate-50 border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-8">
+            <p className="text-muted-foreground">Nenhum registro de &quot;Não Visitar&quot; neste território.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {territory.do_not_visits.map((dnv) => {
+            const date = new Date(dnv.created_at)
+            const isExpired = new Date().getTime() - date.getTime() > 365 * 24 * 60 * 60 * 1000
+            
+            return (
+              <Card key={dnv.id} className={isExpired ? "border-orange-300 bg-orange-50/50" : "border-red-200"}>
+                <CardHeader className="pb-3 px-4 pt-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <CardTitle className="text-base text-slate-800 break-words">
+                        {dnv.address || "Endereço não informado"}
+                      </CardTitle>
+                      <CardDescription className="text-xs mt-1 font-medium text-slate-500">
+                        Criado em: {date.toLocaleDateString("pt-BR")}
+                      </CardDescription>
+                    </div>
+                    <div className="flex gap-1 -mt-2 -mr-2 shrink-0">
+                      <Button variant="ghost" size="icon" className="text-slate-400 hover:text-primary hover:bg-primary/5" onClick={() => handleEditDnv(dnv)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => handleDeleteDnv(dnv.id)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="px-4 pb-4">
+                  {isExpired && (
+                    <Badge variant="outline" className="mb-2 bg-orange-100 text-orange-800 border-orange-200">
+                      Expirado (Acima de 1 ano)
+                    </Badge>
+                  )}
+                  {dnv.notes ? (
+                    <p className="text-sm text-slate-600 line-clamp-3">{dnv.notes}</p>
+                  ) : (
+                    <p className="text-sm text-slate-400 italic">Sem observações adicionais.</p>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
+      {/* DNV Edit Dialog */}
+      <Dialog open={dnvDialogOpen} onOpenChange={setDnvDialogOpen}>
+        <DialogContent>
+          <form onSubmit={handleDnvSubmit}>
+            <DialogHeader>
+              <DialogTitle>Editar Não Visitar</DialogTitle>
+              <DialogDescription>
+                Atualize o endereço ou as observações desta casa bloqueada.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="address">Endereço (opcional)</Label>
+                <Input
+                  id="address"
+                  value={dnvFormData.address}
+                  onChange={(e) => setDnvFormData({ ...dnvFormData, address: e.target.value })}
+                  placeholder="Ex: Rua das Flores, 123"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="notes">Observações</Label>
+                <Textarea
+                  id="notes"
+                  value={dnvFormData.notes}
+                  onChange={(e) => setDnvFormData({ ...dnvFormData, notes: e.target.value })}
+                  placeholder="Ex: Morador pediu para não bater no portão."
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setDnvDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={submitting}>
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

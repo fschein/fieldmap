@@ -55,7 +55,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // 5. Verificar se a troca de senha é obrigatória (Apenas para rotas do Dashboard)
-  if (user && isDashboardPage && !request.nextUrl.pathname.startsWith('/dashboard/settings')) {
+  if (user && isDashboardPage && !request.nextUrl.pathname.startsWith('/dashboard/setup-password')) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('must_change_password')
@@ -63,7 +63,7 @@ export async function middleware(request: NextRequest) {
       .single()
 
     if (profile?.must_change_password) {
-      const redirectResponse = NextResponse.redirect(new URL('/dashboard/settings?force=true', request.url))
+      const redirectResponse = NextResponse.redirect(new URL('/dashboard/setup-password', request.url))
       response.cookies.getAll().forEach(cookie => {
         redirectResponse.cookies.set(cookie)
       })

@@ -14,6 +14,7 @@ type AuthContextType = {
   isAdmin: boolean
   isDirigente: boolean
   signIn: (email: string, password: string) => Promise<{ data: any; error: any }>
+  signUp: (email: string, password: string, fullName: string) => Promise<{ data: any; error: any }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
 }
@@ -35,7 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Select explícito para evitar erro se colunas opcionais ainda não existirem no BD
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, name, email, role, phone")
+        .select("id, name, email, role, phone, must_change_password")
         .eq("id", userId)
         .single()
 
@@ -69,6 +70,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(p)
     }
     return { data, error }
+  }
+
+  const signUp = async (email: string, password: string, fullName: string) => {
+    return await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          name: fullName,
+        },
+      },
+    })
   }
 
   const signOut = async () => {
@@ -157,6 +170,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAdmin,
       isDirigente,
       signIn,
+      signUp,
       signOut,
       refreshProfile
     }}>

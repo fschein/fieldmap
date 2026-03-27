@@ -26,6 +26,7 @@ import {
   User,
 } from "lucide-react"
 import { useState, useCallback } from "react"
+import { NotificationBell } from "@/components/dashboard/notification-bell"
 
 const navItems = [
   {
@@ -72,7 +73,7 @@ const navItems = [
   },
   {
     title: "Perfil",
-    href: "/dashboard/settings",
+    href: "/dashboard/profile",
     icon: User,
     roles: ["admin", "dirigente", "publicador"],
   },
@@ -115,7 +116,7 @@ const handleSignOut = useCallback(async () => {
       <Button
         variant="ghost"
         size="icon"
-        className="fixed left-4 top-4 z-50 md:hidden bg-card shadow-sm border"
+        className="fixed left-4 top-4 z-[100] md:hidden bg-card shadow-sm border"
         onClick={() => setMobileOpen(!mobileOpen)}
         aria-label={mobileOpen ? "Fechar menu" : "Abrir menu"}
       >
@@ -125,7 +126,7 @@ const handleSignOut = useCallback(async () => {
       {/* Overlay */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-[90] bg-background/80 backdrop-blur-sm md:hidden"
           onClick={closeMobileMenu}
           aria-hidden="true"
         />
@@ -134,7 +135,7 @@ const handleSignOut = useCallback(async () => {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed left-0 top-0 z-40 h-screen w-64 transform border-r bg-card transition-transform duration-200 ease-in-out md:translate-x-0",
+          "fixed left-0 top-0 z-[100] h-screen w-64 transform border-r bg-card transition-transform duration-200 ease-in-out md:translate-x-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
         role="navigation"
@@ -142,11 +143,14 @@ const handleSignOut = useCallback(async () => {
       >
         <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-6 dark:bg-sidebar">
-            <FieldMapLogoBrand className="h-8 w-8" />
-            <span className="font-bold text-foreground tracking-tight text-xl">
-              Field<span className="text-primary">Map</span>
-            </span>
+          <div className="flex h-16 items-center justify-between gap-2 border-b border-sidebar-border px-6 dark:bg-sidebar">
+            <div className="flex items-center gap-2">
+              <FieldMapLogoBrand className="h-8 w-8 shrink-0" />
+              <span className="font-bold text-foreground tracking-tight text-xl">
+                Field<span className="text-primary">Map</span>
+              </span>
+            </div>
+            <NotificationBell />
           </div>
 
           {/* Navigation */}

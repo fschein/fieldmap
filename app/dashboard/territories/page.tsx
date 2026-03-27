@@ -383,9 +383,11 @@ export default function TerritoriesPage() {
               <Badge variant="secondary" className="font-mono text-sm px-2 py-0.5 shadow-none bg-slate-100 text-slate-700">
                 #{territory.number}
               </Badge>
-              <h3 className="font-bold text-base text-slate-800 line-clamp-1" title={territory.name}>
-                {territory.name}
-              </h3>
+              <Link href={`/dashboard/territories/${territory.id}`} className="hover:underline hover:text-primary transition-all">
+                <h3 className="font-bold text-base text-slate-800 line-clamp-1" title={territory.name}>
+                  {territory.name}
+                </h3>
+              </Link>
             </div>
             {getPriorityBadge(p.priority)}
           </div>
