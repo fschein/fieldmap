@@ -19,7 +19,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Plus, Calendar, Loader2, MoreVertical, Pencil, Trash2, CheckCircle, Power, Ban } from "lucide-react"
+import { Plus, Calendar, Loader2, MoreVertical, Pencil, Trash2, CheckCircle, Power, Ban, MapPin, CheckSquare } from "lucide-react"
+import { Progress } from "@/components/ui/progress"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +32,7 @@ import { error } from "console"
 
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [stats, setStats] = useState<Record<string, { total: number, completed: number }>>({})
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null)
@@ -55,6 +57,22 @@ export default function CampaignsPage() {
 
     if (data) {
       setCampaigns(data as Campaign[])
+      
+      // Fetch stats for these campaigns
+      const { data: terrs } = await supabase
+        .from("territories")
+        .select("id, status, campaign_id")
+        .not("campaign_id", "is", null)
+        .neq("status", "inactive")
+
+      const newStats: Record<string, { total: number, completed: number }> = {}
+      terrs?.forEach(t => {
+        if (!t.campaign_id) return
+        if (!newStats[t.campaign_id]) newStats[t.campaign_id] = { total: 0, completed: 0 }
+        newStats[t.campaign_id].total++
+        if (t.status === 'completed') newStats[t.campaign_id].completed++
+      })
+      setStats(newStats)
     }
     setLoading(false)
   }
@@ -308,6 +326,33 @@ export default function CampaignsPage() {
                     {campaign.active ? "Ativa" : "Inativa"}
                   </Badge>
                 </div>
+
+                {/* Progress Bar */}
+                {stats[campaign.id] && stats[campaign.id].total > 0 && (
+                  <div className="mt-6 space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <CheckSquare className="h-3.5 w-3.5" />
+                        <span>Progresso</span>
+                      </div>
+                      <span className="font-medium">
+                        {stats[campaign.id].completed} de {stats[campaign.id].total}
+                      </span>
+                    </div>
+                    <Progress 
+                      value={(stats[campaign.id].completed / stats[campaign.id].total) * 100} 
+                      className="h-2"
+                    />
+                    <p className="text-[10px] text-right text-muted-foreground">
+                      {Math.round((stats[campaign.id].completed / stats[campaign.id].total) * 100)}% concluído
+                    </p>
+                  </div>
+                )}
+                {(!stats[campaign.id] || stats[campaign.id].total === 0) && (
+                  <div className="mt-6 pt-4 border-t text-center">
+                    <p className="text-xs text-muted-foreground italic">Nenhum território vinculado</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}

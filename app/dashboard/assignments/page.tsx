@@ -32,13 +32,14 @@ interface AggregatedTerritory {
   number: string
   name: string
   color: string
-  status: 'available' | 'active' | 'overdue'
+  status: 'available' | 'active' | 'overdue' | 'inactive'
   activePublisher: string | null
   assignedAt: string | null
   daysInField: number | null
   totalCompletions: number
   completionsInPeriod: number
   lastCompletedAt: string | null
+  campaignId: string | null
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -67,8 +68,10 @@ export default function AssignmentsPage() {
 
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
+  const [campaignFilter, setCampaignFilter] = useState<string>("all")
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all")
   const [sortBy, setSortBy] = useState<SortOption>("number")
+  const [campaigns, setCampaigns] = useState<{id: string, name: string}[]>([])
 
   const [selectedTerritoryId, setSelectedTerritoryId] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -80,7 +83,7 @@ export default function AssignmentsPage() {
 
       const { data: territories, error: terrErr } = await supabase
         .from("territories")
-        .select("id, name, number, color")
+        .select("id, name, number, color, status, campaign_id")
         .order("number", { ascending: true })
 
       if (terrErr) throw new Error(`Territories: ${terrErr.message}`)
@@ -95,6 +98,15 @@ export default function AssignmentsPage() {
         .order("assigned_at", { ascending: false })
 
       if (assErr) throw new Error(`Assignments: ${assErr.message}`)
+
+      // Fetch active campaigns for filter
+      const { data: campaignsData } = await supabase
+        .from("campaigns")
+        .select("id, name")
+        .eq("active", true)
+        .order("name")
+      
+      if (campaignsData) setCampaigns(campaignsData)
 
       const assignmentsWithProfiles = (assignments || []).map((a: any) => ({
         ...a,
@@ -167,9 +179,10 @@ export default function AssignmentsPage() {
         daysInField,
         totalCompletions: completed.length,
         completionsInPeriod,
-        lastCompletedAt
+        lastCompletedAt,
+        campaignId: t.campaign_id
       }
-    })
+    }).filter(t => t.status !== 'inactive')
 
     setData(processed)
   }, [rawTerritories, rawAssignments, periodFilter])
@@ -189,6 +202,10 @@ export default function AssignmentsPage() {
 
     if (statusFilter !== "all") {
       result = result.filter(t => t.status === statusFilter)
+    }
+
+    if (campaignFilter !== "all") {
+      result = result.filter(t => t.campaignId === campaignFilter)
     }
 
     result.sort((a, b) => {
@@ -335,6 +352,18 @@ export default function AssignmentsPage() {
                 <SelectItem value="active">Em Campo</SelectItem>
                 <SelectItem value="available">Disponíveis</SelectItem>
                 <SelectItem value="overdue">Atrasados</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={campaignFilter} onValueChange={setCampaignFilter}>
+              <SelectTrigger className="w-full sm:w-auto sm:min-w-[150px] flex-1 sm:flex-none justify-start px-3 bg-white border-slate-200">
+                <Calendar className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-slate-400" />
+                <SelectValue placeholder="Campanha" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas Campanhas</SelectItem>
+                {campaigns.map(c => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <Select value={sortBy} onValueChange={(v: SortOption) => setSortBy(v)}>
