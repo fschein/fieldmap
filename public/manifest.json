@@ -1,12 +1,11 @@
 {
   "name": "FieldMap",
   "short_name": "FieldMap",
-  "description": "Gestão inteligente de territórios",
-  "start_url": "/",
+  "description": "Gerenciamento de Territórios",
+  "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#C65D3B",
+  "background_color": "#ffffff",
   "theme_color": "#C65D3B",
-  "orientation": "portrait-primary",
   "icons": [
     {
       "src": "/icon-192x192.png",
@@ -19,6 +18,11 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
     }
   ]
 }

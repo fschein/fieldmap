@@ -41,6 +41,7 @@ interface UserProfile {
   phone: string | null
   gender?: "M" | "F"
   must_change_password?: boolean
+  last_seen_at?: string
 }
 
 function generateTempPassword() {
@@ -100,7 +101,7 @@ export default function UsersPage() {
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, name, email, role, phone")
+        .select("id, name, email, role, phone, last_seen_at")
         .order("name")
       if (error) throw error
       setUsers(data as UserProfile[])
@@ -242,6 +243,7 @@ export default function UsersPage() {
               <TableHead className="w-[250px]">Nome</TableHead>
               <TableHead>Contato</TableHead>
               <TableHead>Nível</TableHead>
+              <TableHead>Visto por último</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
@@ -278,6 +280,17 @@ export default function UsersPage() {
                     <Badge variant={u.role === "admin" ? "default" : "outline"} className="capitalize text-[9px]">
                       {u.role}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-[11px] text-slate-500 italic">
+                      {u.last_seen_at ? new Date(u.last_seen_at).toLocaleString('pt-BR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      }) : "Nunca"}
+                    </span>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">

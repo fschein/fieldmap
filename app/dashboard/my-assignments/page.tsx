@@ -48,9 +48,19 @@ export default function MyAssignmentsPage() {
         throw territoriesError
       }
 
-      setTerritories(territoriesData || [])
+      const territoriesWithProgress = territoriesData || []
+      setTerritories(territoriesWithProgress)
+      
+      // Cache para uso offline
+      localStorage.setItem("my_assignments_cache", JSON.stringify(territoriesWithProgress))
     } catch (error: any) {
       console.error("Erro ao carregar designações:", error?.message || error)
+      
+      // Tentar carregar do cache se estiver offline ou der erro
+      const cached = localStorage.getItem("my_assignments_cache")
+      if (cached) {
+        setTerritories(JSON.parse(cached))
+      }
     } finally {
       setLoading(false)
     }
@@ -116,6 +126,19 @@ export default function MyAssignmentsPage() {
         created_by: user.id,
       })
       if (error) throw error
+
+      // Enviar notificação push para administradores
+      fetch("/api/push/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role: "admin",
+          title: "Novo Pedido de Território",
+          message: `${profile.name} solicitou um novo território.`,
+          url: "/dashboard/assignments"
+        })
+      }).catch(err => console.error("Erro ao disparar push:", err))
+
       localStorage.setItem("last_territory_request", Date.now().toString())
       setCooldown(300) // 5 minutes
       toast.success("Pedido enviado! O administrador será notificado.")

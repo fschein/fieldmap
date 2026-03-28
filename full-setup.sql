@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   phone TEXT,
   role TEXT NOT NULL DEFAULT 'publicador' CHECK (role IN ('admin', 'dirigente', 'publicador')),
   must_change_password BOOLEAN DEFAULT false,
+  last_seen_at TIMESTAMPTZ DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

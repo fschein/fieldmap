@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import { TerritoryWithSubdivisions, Subdivision } from "@/lib/types"
-import { MapPinOff } from "lucide-react"
+import { MapPinOff, Crosshair, Map as MapIcon, Navigation } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface TerritoryMapViewerProps {
@@ -28,6 +28,7 @@ export default function TerritoryMapViewer({
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const userMarkerRef = useRef<L.Marker | null>(null)
   const userRadiusRef = useRef<L.Circle | null>(null)
+  const polygonsRef = useRef<L.FeatureGroup | null>(null)
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
@@ -219,6 +220,7 @@ export default function TerritoryMapViewer({
     // Ajustar zoom para mostrar todos os polígonos
     if (hasValidPolygons && polygons.length > 0) {
       const group = L.featureGroup(polygons)
+      polygonsRef.current = group
       const bounds = group.getBounds()
       console.log("Bounds calculados:", bounds)
       map.fitBounds(bounds, { padding: [50, 50] })
@@ -273,11 +275,6 @@ export default function TerritoryMapViewer({
               fillOpacity: 0.1,
               weight: 1
             }).addTo(map)
-
-            // Centraliza no usuário apenas na primeira vez que recebe a localização e o PinMode NÃO estiver ativo
-            if (!pinMode) {
-              map.setView([lat, lng], Math.max(map.getZoom(), 16))
-            }
           } else {
             userMarkerRef.current.setLatLng([lat, lng])
             if (userRadiusRef.current) {
@@ -394,6 +391,44 @@ export default function TerritoryMapViewer({
       )}
 
 
+      {/* Controles de Centralização */}
+      {!pinMode && (
+        <div className="absolute right-4 bottom-4 flex flex-col gap-2 z-[900]">
+          <Button
+            size="icon"
+            variant="secondary"
+            className="h-10 w-10 bg-white shadow-md border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-700"
+            title="Centralizar no Território"
+            onClick={() => {
+              if (mapRef.current && polygonsRef.current) {
+                mapRef.current.fitBounds(polygonsRef.current.getBounds(), { padding: [50, 50] })
+              }
+            }}
+          >
+            <MapIcon className="h-5 w-5" />
+          </Button>
+          <Button
+            size="icon"
+            variant="secondary"
+            className="h-10 w-10 bg-white shadow-md border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-700"
+            title="Minha Localização"
+            onClick={() => {
+              if (mapRef.current && userMarkerRef.current) {
+                mapRef.current.setView(userMarkerRef.current.getLatLng(), 17)
+              } else if ('geolocation' in navigator) {
+                // Caso o watchPosition ainda não tenha disparado
+                navigator.geolocation.getCurrentPosition((pos) => {
+                  if (mapRef.current) {
+                    mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], 17)
+                  }
+                })
+              }
+            }}
+          >
+            <Navigation className="h-5 w-5" />
+          </Button>
+        </div>
+      )}
 
       {/* Estilos customizados */}
       <style jsx global>{`

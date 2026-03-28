@@ -6,6 +6,8 @@ import { useAuth } from "@/hooks/use-auth"
 import { Sidebar } from "@/components/dashboard/sidebar"
 import { Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { PushSubscriptionManager } from "@/components/dashboard/push-subscription-manager"
 
 export default function DashboardLayout({
   children,
@@ -42,6 +44,26 @@ export default function DashboardLayout({
 
     // Se há usuário, pode renderizar
     setShouldRender(true)
+
+    // Atualiza o last_seen_at uma vez por sessão/dia
+    const updateLastSeen = async () => {
+      if (!user?.id) return
+      
+      const lastSeenUpdate = sessionStorage.getItem(`last_seen_${user.id}`)
+      const today = new Date().toDateString()
+      
+      if (lastSeenUpdate === today) return
+      
+      const supabase = getSupabaseBrowserClient()
+      await supabase
+        .from("profiles")
+        .update({ last_seen_at: new Date().toISOString() })
+        .eq("id", user.id)
+      
+      sessionStorage.setItem(`last_seen_${user.id}`, today)
+    }
+    
+    updateLastSeen()
   }, [isReady, user, profile, pathname, router])
 
   // Estado de carregamento inicial
@@ -75,6 +97,7 @@ export default function DashboardLayout({
           "container mx-auto p-6 pt-20 md:pt-6",
           isSetupPage && "pt-6"
         )}>
+          <PushSubscriptionManager />
           {children}
         </div>
       </main>

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { useAuth } from "@/hooks/use-auth"
+import { useOfflineManager } from "@/hooks/use-offline-manager"
 import { TerritoryWithSubdivisions, Subdivision } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Loader2, CheckCircle2, MapPin, MapPinOff, Navigation } from "lucide-react"
@@ -30,6 +31,7 @@ export default function TerritoryMapPage() {
   const params = useParams()
   const router = useRouter()
   const { user, isReady } = useAuth()
+  const { isOnline, addPendingAction } = useOfflineManager()
   const [territory, setTerritory] = useState<TerritoryWithSubdivisions | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -67,10 +69,33 @@ export default function TerritoryMapPage() {
         return
       }
 
-      setTerritory(data)
+      // Guardar no cache para uso offline
+      localStorage.setItem(`territory_cache_${territoryId}`, JSON.stringify(data))
+      setTerritory(data as TerritoryWithSubdivisions)
     } catch (error: any) {
       console.error("Erro ao carregar território:", error?.message || error)
-      router.push("/dashboard/my-assignments")
+      
+      // Tentar carregar do cache se estiver offline ou der erro
+      const cached = localStorage.getItem(`territory_cache_${territoryId}`)
+      if (cached) {
+        const parsed = JSON.parse(cached) as TerritoryWithSubdivisions
+        
+        // Aplicar alterações pendentes que ainda não foram sincronizadas
+        const pending = JSON.parse(localStorage.getItem("pending_subdivision_updates") || "[]")
+        if (pending.length > 0 && parsed.subdivisions) {
+          parsed.subdivisions = parsed.subdivisions.map(s => {
+            const update = pending.find((p: any) => p.subdivisionId === s.id)
+            if (update) {
+              return { ...s, status: update.status, completed: update.completed }
+            }
+            return s
+          })
+        }
+        
+        setTerritory(parsed)
+      } else {
+        router.push("/dashboard/my-assignments")
+      }
     } finally {
       setLoading(false)
     }
@@ -81,6 +106,26 @@ export default function TerritoryMapPage() {
       fetchTerritory()
     }
   }, [isReady, fetchTerritory])
+
+  const { syncPendingActions } = useOfflineManager()
+
+  // Sincronizar ao entrar na página se estiver online
+  useEffect(() => {
+    if (isOnline) {
+      syncPendingActions()
+    }
+  }, [isOnline, syncPendingActions])
+
+  // Listener para sincronização concluída ou ação offline
+  useEffect(() => {
+    const handleSync = () => fetchTerritory()
+    window.addEventListener("sync-complete", handleSync)
+    window.addEventListener("offline-action-added", handleSync)
+    return () => {
+      window.removeEventListener("sync-complete", handleSync)
+      window.removeEventListener("offline-action-added", handleSync)
+    }
+  }, [fetchTerritory])
 
   const [showCompleteDialog, setShowCompleteDialog] = useState(false)
 
@@ -135,6 +180,14 @@ export default function TerritoryMapPage() {
   const handleToggleSubdivision = async (subdivision: Subdivision) => {
     const nextStatus = subdivision.completed || subdivision.status === 'completed' ? 'available' : 'completed'
     const nextCompleted = nextStatus === 'completed'
+
+    if (!isOnline) {
+      addPendingAction(subdivision.id, nextStatus, nextCompleted)
+      setDrawerOpen(false)
+      // O useEffect sync-complete irá recarregar os dados locais (que já refletem o localStorage se eu gerenciar isso)
+      // Mas por enquanto, vamos apenas avisar o usuário
+      return
+    }
 
     try {
       const { error } = await supabase

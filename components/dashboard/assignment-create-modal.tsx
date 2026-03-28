@@ -224,6 +224,20 @@ export function AssignmentCreateModal({
         .update(terrUpdate)
         .eq("id", selectedTerritoryId)
 
+      // Enviar notificação push se não for histórico
+      if (!isCompleted) {
+        fetch("/api/push/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: selectedPublisherId,
+            title: "Novo Território!",
+            message: `Você recebeu o território ${selectedTerr?.number} - ${selectedTerr?.name}.`,
+            url: `/dashboard/my-assignments/${selectedTerritoryId}/map`
+          })
+        }).catch(err => console.error("Erro ao disparar push:", err))
+      }
+
       toast.success(
         isCompleted
           ? "Designação histórica salva com sucesso!"
