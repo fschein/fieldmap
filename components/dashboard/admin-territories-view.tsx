@@ -20,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle
 } from "@/components/ui/dialog"
+import { Switch } from "@/components/ui/switch"
 import {
   Plus,
   Map,
@@ -204,6 +205,7 @@ export function AdminTerritoriesView() {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false)
   const [selectedTerritory, setSelectedTerritory] = useState<TerritoryWithDetails | null>(null)
   const [users, setUsers] = useState<Profile[]>([])
+  const [groups, setGroups] = useState<any[]>([])
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [searchUser, setSearchUser] = useState("")
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
@@ -254,6 +256,7 @@ export function AdminTerritoriesView() {
   const [editName, setEditName] = useState("")
   const [editNumber, setEditNumber] = useState("")
   const [editColor, setEditColor] = useState("")
+  const [editGroupId, setEditGroupId] = useState<string | null>(null)
   const [editInactive, setEditInactive] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
 
@@ -264,7 +267,7 @@ export function AdminTerritoriesView() {
 
     try {
       const { data: { user: currentUser } } = await supabase.auth.getUser()
-      const [terrRes, usersRes, campRes] = await Promise.all([
+      const [terrRes, usersRes, campRes, groupsRes] = await Promise.all([
         supabase
           .from("territories")
           .select(`
@@ -288,15 +291,21 @@ export function AdminTerritoriesView() {
           .select("*")
           .eq("active", true)
           .abortSignal(signal)
+          .order("name"),
+        supabase
+          .from("groups")
+          .select("*")
+          .abortSignal(signal)
           .order("name")
       ])
 
-      if (terrRes.error) throw terrRes.error
       if (usersRes.error) throw usersRes.error
       if (campRes.error) throw campRes.error
+      if (groupsRes.error) throw groupsRes.error
 
       if (usersRes.data) setUsers(usersRes.data)
       if (campRes.data) setCampaigns(campRes.data)
+      if (groupsRes.data) setGroups(groupsRes.data)
 
       if (terrRes.data) {
         const territoriesData = terrRes.data as unknown as TerritoryWithDetails[]
@@ -400,6 +409,7 @@ export function AdminTerritoriesView() {
     setEditName(territory.name)
     setEditNumber(territory.number)
     setEditColor(territory.color || "#C65D3B")
+    setEditGroupId(territory.group?.id || null)
     setEditInactive(territory.status === 'inactive')
     setEditDialogOpen(true)
   }
@@ -414,7 +424,8 @@ export function AdminTerritoriesView() {
         .update({
           name: editName,
           number: editNumber,
-          color: editColor,
+          color: editGroupId ? groups.find(g => g.id === editGroupId)?.color || editColor : editColor,
+          group_id: editGroupId,
           status: newStatus,
           assigned_to: editInactive ? null : editingTerritory.assigned_to,
         })
@@ -465,6 +476,13 @@ export function AdminTerritoriesView() {
             <h3 className="font-bold text-slate-900 truncate text-sm">
               {territory.name || "Sem nome"}
             </h3>
+            {territory.group && (
+              <span 
+                className="w-2 h-2 rounded-full shrink-0 shadow-sm" 
+                style={{ backgroundColor: territory.group.color }}
+                title={`Grupo: ${territory.group.name}`}
+              />
+            )}
           </div>
 
           <div className="flex items-center gap-2 text-xs">
@@ -493,22 +511,42 @@ export function AdminTerritoriesView() {
                 </span>
               </div>
             )}
+            {territory.group && (
+              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
+                <Map className="h-3 w-3" />
+                {territory.group.name}
+              </div>
+            )}
           </div>
         </div>
 
-        {isLivre && (
+        <div className="flex items-center gap-1 shrink-0">
           <Button
             size="icon"
             variant="ghost"
-            className="h-8 w-8 rounded-full hover:bg-slate-100 flex-shrink-0 text-slate-400 hover:text-primary transition-colors"
+            className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
-              handleOpenAssignDialog(territory);
+              handleOpenEdit(territory);
             }}
           >
-            <ArrowRight className="h-4 w-4" />
+            <Pencil className="h-3.5 w-3.5" />
           </Button>
-        )}
+
+          {isLivre && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 hover:text-primary transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenAssignDialog(territory);
+              }}
+            >
+              <ArrowRight className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
     )
   }
@@ -656,6 +694,98 @@ export function AdminTerritoriesView() {
           </div>
           <DialogFooter>
             <Button onClick={handleAssign} disabled={assigning}>Designar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Edição de Território */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle>Editar Território {editNumber}</DialogTitle>
+            <DialogDescription>
+              Ajuste as informações básicas e o grupo responsável.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>Número</Label>
+                <Input value={editNumber} onChange={e => setEditNumber(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Cor Padrão</Label>
+                <div className="flex gap-2 items-center">
+                  <Input type="color" value={editColor} onChange={e => setEditColor(e.target.value)} className="w-12 p-1 h-9" />
+                  <span className="text-xs text-slate-400 font-mono uppercase">{editColor}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label>Nome/Referência</Label>
+              <Input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Ex: Quadra do Mercado" />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-[#C65D3B] font-bold">Grupo Responsável (Dom.)</Label>
+              <div className="p-3 border rounded-lg bg-orange-50/50 border-orange-100 space-y-3">
+                <p className="text-[11px] text-orange-800 leading-tight">
+                  No domingo, o território será atribuído automaticamente a este grupo.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditGroupId(null)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-full text-xs font-bold transition-all border",
+                      !editGroupId 
+                        ? "bg-white border-slate-400 text-slate-900 shadow-sm" 
+                        : "bg-slate-50 border-transparent text-slate-400 hover:bg-slate-100"
+                    )}
+                  >
+                    Nenhum
+                  </button>
+                  {groups.map(g => (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() => setEditGroupId(g.id)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5",
+                        editGroupId === g.id
+                          ? "bg-white shadow-sm ring-1 ring-offset-1"
+                          : "opacity-60 grayscale hover:grayscale-0 hover:opacity-100"
+                      )}
+                      style={{ 
+                        borderColor: editGroupId === g.id ? g.color : "transparent",
+                        color: editGroupId === g.id ? g.color : "inherit",
+                        backgroundColor: editGroupId === g.id ? `${g.color}10` : ""
+                      }}
+                    >
+                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: g.color }} />
+                      {g.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between p-3 border rounded-md bg-slate-50">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-medium">Território Ativo</Label>
+                <p className="text-xs text-muted-foreground">Desative para ocultar das listas de designação.</p>
+              </div>
+              <Switch checked={!editInactive} onCheckedChange={(val: boolean) => setEditInactive(!val)} />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSaveEdit} disabled={editSaving}>
+              {editSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar Alterações"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

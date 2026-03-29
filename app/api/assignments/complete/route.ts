@@ -20,15 +20,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "territoryId, userId e action são obrigatórios" }, { status: 400 })
     }
 
-    // 0. Verifica se o território ainda está designado para este usuário
+    // 0. Verifica se o território ainda está designado para este usuário ou seu grupo (Modo Domingo)
+    const { data: userProfile } = await supabaseAdmin
+      .from("profiles")
+      .select("group_id")
+      .eq("id", userId)
+      .single()
+
     const { data: currentTerritory } = await supabaseAdmin
       .from("territories")
-      .select("assigned_to")
+      .select("assigned_to, group_id")
       .eq("id", territoryId)
       .single()
     
-    if (currentTerritory?.assigned_to !== userId) {
-      return NextResponse.json({ error: "Este território não está mais designado para você." }, { status: 403 })
+    const isSunday = new Date().getDay() === 0
+    const isGroupAssignment = !currentTerritory?.assigned_to && isSunday && currentTerritory?.group_id === userProfile?.group_id
+
+    if (currentTerritory?.assigned_to !== userId && !isGroupAssignment) {
+      return NextResponse.json({ error: "Este território não está disponível para você hoje." }, { status: 403 })
     }
 
     if (!["complete", "return"].includes(action)) {
@@ -38,8 +47,8 @@ export async function POST(request: Request) {
     const isComplete = action === "complete"
     const now = new Date().toISOString()
 
-    // 1. Atualiza o assignment do usuário para este território
-    const { error: assignmentError } = await supabaseAdmin
+    // 1. Atualiza o assignment (do usuário ou do grupo)
+    const query = supabaseAdmin
       .from("assignments")
       .update({
         status: isComplete ? "completed" : "returned",
@@ -51,8 +60,15 @@ export async function POST(request: Request) {
         } : {}),
       })
       .eq("territory_id", territoryId)
-      .eq("user_id", userId)
       .eq("status", "active")
+
+    if (isGroupAssignment) {
+      query.eq("group_id", userProfile?.group_id)
+    } else {
+      query.eq("user_id", userId)
+    }
+
+    const { error: assignmentError } = await query
 
     if (assignmentError) throw assignmentError
 

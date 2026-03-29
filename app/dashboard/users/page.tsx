@@ -31,7 +31,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, UserPlus, Pencil, Trash2, Mail, Phone, ShieldAlert, Lock, Copy, RefreshCw, CheckCircle2 } from "lucide-react"
+import { Loader2, UserPlus, Pencil, Trash2, Mail, Phone, ShieldAlert, Lock, Copy, RefreshCw, CheckCircle2, UserCheck, UserMinus } from "lucide-react"
+import { Switch } from "@/components/ui/switch"
 
 interface UserProfile {
   id: string
@@ -39,9 +40,17 @@ interface UserProfile {
   email: string
   role: "admin" | "dirigente" | "publicador"
   phone: string | null
+  group_id?: string | null
+  groups?: { name: string } | null
   gender?: "M" | "F"
   must_change_password?: boolean
+  is_active?: boolean
   last_seen_at?: string
+}
+
+interface Group {
+  id: string
+  name: string
 }
 
 function generateTempPassword() {
@@ -71,6 +80,7 @@ export default function UsersPage() {
   const { isReady, isAdmin, isDirigente, user } = useAuth()
 
   const [users, setUsers] = useState<UserProfile[]>([])
+  const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
 
   // Modal de Criar/Editar
@@ -83,8 +93,10 @@ export default function UsersPage() {
     role: "admin" | "dirigente" | "publicador"
     phone: string
     gender: "M" | "F"
+    groupId: string
     password: string
-  }>({ name: "", email: "", role: "publicador", phone: "", gender: "M", password: "" })
+    isActive: boolean
+  }>({ name: "", email: "", role: "publicador", phone: "", gender: "M", groupId: "none", password: "", isActive: true })
 
   // Modal de Redefinir Senha
   const [resetUser, setResetUser] = useState<UserProfile | null>(null)
@@ -95,16 +107,26 @@ export default function UsersPage() {
 
   const supabase = getSupabaseBrowserClient()
 
+  const fetchGroups = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.from("groups").select("id, name").order("name")
+      if (error) throw error
+      setGroups(data || [])
+    } catch (err: any) {
+      console.error("Erro ao buscar grupos:", err.message)
+    }
+  }, [supabase])
+
   const fetchUsers = useCallback(async () => {
     if (!user) return
     setLoading(true)
     try {
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, name, email, role, phone, last_seen_at")
+        .select("id, name, email, role, phone, last_seen_at, group_id, is_active, gender, groups(name)")
         .order("name")
       if (error) throw error
-      setUsers(data as UserProfile[])
+      setUsers(data as any[])
     } catch (err: any) {
       console.error("Erro ao buscar usuários:", err.message)
     } finally {
@@ -114,18 +136,37 @@ export default function UsersPage() {
 
   useEffect(() => {
     if (isReady && user && (isAdmin || isDirigente)) {
+      fetchGroups()
       fetchUsers()
     }
-  }, [isReady, isAdmin, isDirigente, user, fetchUsers])
+  }, [isReady, isAdmin, isDirigente, user, fetchUsers, fetchGroups])
 
   // ─────────── Criar / Editar ───────────
   const handleOpenDialog = (u?: UserProfile) => {
     if (u) {
       setEditingUser(u)
-      setFormData({ name: u.name, email: u.email, role: u.role, phone: u.phone || "", gender: u.gender || "M", password: "" })
+      setFormData({ 
+        name: u.name, 
+        email: u.email, 
+        role: u.role, 
+        phone: u.phone || "", 
+        gender: u.gender || "M", 
+        groupId: u.group_id || "none",
+        password: "" ,
+        isActive: u.is_active !== false
+      })
     } else {
       setEditingUser(null)
-      setFormData({ name: "", email: "", role: "publicador", phone: "", gender: "M", password: generateTempPassword() })
+      setFormData({ 
+        name: "", 
+        email: "", 
+        role: "publicador", 
+        phone: "", 
+        gender: "M", 
+        groupId: "none",
+        password: generateTempPassword(),
+        isActive: true
+      })
     }
     setIsDialogOpen(true)
   }
@@ -139,6 +180,8 @@ export default function UsersPage() {
         email: formData.email,
         role: formData.role,
         phone: formData.phone || null,
+        group_id: formData.groupId === "none" ? null : formData.groupId,
+        is_active: formData.isActive,
         updated_at: new Date().toISOString(),
       }
 
@@ -150,7 +193,10 @@ export default function UsersPage() {
         const res = await fetch("/api/admin/create-user", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...formData }),
+          body: JSON.stringify({ 
+            ...formData, 
+            group_id: formData.groupId === "none" ? null : formData.groupId 
+          }),
         })
         const json = await res.json()
         if (!res.ok) throw new Error(json.error || "Erro ao criar usuário")
@@ -240,77 +286,70 @@ export default function UsersPage() {
         <Table>
           <TableHeader className="bg-slate-50">
             <TableRow>
-              <TableHead className="w-[250px]">Nome</TableHead>
+              <TableHead className="w-[200px]">Nome</TableHead>
               <TableHead>Contato</TableHead>
+              <TableHead>Grupo</TableHead>
               <TableHead>Nível</TableHead>
               <TableHead>Visto por último</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
+              <TableHead className="text-right sr-only">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-10">
+                <TableCell colSpan={5} className="text-center py-10">
                   <Loader2 className="h-6 w-6 animate-spin mx-auto text-slate-200" />
                 </TableCell>
               </TableRow>
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center py-10 text-slate-400 italic">Nenhum usuário cadastrado.</TableCell>
+                <TableCell colSpan={5} className="text-center py-10 text-slate-400 italic">Nenhum usuário cadastrado.</TableCell>
               </TableRow>
             ) : (
               users.map((u) => (
-                <TableRow key={u.id} className="hover:bg-slate-50/50">
-                  <TableCell className="font-medium text-slate-700">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={`w-2 h-2 rounded-full ${u.gender === "F" ? "bg-pink-400" : "bg-blue-400"}`}
-                        title={u.gender === "F" ? "Irmã" : "Irmão"}
-                      />
-                      {u.name}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-1 text-[11px] text-slate-500">
-                      <div className="flex items-center gap-1.5"><Mail className="h-3 w-3" /> {u.email}</div>
-                      {u.phone && <div className="flex items-center gap-1.5"><Phone className="h-3 w-3" /> {u.phone}</div>}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={u.role === "admin" ? "default" : "outline"} className="capitalize text-[9px]">
-                      {u.role}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-[11px] text-slate-500 italic">
-                      {u.last_seen_at ? new Date(u.last_seen_at).toLocaleString('pt-BR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      }) : "Nunca"}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        title="Redefinir senha"
-                        onClick={() => handleOpenResetDialog(u)}
-                      >
-                        <Lock className="h-4 w-4 text-orange-400" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(u)}>
-                        <Pencil className="h-4 w-4 text-slate-300" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(u.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive/60" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
+                 <TableRow key={u.id} className="hover:bg-slate-50/50 cursor-pointer transition-colors" onClick={() => handleOpenDialog(u)}>
+                   <TableCell className="font-medium text-slate-700">
+                     <div className="flex items-center gap-2">
+                       <span
+                         className={`w-2 h-2 rounded-full ${u.is_active === false ? "bg-slate-300" : (u.gender === "F" ? "bg-pink-400" : "bg-blue-400")}`}
+                         title={u.is_active === false ? "Inativo" : (u.gender === "F" ? "Irmã" : "Irmão")}
+                       />
+                       <span className={u.is_active === false ? "text-slate-400" : ""}>{u.name}</span>
+                       {u.is_active === false && <Badge variant="secondary" className="text-[9px] h-4 px-1">Inativo</Badge>}
+                     </div>
+                   </TableCell>
+                   <TableCell className={u.is_active === false ? "opacity-50" : ""}>
+                     <div className="flex flex-col gap-1 text-[11px] text-slate-500">
+                       <div className="flex items-center gap-1.5"><Mail className="h-3 w-3" /> {u.email}</div>
+                       {u.phone && <div className="flex items-center gap-1.5"><Phone className="h-3 w-3" /> {u.phone}</div>}
+                     </div>
+                   </TableCell>
+                   <TableCell className={u.is_active === false ? "opacity-50" : ""}>
+                     {u.groups?.name ? (
+                       <Badge variant="secondary" className="text-[10px]">
+                         {u.groups.name}
+                       </Badge>
+                     ) : (
+                       <span className="text-[10px] text-slate-300 italic">Sem grupo</span>
+                     )}
+                   </TableCell>
+                   <TableCell className={u.is_active === false ? "opacity-50" : ""}>
+                     <Badge variant={u.role === "admin" ? "default" : "outline"} className="capitalize text-[9px]">
+                       {u.role}
+                     </Badge>
+                   </TableCell>
+                   <TableCell className={u.is_active === false ? "opacity-50" : ""}>
+                     <span className="text-[11px] text-slate-500 italic">
+                       {u.last_seen_at ? new Date(u.last_seen_at).toLocaleString('pt-BR', {
+                         day: '2-digit',
+                         month: '2-digit',
+                         year: 'numeric',
+                         hour: '2-digit',
+                         minute: '2-digit'
+                       }) : "Nunca"}
+                     </span>
+                   </TableCell>
+                 </TableRow>
               ))
             )}
           </TableBody>
@@ -354,17 +393,69 @@ export default function UsersPage() {
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <Label className="text-xs">Tipo de Usuário</Label>
-                <Select value={formData.role} onValueChange={(v: any) => setFormData({ ...formData, role: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="publicador">Publicador</SelectItem>
-                    <SelectItem value="dirigente">Dirigente</SelectItem>
-                    <SelectItem value="admin">Administrador</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label className="text-xs">Tipo de Usuário</Label>
+                  <Select value={formData.role} onValueChange={(v: any) => setFormData({ ...formData, role: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="publicador">Publicador</SelectItem>
+                      <SelectItem value="dirigente">Dirigente</SelectItem>
+                      <SelectItem value="admin">Administrador</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Grupo (Domingo)</Label>
+                  <Select value={formData.groupId} onValueChange={(v) => setFormData({ ...formData, groupId: v })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Nenhum</SelectItem>
+                      {groups.map(g => (
+                        <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+
+              {editingUser && (
+                <div className="flex items-center justify-between p-3 border rounded-md bg-slate-50">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-medium">Status do Usuário</Label>
+                    <p className="text-xs text-muted-foreground">
+                      {formData.isActive ? "Acesso liberado ao sistema." : "Acesso bloqueado temporariamente."}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{formData.isActive ? "Ativo" : "Inativo"}</span>
+                    <Switch 
+                      checked={formData.isActive} 
+                      onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })} 
+                    />
+                  </div>
+                </div>
+              )}
+
+              {editingUser && (
+                <div className="bg-orange-50 p-3 rounded-md border border-orange-100 flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label className="text-xs text-orange-900 font-bold flex items-center gap-1.5">
+                      <Lock className="h-3 w-3" /> Segurança
+                    </Label>
+                    <p className="text-[10px] text-orange-700">Redefinir acesso do usuário.</p>
+                  </div>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 text-[11px] border-orange-200 text-orange-600 hover:bg-orange-100"
+                    onClick={() => handleOpenResetDialog(editingUser)}
+                  >
+                    Redefinir Senha
+                  </Button>
+                </div>
+              )}
 
               {!editingUser && (
                 <div className="space-y-1 bg-amber-50 p-3 rounded-md border border-amber-100">

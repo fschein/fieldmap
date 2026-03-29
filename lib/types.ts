@@ -10,7 +10,10 @@ export interface Profile {
   role: UserRole
   gender?: "M" | "F"
   phone?: string | null
+  group_id?: string | null
   must_change_password?: boolean
+  is_active?: boolean
+  last_seen_at?: string
   created_at: string
   updated_at: string
 }
@@ -93,7 +96,8 @@ export interface Assignment {
   id: string
   territory_id: string
   subdivision_id: string | null // Renomeado de block_id
-  user_id: string
+  user_id?: string | null
+  group_id?: string | null
   campaign_id: string | null
   status: AssignmentStatus
   assigned_at: string

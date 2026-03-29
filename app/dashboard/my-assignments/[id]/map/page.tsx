@@ -63,13 +63,22 @@ export default function TerritoryMapPage() {
           do_not_visits(*)
         `)
         .eq("id", territoryId)
-        .eq("assigned_to", user.id)
-        .abortSignal(signal)
         .single()
 
       if (error) throw error
 
       if (!data) {
+        router.push("/dashboard/my-assignments")
+        return
+      }
+
+      // Access check
+      const isSunday = new Date().getDay() === 0
+      const { data: profile } = await supabase.from("profiles").select("group_id").eq("id", user.id).single()
+      const canAccess = data.assigned_to === user.id || (isSunday && data.group_id && data.group_id === profile?.group_id)
+      
+      if (!canAccess) {
+        toast.error("Você não tem acesso a este território.")
         router.push("/dashboard/my-assignments")
         return
       }

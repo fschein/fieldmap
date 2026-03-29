@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Select explícito para evitar erro se colunas opcionais ainda não existirem no BD
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, name, email, role, phone, must_change_password")
+        .select("id, name, email, role, phone, must_change_password, is_active, group_id")
         .eq("id", userId)
         .abortSignal(signal)
         .single()
@@ -74,8 +74,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (data.user && !error) {
-      setUser(data.user)
       const p = await fetchProfile(data.user.id)
+      if (p && p.is_active === false) {
+        await supabase.auth.signOut()
+        return { data: null, error: { message: "Sua conta está inativa. Procure um administrador." } }
+      }
+      setUser(data.user)
       setProfile(p)
     }
     return { data, error }
@@ -122,10 +126,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(safetyTimeout)
       
       if (session?.user) {
-        setUser(session.user)
         // Buscamos o profile de forma não-bloqueante
         fetchProfile(session.user.id).then(p => {
-          if (mounted) setProfile(p)
+          if (mounted) {
+            if (p && p.is_active === false) {
+              signOut()
+            } else {
+              setProfile(p)
+              setUser(session.user)
+            }
+          }
         })
       } else {
         setUser(null)
@@ -189,7 +199,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(safetyTimeout)
       subscription.unsubscribe()
     }
-  }, [fetchProfile, isReady])
+  }, [fetchProfile])
 
   const isAdmin = profile?.role === "admin"
   const isDirigente = profile?.role === "dirigente" || isAdmin

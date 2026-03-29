@@ -13,7 +13,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const { email, password, name, role, phone, gender } = await request.json()
+    const { email, password, name, role, phone, gender, group_id } = await request.json()
 
     if (!email || !password || !name) {
       return NextResponse.json({ error: "E-mail, senha e nome são obrigatórios" }, { status: 400 })
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
       email,
       password,
       email_confirm: true, // Auto-confirma o email
-      user_metadata: { name, role, phone, gender },
+      user_metadata: { name, role, phone, gender, group_id },
     })
 
     if (authError) {
@@ -49,6 +49,7 @@ export async function POST(request: Request) {
         role: role || "publicador",
         phone: phone || null,
         gender: gender || "M",
+        group_id: group_id || null,
         must_change_password: true,
         updated_at: new Date().toISOString()
       })
