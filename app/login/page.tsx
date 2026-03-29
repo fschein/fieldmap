@@ -72,11 +72,14 @@ if (!isReady) return <Loader2 className="animate-spin" />
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary">
-            <MapPin className="h-6 w-6 text-primary-foreground" />
+        <CardHeader className="text-center pt-10 pb-2">
+          <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center">
+             <img src="/logo.png" alt="FieldMap Logo" className="w-full h-full object-contain" />
           </div>
-          <CardTitle className="text-2xl">FieldMap</CardTitle>
+          <CardTitle className="text-3xl font-black tracking-tighter">
+            <span className="text-slate-900">Field</span>
+            <span className="text-[#C65D3B]">Map</span>
+          </CardTitle>
           <CardDescription>
             Entre com suas credenciais para acessar o sistema
           </CardDescription>
