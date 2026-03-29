@@ -107,32 +107,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true
 
+    // 1. Safety Catch: Force unblock after 6 seconds if auth hangs
+    const safetyTimeout = setTimeout(() => {
+      if (mounted && !isReady) {
+        console.warn("Auth Provider: Unblocking UI via Safety Catch (6s timeout)")
+        setIsReady(true)
+        setLoading(false)
+      }
+    }, 6000)
+
+    const finishInitialization = (session: Session | null) => {
+      if (!mounted) return
+      
+      clearTimeout(safetyTimeout)
+      
+      if (session?.user) {
+        setUser(session.user)
+        // Buscamos o profile de forma não-bloqueante
+        fetchProfile(session.user.id).then(p => {
+          if (mounted) setProfile(p)
+        })
+      } else {
+        setUser(null)
+        setProfile(null)
+      }
+      
+      setIsReady(true)
+      setLoading(false)
+    }
+
+    // 2. Proactive Session Check (Immediate)
+    supabase.auth.getSession().then(({ data }: { data: { session: Session | null } }) => {
+      const { session } = data
+      if (mounted && !isReady) {
+        console.log("Auth Provider: Proactive session check complete")
+        finishInitialization(session)
+      }
+    })
+
+    // 3. Auth State Change Listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event: AuthChangeEvent, session: Session | null) => {
         if (!mounted) return
 
-        console.log("Auth event:", event)
+        console.log("Auth Provider Event:", event)
 
         if (event === "INITIAL_SESSION") {
-          // ✅ LOCK RESOLVIDO AQUI: isReady e loading são definidos PRIMEIRO,
-          // de forma síncrona, ANTES de qualquer fetch de dados.
-          // Isso garante que o spinner NUNCA fica preso esperando a rede.
-          if (session?.user) {
-            setUser(session.user)
-          } else {
-            setUser(null)
-            setProfile(null)
-          }
-
-          // Desbloqueia a UI imediatamente
-          setIsReady(true)
-          setLoading(false)
-
-          // Busca o profile de forma assíncrona e não-bloqueante
-          if (session?.user) {
-            fetchProfile(session.user.id).then(p => {
-              if (mounted) setProfile(p)
-            })
+          // Se o getSession já ganhou a corrida, ignore o INITIAL_SESSION redundante
+          if (!isReady) {
+            finishInitialization(session)
           }
           return
         }
@@ -163,9 +186,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       mounted = false
+      clearTimeout(safetyTimeout)
       subscription.unsubscribe()
     }
-  }, [fetchProfile])
+  }, [fetchProfile, isReady])
 
   const isAdmin = profile?.role === "admin"
   const isDirigente = profile?.role === "dirigente" || isAdmin
