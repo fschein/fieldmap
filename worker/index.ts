@@ -1,7 +1,9 @@
-// worker/index.ts
+/// <reference lib="webworker" />
+
+export default null
 declare let self: ServiceWorkerGlobalScope
 
-self.addEventListener('push', (event) => {
+self.addEventListener('push', (event: PushEvent) => {
   if (!event.data) return
 
   try {
@@ -17,7 +19,7 @@ self.addEventListener('push', (event) => {
       actions: [
         { action: 'open', title: 'Ver Agora' }
       ]
-    }
+    } as any
 
     event.waitUntil(
       self.registration.showNotification(data.title, options)
@@ -27,7 +29,7 @@ self.addEventListener('push', (event) => {
   }
 })
 
-self.addEventListener('notificationclick', (event) => {
+self.addEventListener('notificationclick', (event: NotificationEvent) => {
   event.notification.close()
   
   const urlToOpen = event.notification.data.url
@@ -35,7 +37,7 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (let i = 0; i < clientList.length; i++) {
-        const client = clientList[i]
+        const client = clientList[i] as WindowClient
         if (client.url === urlToOpen && 'focus' in client) {
           return client.focus()
         }

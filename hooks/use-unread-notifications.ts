@@ -45,7 +45,7 @@ export function useUnreadNotifications(): number {
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "notifications" },
-        (payload) => {
+        (payload: any) => {
           const notif = payload.new as { read: boolean; created_by: string }
           if (notif.read) return
           if (!isAdminOrDirigente && notif.created_by !== user.id) return
