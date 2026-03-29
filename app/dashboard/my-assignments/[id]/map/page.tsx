@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { createTimeoutSignal } from "@/lib/utils/api-utils"
 import { useAuth } from "@/hooks/use-auth"
 import { useOfflineManager } from "@/hooks/use-offline-manager"
 import { TerritoryWithSubdivisions, Subdivision } from "@/lib/types"
@@ -28,6 +29,8 @@ function MapLoadingSkeleton() {
   )
 }
 
+const supabase = getSupabaseBrowserClient()
+
 export default function TerritoryMapPage() {
   const params = useParams()
   const router = useRouter()
@@ -42,14 +45,13 @@ export default function TerritoryMapPage() {
   const [dnvDialogOpen, setDnvDialogOpen] = useState(false)
   const [dnvCoords, setDnvCoords] = useState<{ lat: number, lng: number } | null>(null)
   const [animatingSubdivisionId, setAnimatingSubdivisionId] = useState<string | null>(null)
-  
-  const supabase = getSupabaseBrowserClient()
   const territoryId = params.id as string
 
   const fetchTerritory = useCallback(async () => {
     if (!territoryId || !user?.id) return
 
     setLoading(true)
+    const { signal, clear } = createTimeoutSignal(15000)
     try {
       const { data, error } = await supabase
         .from("territories")
@@ -62,6 +64,7 @@ export default function TerritoryMapPage() {
         `)
         .eq("id", territoryId)
         .eq("assigned_to", user.id)
+        .abortSignal(signal)
         .single()
 
       if (error) throw error
@@ -75,6 +78,9 @@ export default function TerritoryMapPage() {
       localStorage.setItem(`territory_cache_${territoryId}`, JSON.stringify(data))
       setTerritory(data as TerritoryWithSubdivisions)
     } catch (error: any) {
+      if (error.name === 'AbortError') {
+        toast.error("Tempo esgotado ao carregar mapa.")
+      }
       console.error("Erro ao carregar território:", error?.message || error)
 
       // Tentar carregar do cache se estiver offline ou der erro
@@ -99,6 +105,7 @@ export default function TerritoryMapPage() {
         router.push("/dashboard/my-assignments")
       }
     } finally {
+      clear()
       setLoading(false)
     }
   }, [territoryId, user?.id, supabase, router])

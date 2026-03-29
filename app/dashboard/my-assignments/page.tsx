@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { FieldMapLogoBrand } from "@/components/icons/fieldmap-logo"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { createTimeoutSignal } from "@/lib/utils/api-utils"
 import { useAuth } from "@/hooks/use-auth"
 import { Button } from "@/components/ui/button"
 import { Loader2, MapPin, Plus, ChevronRight } from "lucide-react"
@@ -15,6 +16,8 @@ interface TerritoryAssignment extends TerritoryWithSubdivisions {
   assignments: { assigned_at: string; status: string; campaign?: { name: string } }[]
 }
 
+const supabase = getSupabaseBrowserClient()
+
 export default function MyAssignmentsPage() {
   const { user, profile, isReady } = useAuth()
   const [territories, setTerritories] = useState<TerritoryAssignment[]>([])
@@ -22,24 +25,29 @@ export default function MyAssignmentsPage() {
   const [requesting, setRequesting] = useState(false)
   const [cooldown, setCooldown] = useState(0)
   const router = useRouter()
-  const supabase = getSupabaseBrowserClient()
 
   const fetchMyAssignments = useCallback(async () => {
     if (!user?.id) return
     setLoading(true)
+    const { signal, clear } = createTimeoutSignal(15000)
     try {
       const { data, error } = await supabase
         .from("territories")
         .select(`*, campaign:campaigns(*), subdivisions(*), assignments(*, campaign:campaigns(*))`)
         .eq("assigned_to", user.id)
+        .abortSignal(signal)
         .order("number", { ascending: true })
       if (error) throw error
       setTerritories(data || [])
       localStorage.setItem("my_assignments_cache", JSON.stringify(data || []))
-    } catch {
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        toast.error("Tempo esgotado ao carregar territórios.")
+      }
       const cached = localStorage.getItem("my_assignments_cache")
       if (cached) setTerritories(JSON.parse(cached))
     } finally {
+      clear()
       setLoading(false)
     }
   }, [user?.id, supabase])

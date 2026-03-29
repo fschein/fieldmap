@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { createTimeoutSignal } from "@/lib/utils/api-utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -189,9 +190,10 @@ const FilterPill = ({ label, count, active, onClick, emoji }: any) => (
   </button>
 )
 
+const supabase = getSupabaseBrowserClient()
+
 export function AdminTerritoriesView() {
   const router = useRouter()
-  const supabase = getSupabaseBrowserClient()
   const [priorityTerritories, setPriorityTerritories] = useState<PriorityScore[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
@@ -256,10 +258,12 @@ export function AdminTerritoriesView() {
   const [editSaving, setEditSaving] = useState(false)
 
   const loadData = useCallback(async () => {
-    try {
-      setLoading(true)
-      setErrorMsg("")
+    setLoading(true)
+    setErrorMsg("")
+    const { signal, clear } = createTimeoutSignal(15000)
 
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
       const [terrRes, usersRes, campRes] = await Promise.all([
         supabase
           .from("territories")
@@ -271,16 +275,19 @@ export function AdminTerritoriesView() {
             subdivisions(id, territory_id, completed, status, name),
             assignments(id, assigned_at, status)
           `)
+          .abortSignal(signal)
           .order("number"),
         supabase
           .from("profiles")
           .select("*")
           .in("role", ["admin", "dirigente", "publicador"])
+          .abortSignal(signal)
           .order("name"),
         supabase
           .from("campaigns")
           .select("*")
           .eq("active", true)
+          .abortSignal(signal)
           .order("name")
       ])
 
@@ -295,16 +302,20 @@ export function AdminTerritoriesView() {
         const territoriesData = terrRes.data as unknown as TerritoryWithDetails[]
         const priorities = territoriesData
           .map(t => calculatePriorityScore(t))
-        // .sort((a, b) => b.score - a.score)
         setPriorityTerritories(priorities)
       }
     } catch (err: any) {
-      console.error("Erro ao carregar dados:", err.message)
-      setErrorMsg("Falha ao carregar territórios. Verifique sua conexão.")
+      if (err.name === 'AbortError') {
+        setErrorMsg("Tempo esgotado ao carregar dados. Verifique sua conexão.")
+      } else {
+        console.error("Erro ao carregar dados:", err.message)
+        setErrorMsg("Falha ao carregar territórios.")
+      }
     } finally {
+      clear()
       setLoading(false)
     }
-  }, [supabase])
+  }, [])
 
   useEffect(() => {
     loadData()

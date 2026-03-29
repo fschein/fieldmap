@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback } from "react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { createTimeoutSignal } from "@/lib/utils/api-utils"
 import { useRouter } from "next/navigation"
 import type { User, AuthChangeEvent, Session } from "@supabase/supabase-js"
 import type { Profile } from "@/lib/types"
@@ -32,12 +33,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   const fetchProfile = useCallback(async (userId: string): Promise<Profile | null> => {
+    const { signal, clear } = createTimeoutSignal(15000)
     try {
       // Select explícito para evitar erro se colunas opcionais ainda não existirem no BD
       const { data, error } = await supabase
         .from("profiles")
         .select("id, name, email, role, phone, must_change_password")
         .eq("id", userId)
+        .abortSignal(signal)
         .single()
 
       if (error) {
@@ -48,9 +51,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return null
       }
       return data as Profile
-    } catch (err) {
-      console.warn("Exception fetching profile:", err)
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        console.warn("Timeout ao carregar perfil (15s)")
+      } else {
+        console.warn("Exception fetching profile:", err)
+      }
       return null
+    } finally {
+      clear()
     }
   }, [])
 

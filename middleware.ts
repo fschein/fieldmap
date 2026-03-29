@@ -56,18 +56,28 @@ export async function middleware(request: NextRequest) {
 
   // 5. Verificar se a troca de senha é obrigatória (Apenas para rotas do Dashboard)
   if (user && isDashboardPage && !request.nextUrl.pathname.startsWith('/dashboard/setup-password')) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('must_change_password')
-      .eq('id', user.id)
-      .single()
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 12000)
 
-    if (profile?.must_change_password) {
-      const redirectResponse = NextResponse.redirect(new URL('/dashboard/setup-password', request.url))
-      response.cookies.getAll().forEach(cookie => {
-        redirectResponse.cookies.set(cookie)
-      })
-      return redirectResponse
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('must_change_password')
+        .eq('id', user.id)
+        .abortSignal(controller.signal)
+        .single()
+
+      if (profile?.must_change_password) {
+        const redirectResponse = NextResponse.redirect(new URL('/dashboard/setup-password', request.url))
+        response.cookies.getAll().forEach(cookie => {
+          redirectResponse.cookies.set(cookie)
+        })
+        return redirectResponse
+      }
+    } catch (err) {
+      console.warn("[Middleware] Timeout ou erro ao verificar perfil, ignorando bloqueio:", err)
+    } finally {
+      clearTimeout(timeoutId)
     }
   }
 
