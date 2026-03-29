@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { MapPin, Loader2 } from "lucide-react"
+import { FieldMapLogoBrand } from "@/components/icons/fieldmap-logo"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -73,13 +74,13 @@ if (!isReady) return <Loader2 className="animate-spin" />
     <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center pt-10 pb-2">
-          <div className="mx-auto mb-4 flex h-24 w-24 items-center justify-center">
-             <img src="/logo.png" alt="FieldMap Logo" className="w-full h-full object-contain" />
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <FieldMapLogoBrand className="h-10 w-10 shrink-0" />
+            <CardTitle className="text-4xl font-black tracking-tighter">
+              <span className="text-slate-900">Field</span>
+              <span className="text-[#C65D3B]">Map</span>
+            </CardTitle>
           </div>
-          <CardTitle className="text-3xl font-black tracking-tighter">
-            <span className="text-slate-900">Field</span>
-            <span className="text-[#C65D3B]">Map</span>
-          </CardTitle>
           <CardDescription>
             Entre com suas credenciais para acessar o sistema
           </CardDescription>
