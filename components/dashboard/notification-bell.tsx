@@ -17,6 +17,7 @@ function NotifIcon({ type }: { type: AppNotification["type"] }) {
   if (type === "request") return <MapPin className="h-4 w-4 text-blue-500" />
   if (type === "returned") return <ArrowDownToLine className="h-4 w-4 text-green-600" />
   if (type === "idle") return <UserX className="h-4 w-4 text-orange-500" />
+  if (type === "assigned") return <MapPin className="h-4 w-4 text-blue-600" />
   return <Bell className="h-4 w-4 text-slate-400" />
 }
 
@@ -79,6 +80,8 @@ export function NotificationBell() {
                     router.push("/dashboard/assignments")
                   } else if (notif.type === "returned" && notif.territory_id) {
                     router.push(`/dashboard/territories/${notif.territory_id}`)
+                  } else if (notif.type === "assigned") {
+                    router.push("/dashboard/my-assignments")
                   }
                 }}
                 className={cn(
@@ -91,6 +94,7 @@ export function NotificationBell() {
                   notif.type === "request" && "bg-blue-100",
                   notif.type === "returned" && "bg-green-100",
                   notif.type === "idle" && "bg-orange-100",
+                  notif.type === "assigned" && "bg-blue-50",
                 )}>
                   <NotifIcon type={notif.type} />
                 </span>

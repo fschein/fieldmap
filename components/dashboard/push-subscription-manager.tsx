@@ -107,7 +107,7 @@ export function PushSubscriptionManager() {
       <div className="flex-1 min-w-0">
         <p className="text-xs font-bold text-slate-800">Notificações no Celular</p>
         <p className="text-[10px] text-slate-500 truncate">
-          {subscription ? "Você receberá avisos sobre seus territórios" : "Ative para receber avisos em tempo real"}
+          {subscription ? "Você receberá notificações sobre seus territórios" : "Ative para receber notificações em tempo real"}
         </p>
       </div>
       <Button 

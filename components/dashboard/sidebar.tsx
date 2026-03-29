@@ -110,21 +110,25 @@ const handleSignOut = useCallback(async () => {
     setMobileOpen(false)
   }, [])
 
+  const isAdmin = profile?.role === "admin"
+
   return (
     <>
-      {/* Mobile menu button */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="fixed left-4 top-4 z-[100] md:hidden bg-card shadow-sm border"
-        onClick={() => setMobileOpen(!mobileOpen)}
-        aria-label={mobileOpen ? "Fechar menu" : "Abrir menu"}
-      >
-        {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-      </Button>
+      {/* Mobile menu button - Only for Admins */}
+      {isAdmin && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="fixed left-4 top-4 z-[100] md:hidden bg-card shadow-sm border"
+          onClick={() => setMobileOpen(!mobileOpen)}
+          aria-label={mobileOpen ? "Fechar menu" : "Abrir menu"}
+        >
+          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </Button>
+      )}
 
-      {/* Overlay */}
-      {mobileOpen && (
+      {/* Overlay - Only for Admins on mobile */}
+      {isAdmin && mobileOpen && (
         <div
           className="fixed inset-0 z-[90] bg-background/80 backdrop-blur-sm md:hidden"
           onClick={closeMobileMenu}
@@ -145,12 +149,12 @@ const handleSignOut = useCallback(async () => {
           {/* Logo */}
           <div className="flex h-16 items-center justify-between gap-2 border-b border-sidebar-border px-6 dark:bg-sidebar">
             <div className="flex items-center gap-2">
-              <FieldMapLogoBrand className="h-8 w-8 shrink-0" />
+              <FieldMapLogoBrand className="h-6 w-6 shrink-0" />
               <span className="font-bold text-foreground tracking-tight text-xl">
                 Field<span className="text-primary">Map</span>
               </span>
             </div>
-            <NotificationBell />
+            {/* <NotificationBell /> */}
           </div>
 
           {/* Navigation */}

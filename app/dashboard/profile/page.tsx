@@ -9,12 +9,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, User, Mail, Shield, Lock, Eye, EyeOff, AlertTriangle, CheckCircle2 } from "lucide-react"
+import { Loader2, User, Mail, Shield, Lock, Eye, EyeOff, CheckCircle2, LogOut } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
 export default function ProfilePage() {
-  const { user, profile } = useAuth()
+  const { user, profile, signOut } = useAuth()
   const [name, setName] = useState(profile?.name || "")
   const [phone, setPhone] = useState(profile?.phone || "")
   const [saving, setSaving] = useState(false)
@@ -118,41 +118,37 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-3xl font-bold">Meu Perfil</h1>
-        <p className="text-muted-foreground">
-          Visualize e edite suas informações
-        </p>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Informações da Conta</CardTitle>
-          <CardDescription>
-            Seus dados de acesso ao sistema
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-            <Mail className="h-5 w-5 text-muted-foreground" />
-            <div>
-              <p className="text-sm text-muted-foreground">E-mail</p>
-              <p className="font-medium">{user?.email}</p>
-            </div>
+    <div className="space-y-6 max-w-2xl mx-auto pb-10">
+      {/* HEADER PREMIUM */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b">
+        <div className="flex items-center gap-4">
+          <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center text-primary border-2 border-primary/20 shadow-sm">
+            <User className="h-8 w-8" />
           </div>
-
-          <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-            <Shield className="h-5 w-5 text-muted-foreground" />
-            <div>
-              <p className="text-sm text-muted-foreground">Função</p>
-              <Badge variant={getRoleBadgeVariant(profile?.role || "") as "default" | "secondary" | "destructive"}>
-                {getRoleName(profile?.role || "")}
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <h1 className="text-2xl font-bold tracking-tight">{profile?.name || "Meu Perfil"}</h1>
+              <Badge variant={getRoleBadgeVariant(profile?.role || "publicador") as any} className="h-5 px-1.5 text-[10px] uppercase font-black tracking-wider">
+                {getRoleName(profile?.role || "publicador")}
               </Badge>
             </div>
+            <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+              <Mail className="h-3.5 w-3.5" />
+              {user?.email}
+            </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+        
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => signOut()} 
+          className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 h-10 px-4 font-bold shadow-sm"
+        >
+          <LogOut className="h-4 w-4 mr-2" />
+          Sair do App
+        </Button>
+      </div>
 
       <Card>
         <CardHeader>
@@ -161,30 +157,27 @@ export default function ProfilePage() {
             Atualize suas informações pessoais
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-4"> {/* Added this div to wrap the inputs */}
-            <div className="space-y-2">
-              <Label htmlFor="email">E-mail</Label>
-              <Input id="email" value={user?.email || ""} disabled className="bg-muted" />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="name">Nome Completo</Label>
+        <CardContent className="space-y-6 pt-6">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="name" className="text-sm font-bold">Nome Completo</Label>
               <Input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Seu nome"
+                className="h-11"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="phone">WhatsApp / Telefone</Label>
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="phone" className="text-sm font-bold">WhatsApp / Telefone</Label>
               <Input
                 id="phone"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="(00) 00000-0000"
+                className="h-11"
               />
             </div>
           </div>

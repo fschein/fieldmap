@@ -170,6 +170,18 @@ export function AssignmentHistorySheet({
       })
       if (error) throw error
 
+      // Inserir notificação (Novo território designado)
+      if (territory) {
+        await supabase.from("notifications").insert({
+          type: "assigned",
+          title: "Novo território designado",
+          message: `O território ${territory.number} foi designado para você.`,
+          user_id: selectedPublisher,
+          territory_id: territoryId,
+          created_by: (await supabase.auth.getUser()).data.user?.id
+        }).catch(err => console.error("Erro ao inserir notificação:", err))
+      }
+
       toast.success("Nova designação criada!")
       setIsAddingMode(false)
       setSelectedPublisher("")

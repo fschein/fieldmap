@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getLocalTodayStr, toLocalISOString } from "@/lib/date-utils"
 import {
   Dialog,
   DialogContent,
@@ -52,26 +53,22 @@ export function AssignmentCreateModal({
 
   const [territories, setTerritories] = useState<Territory[]>([])
   const [publishers, setPublishers] = useState<Publisher[]>([])
-  const [campaigns, setCampaigns] = useState<{ id: string; name: string }[]>([])
+  const [campaigns, setCampaigns] = useState<{ id: string; name: string; start_date?: string | null; end_date?: string | null }[]>([])
 
   const [selectedTerritoryId, setSelectedTerritoryId] = useState<string>("")
   const [selectedPublisherId, setSelectedPublisherId] = useState<string>("")
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>("")
-  const [startDate, setStartDate] = useState(todayStr())
+  const [startDate, setStartDate] = useState(getLocalTodayStr())
   const [endDate, setEndDate] = useState("")
   const [searchTerritory, setSearchTerritory] = useState("")
   const [searchPublisher, setSearchPublisher] = useState("")
-
-  function todayStr() {
-    return new Date().toISOString().split("T")[0]
-  }
 
   useEffect(() => {
     if (open) {
       setSelectedTerritoryId(preselectedTerritoryId || "")
       setSelectedPublisherId("")
       setSelectedCampaignId("")
-      setStartDate(todayStr())
+      setStartDate(getLocalTodayStr())
       setEndDate("")
       setSearchTerritory("")
       setSearchPublisher("")
@@ -94,7 +91,7 @@ export function AssignmentCreateModal({
           .order("name"),
         supabase
           .from("campaigns")
-          .select("id, name")
+          .select("id, name, start_date, end_date")
           .eq("active", true)
           .order("name"),
         supabase
@@ -145,7 +142,23 @@ export function AssignmentCreateModal({
       }
 
       if (pubRes.data) setPublishers(pubRes.data)
-      if (campRes.data) setCampaigns(campRes.data)
+      if (campRes.data) {
+        const campsData = campRes.data as any[]
+        setCampaigns(campsData)
+
+        // Auto-selecionar campanha atual baseada na data de HOJE
+        const today = new Date()
+        const currentCampaign = campsData.find(c => {
+          if (!c.start_date) return false
+          const start = new Date(c.start_date + "T00:00:00")
+          const end = c.end_date ? new Date(c.end_date + "T23:59:59") : null
+          return today >= start && (!end || today <= end)
+        })
+
+        if (currentCampaign) {
+          setSelectedCampaignId(currentCampaign.id)
+        }
+      }
     } catch (e) {
       console.error(e)
     } finally {
@@ -182,8 +195,8 @@ export function AssignmentCreateModal({
 
     setSaving(true)
     try {
-      const startISO = new Date(`${startDate}T12:00:00Z`).toISOString()
-      const endISO = endDate ? new Date(`${endDate}T12:00:00Z`).toISOString() : null
+      const startISO = toLocalISOString(startDate)
+      const endISO = toLocalISOString(endDate)
       const isCompleted = !!endISO
 
       if (!isCompleted) {

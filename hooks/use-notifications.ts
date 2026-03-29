@@ -5,12 +5,13 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 
 export interface AppNotification {
   id: string
-  type: "request" | "returned" | "idle"
+  type: "request" | "returned" | "idle" | "assigned"
   title: string
   message: string
   read: boolean
   created_at: string
   created_by?: string
+  user_id?: string
   territory_id?: string
 }
 
@@ -21,9 +22,13 @@ export function useNotifications() {
   const [loading, setLoading] = useState(true)
 
   const fetchNotifications = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
     const { data, error } = await supabase
       .from("notifications")
       .select("*")
+      .or(`user_id.eq.${user.id},user_id.is.null`)
       .eq("read", false)
       .order("created_at", { ascending: false })
       .limit(50)
@@ -33,7 +38,6 @@ export function useNotifications() {
     }
 
     if (!error && data) {
-      console.log("Notificações carregadas:", data.length)
       setNotifications(data as AppNotification[])
       setUnreadCount((data as AppNotification[]).filter((n: AppNotification) => !n.read).length)
     }
@@ -65,10 +69,17 @@ export function useNotifications() {
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "notifications" },
         (payload: { new: AppNotification }) => {
-          console.log("Nova notificação recebida via Realtime:", payload.new)
           const newNotif = payload.new as AppNotification
-          setNotifications((prev) => [newNotif, ...prev])
-          setUnreadCount((prev) => prev + 1)
+          
+          // Check if notification is for current user or everyone
+          const checkUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (user && (!newNotif.user_id || newNotif.user_id === user.id)) {
+              setNotifications((prev) => [newNotif, ...prev])
+              setUnreadCount((prev) => prev + 1)
+            }
+          }
+          checkUser()
         }
       )
       .subscribe((status: string) => {

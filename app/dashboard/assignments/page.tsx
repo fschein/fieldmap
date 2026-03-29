@@ -18,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { TerritoryPrintReport } from "@/components/dashboard/territory-print-report"
 import {
   Loader2, Search, SlidersHorizontal, ArrowUpDown,
   Download, History, AlertTriangle, Plus, User, Calendar, Clock,
@@ -26,7 +27,7 @@ import {
 import { Progress } from "@/components/ui/progress"
 
 type SortOption = "number" | "days_desc" | "days_asc" | "assigned_desc" | "assigned_asc" | "last_completed_asc" | "last_completed_desc"
-type StatusFilter = "all" | "active" | "available" | "overdue"
+type StatusFilter = "all" | "active" | "available" | "overdue" | "completed"
 type PeriodFilter = "all" | "6m" | "12m"
 
 interface AggregatedTerritory {
@@ -34,7 +35,7 @@ interface AggregatedTerritory {
   number: string
   name: string
   color: string
-  status: 'available' | 'active' | 'overdue' | 'inactive'
+  status: 'available' | 'active' | 'overdue' | 'inactive' | 'completed' | 'assigned'
   activePublisher: string | null
   assignedAt: string | null
   daysInField: number | null
@@ -45,14 +46,18 @@ interface AggregatedTerritory {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  available: "Livre",
-  active: "Em Campo",
-  overdue: "Atrasado",
+  available: "DEVOLVIDO",
+  completed: "LIVRE",
+  assigned: "EM CAMPO",
+  active: "EM CAMPO",
+  overdue: "ATRASADO",
 }
 
 const STATUS_CLASS: Record<string, string> = {
-  available: "bg-slate-100 text-slate-500 border-slate-200",
-  active: "bg-blue-50 text-blue-700 border-blue-200",
+  available: "bg-amber-100 text-amber-700 border-amber-200",
+  completed: "bg-emerald-100 text-emerald-700 border-emerald-200 font-bold",
+  assigned: "bg-blue-100 text-blue-700 border-blue-200",
+  active: "bg-blue-100 text-blue-700 border-blue-200",
   overdue: "bg-red-100 text-red-700 border-red-300 font-bold",
 }
 
@@ -86,7 +91,7 @@ export default function AssignmentsPage() {
 
       const { data: territories, error: terrErr } = await supabase
         .from("territories")
-        .select("id, name, number, color, status, campaign_id, assigned_to")
+        .select("id, name, number, color, status, campaign_id, assigned_to, subdivisions(completed)")
         .order("number", { ascending: true })
 
       if (terrErr) throw new Error(`Territories: ${terrErr.message}`)
@@ -162,13 +167,28 @@ export default function AssignmentsPage() {
         new Date(a.completed_at).getTime() >= periodStartTime
       ).length
 
+      const totalSubdivisions = (t as any).subdivisions?.length || 0
+      const completedSubdivisions = (t as any).subdivisions?.filter((s: any) => s.completed).length || 0
+      
       let daysInField: number | null = null
-      let status: 'available' | 'active' | 'overdue' | 'inactive' = t.status || 'available'
+      let status: 'available' | 'active' | 'overdue' | 'inactive' | 'completed' = t.status || 'available'
 
-      if (status !== 'inactive' && activeAssig && activeAssig.user_id === t.assigned_to) {
-        const start = new Date(activeAssig.assigned_at).getTime()
-        daysInField = Math.ceil((now.getTime() - start) / (1000 * 60 * 60 * 24))
-        status = daysInField > 90 ? 'overdue' : 'active'
+      if (status !== 'inactive') {
+        if (activeAssig && activeAssig.user_id === t.assigned_to) {
+          const start = new Date(activeAssig.assigned_at).getTime()
+          daysInField = Math.ceil((now.getTime() - start) / (1000 * 60 * 60 * 24))
+          status = daysInField > 90 ? 'overdue' : 'active'
+        } else {
+          // Lógica DINÂMICA baseada no progresso real das quadras
+          const isFull = totalSubdivisions > 0 && completedSubdivisions === totalSubdivisions
+          const isEmpty = completedSubdivisions === 0
+          
+          if (isFull || isEmpty) {
+            status = 'completed' // LIVRE
+          } else {
+            status = 'available' // DEVOLVIDO
+          }
+        }
       }
 
       return {
@@ -242,8 +262,6 @@ export default function AssignmentsPage() {
           if (!b.lastCompletedAt) return -1
           return new Date(b.lastCompletedAt).getTime() - new Date(a.lastCompletedAt).getTime()
         default:
-          if (a.status === 'active' && b.status !== 'active') return -1
-          if (b.status === 'active' && a.status !== 'active') return 1
           return a.number.localeCompare(b.number, undefined, { numeric: true })
       }
     })
@@ -279,32 +297,11 @@ export default function AssignmentsPage() {
     active: data.filter(t => t.status === 'active').length,
     overdue: data.filter(t => t.status === 'overdue').length,
     available: data.filter(t => t.status === 'available').length,
+    completed: data.filter(t => t.status === 'completed').length,
   }
 
   return (
     <div className="space-y-4 pb-10">
-
-      {/* ===== Print Header (hidden on screen) ===== */}
-      <div className="hidden print:block mb-6 print-header">
-        <h1 className="text-2xl font-bold border-b-2 border-slate-900 pb-2 flex justify-between items-end">
-          <span>Relatório de Designações</span>
-          <span className="text-base font-normal text-slate-500">FieldMap</span>
-        </h1>
-        <div className="flex justify-between mt-2 font-medium">
-          <p className="text-sm text-slate-700">
-            Gerado em: {new Date().toLocaleString("pt-BR")}
-          </p>
-          <p className="text-sm text-slate-700">
-            Período analisado: {getPeriodLabel()}
-          </p>
-        </div>
-        <div className="flex gap-4 mt-2 text-sm text-slate-600">
-          <span>Total: <b>{filtered.length}</b> territórios</span>
-          <span>Em campo: <b>{stats.active}</b></span>
-          <span>Atrasados: <b>{stats.overdue}</b></span>
-          <span>Disponíveis: <b>{stats.available}</b></span>
-        </div>
-      </div>
 
       {/* ===== Screen Header ===== */}
       <div className="print:hidden space-y-4">
@@ -312,7 +309,7 @@ export default function AssignmentsPage() {
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Designações</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {stats.active} em campo &bull; {stats.overdue} atrasados &bull; {stats.available} disponíveis
+              {stats.active} em campo &bull; {stats.overdue} atrasados &bull; {stats.available} devolvidos &bull; {stats.completed} livres
             </p>
           </div>
           <div className="flex gap-2">
@@ -409,9 +406,10 @@ export default function AssignmentsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os Status</SelectItem>
-                <SelectItem value="active">Em Campo</SelectItem>
-                <SelectItem value="available">Disponíveis</SelectItem>
-                <SelectItem value="overdue">Atrasados</SelectItem>
+                <SelectItem value="active">EM CAMPO</SelectItem>
+                <SelectItem value="available">DEVOLVIDO</SelectItem>
+                <SelectItem value="completed">LIVRE</SelectItem>
+                <SelectItem value="overdue">ATRASADO</SelectItem>
               </SelectContent>
             </Select>
             <Select value={campaignFilter} onValueChange={setCampaignFilter}>
@@ -523,11 +521,9 @@ export default function AssignmentsPage() {
                     <TableCell className="py-2.5 whitespace-nowrap">
                       <span className={`
                         text-[10px] px-2 py-0.5 rounded-full uppercase font-medium border
-                        ${t.status === 'active' ? 'bg-blue-50 text-blue-700 border-blue-200 print:border-transparent' : 
-                          t.status === 'overdue' ? 'bg-red-100 text-red-700 border-red-300 print:border-transparent' : 
-                          'bg-slate-100 text-slate-600 border-slate-200 print:border-transparent'}
+                        ${STATUS_CLASS[t.status] || 'bg-slate-100 text-slate-500'}
                       `}>
-                        {STATUS_LABELS[t.status]}
+                        {STATUS_LABELS[t.status] || t.status}
                       </span>
                     </TableCell>
                     <TableCell className="py-2.5 text-center font-bold text-slate-700 border-l border-slate-100 print:border-slate-300">
@@ -616,54 +612,6 @@ export default function AssignmentsPage() {
         </>
       )}
 
-      {/* Print footer */}
-      <div className="hidden print:block mt-6 pt-2 border-t border-slate-300 text-[10px] text-slate-500 text-center">
-        Página 1 • FieldMap
-      </div>
-
-      {/* Print styles for full layout */}
-      <style jsx global>{`
-        @media print {
-          /* Setup Full Page & Removing Browser Margins */
-          @page { size: A4 portrait; margin: 10mm; }
-          
-          /* Hide everything outside of our layout */
-          body * { visibility: hidden; }
-          
-          /* Show only the Assignments page wrapper and its children */
-          .pb-10, .pb-10 * { visibility: visible; }
-          
-          /* Absolute positioning trick to stretch the content to fill the page, overwriting layouts */
-          .pb-10 {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: auto;
-            margin: 0;
-            padding: 0;
-            background: white !important;
-          }
-
-          /* General styling */
-          * { print-color-adjust: exact !important; -webkit-print-color-adjust: exact !important; }
-          
-          /* Table fine-tuning to prevent awkward breaks */
-          table { width: 100% !important; border-collapse: collapse !important; font-size: 10px !important; }
-          th { background-color: #f1f5f9 !important; color: #0f172a !important; padding: 6px 8px !important; text-align: left; }
-          td { padding: 4px 8px !important; border-bottom: 1px solid #e2e8f0 !important; }
-          tr { page-break-inside: avoid; }
-          
-          /* Colors for status */
-          .bg-blue-50 { background-color: transparent !important; color: #1e40af !important; border: 1px solid #bfdbfe !important; }
-          .bg-red-100 { background-color: #fee2e2 !important; color: #b91c1c !important; }
-          .bg-red-50\\/60, .print\\:bg-red-50 { background-color: #fef2f2 !important; }
-          
-          /* Adjust elements that shouldn't display */
-          nav, aside, header, .print\\:hidden, button { display: none !important; }
-        }
-      `}</style>
-
       {/* Modals */}
       <AssignmentHistorySheet
         territoryId={selectedTerritoryId}
@@ -675,6 +623,20 @@ export default function AssignmentsPage() {
         open={createModalOpen}
         onOpenChange={setCreateModalOpen}
         onSuccess={fetchData}
+      />
+
+      {/* COMPONENTE DE IMPRESSÃO (Otimizado para PDF) */}
+      <TerritoryPrintReport 
+        data={[...filtered]
+          .sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }))
+          .map(t => ({
+            id: t.id,
+            number: t.number,
+            name: t.name,
+            lastCompletedAt: t.lastCompletedAt,
+            completionsInPeriod: t.completionsInPeriod
+          }))}
+        campaignName={campaignFilter !== 'all' ? campaigns.find(c => c.id === campaignFilter)?.name : undefined}
       />
     </div>
   )

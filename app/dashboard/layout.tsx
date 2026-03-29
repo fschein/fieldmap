@@ -8,6 +8,10 @@ import { Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { PushSubscriptionManager } from "@/components/dashboard/push-subscription-manager"
+import { useUnreadNotifications } from "@/hooks/use-unread-notifications"
+import { BottomNav } from "@/components/layout/bottom-nav"
+
+const BOTTOM_NAV_ROLES = ["dirigente", "publicador"]
 
 export default function DashboardLayout({
   children,
@@ -18,6 +22,7 @@ export default function DashboardLayout({
   const router = useRouter()
   const pathname = usePathname()
   const [shouldRender, setShouldRender] = useState(false)
+  const unreadCount = useUnreadNotifications()
 
   useEffect(() => {
     // Aguarda até que a autenticação esteja pronta
@@ -88,19 +93,30 @@ export default function DashboardLayout({
   }
 
   const isSetupPage = pathname === "/dashboard/setup-password"
+  const isMapPage = pathname.includes("/map")
+  const showBottomNav = !isSetupPage && !isMapPage && profile?.role && BOTTOM_NAV_ROLES.includes(profile.role)
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-screen bg-slate-50">
       {!isSetupPage && <Sidebar />}
-      <main className={cn(!isSetupPage && "md:ml-64")}>
+      <main className={cn(
+        !isSetupPage && "md:ml-64",
+        showBottomNav && "pb-16 md:pb-0"
+      )}>
         <div className={cn(
-          "container mx-auto p-6 pt-20 md:pt-6",
-          isSetupPage && "pt-6"
+          "container mx-auto p-2 pt-20 md:pt-6",
+          isSetupPage && "pt-6",
+          isMapPage && "p-0 pt-0" // Removendo padding do container no mapa para ser edge-to-edge
         )}>
           <PushSubscriptionManager />
           {children}
         </div>
       </main>
+
+      {/* Bottom Nav visível apenas para Dirigentes e Publicadores no mobile, e se não for página de setup/mapa */}
+      {showBottomNav && (
+        <BottomNav unreadCount={unreadCount} />
+      )}
     </div>
   )
 }

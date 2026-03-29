@@ -12,6 +12,7 @@ import { SubdivisionDrawer } from "@/components/my-assignments/subdivision-drawe
 import { CompleteAssignmentDialog } from "@/components/my-assignments/complete-assignment-dialog"
 import { AddDoNotVisitDialog } from "@/components/my-assignments/add-do-not-visit-dialog"
 import dynamic from "next/dynamic"
+import { toast } from "sonner"
 
 // Importar o mapa dinamicamente para evitar problemas de SSR
 const TerritoryMapViewer = dynamic(
@@ -39,9 +40,10 @@ export default function TerritoryMapPage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [pinMode, setPinMode] = useState(false)
   const [dnvDialogOpen, setDnvDialogOpen] = useState(false)
-  const [dnvCoords, setDnvCoords] = useState<{lat: number, lng: number} | null>(null)
+  const [dnvCoords, setDnvCoords] = useState<{ lat: number, lng: number } | null>(null)
+  const [animatingSubdivisionId, setAnimatingSubdivisionId] = useState<string | null>(null)
+  
   const supabase = getSupabaseBrowserClient()
-
   const territoryId = params.id as string
 
   const fetchTerritory = useCallback(async () => {
@@ -74,12 +76,12 @@ export default function TerritoryMapPage() {
       setTerritory(data as TerritoryWithSubdivisions)
     } catch (error: any) {
       console.error("Erro ao carregar território:", error?.message || error)
-      
+
       // Tentar carregar do cache se estiver offline ou der erro
       const cached = localStorage.getItem(`territory_cache_${territoryId}`)
       if (cached) {
         const parsed = JSON.parse(cached) as TerritoryWithSubdivisions
-        
+
         // Aplicar alterações pendentes que ainda não foram sincronizadas
         const pending = JSON.parse(localStorage.getItem("pending_subdivision_updates") || "[]")
         if (pending.length > 0 && parsed.subdivisions) {
@@ -91,7 +93,7 @@ export default function TerritoryMapPage() {
             return s
           })
         }
-        
+
         setTerritory(parsed)
       } else {
         router.push("/dashboard/my-assignments")
@@ -154,10 +156,11 @@ export default function TerritoryMapPage() {
         throw new Error(error || "Erro ao processar devolução")
       }
 
+      toast.success("Território processado com sucesso!")
       router.push("/dashboard/my-assignments")
     } catch (error: any) {
       console.error("Erro ao processar devolução:", error?.message || error)
-      alert("Erro ao processar devolução. Tente novamente.")
+      toast.error("Erro ao processar devolução: " + error.message)
       setSaving(false)
     }
   }
@@ -177,41 +180,70 @@ export default function TerritoryMapPage() {
     setPinMode(false)
   }
 
-  const handleToggleSubdivision = async (subdivision: Subdivision) => {
-    const nextStatus = subdivision.completed || subdivision.status === 'completed' ? 'available' : 'completed'
-    const nextCompleted = nextStatus === 'completed'
+  const handleToggleSubdivision = async (completionDate?: string) => {
+    if (!selectedSubdivision) return
+    
+    const isNowCompleting = !(selectedSubdivision.completed || selectedSubdivision.status === 'completed')
+    const nextStatus = isNowCompleting ? 'completed' : 'available'
+    const nextCompleted = isNowCompleting
 
     if (!isOnline) {
-      addPendingAction(subdivision.id, nextStatus, nextCompleted)
+      addPendingAction(selectedSubdivision.id, nextStatus, nextCompleted)
       setDrawerOpen(false)
-      // O useEffect sync-complete irá recarregar os dados locais (que já refletem o localStorage se eu gerenciar isso)
-      // Mas por enquanto, vamos apenas avisar o usuário
+      toast.info("Ação registrada offline")
       return
     }
 
     try {
+      const updateData: any = {
+        status: nextStatus,
+        completed: nextCompleted,
+      }
+      
+      if (isNowCompleting && completionDate) {
+        // Garantir que a data de conclusão seja salva no updated_at para exibição
+        updateData.updated_at = new Date(completionDate).toISOString()
+      } else {
+        updateData.updated_at = new Date().toISOString()
+      }
+
       const { error } = await supabase
         .from("subdivisions")
-        .update({
-          status: nextStatus,
-          completed: nextCompleted,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", subdivision.id)
+        .update(updateData)
+        .eq("id", selectedSubdivision.id)
 
       if (error) throw error
 
-      // Recarregar o território para o mapa refletir o novo status
+      if (isNowCompleting) {
+        toast.success(`Quadra ${selectedSubdivision.name} concluída!`)
+        setAnimatingSubdivisionId(selectedSubdivision.id)
+        setTimeout(() => setAnimatingSubdivisionId(null), 1000)
+      }
+
+      // Recarregar o território
       await fetchTerritory()
       setDrawerOpen(false)
+
+      // Fluxo UX: Selecionar próxima quadra disponível
+      if (isNowCompleting && territory?.subdivisions) {
+        const next = territory.subdivisions.find(s => 
+          s.id !== selectedSubdivision.id && 
+          !(s.completed || s.status === 'completed')
+        )
+        if (next) {
+          // Pequeno delay para a animação do mapa rolar
+          setTimeout(() => {
+            setSelectedSubdivision(next)
+          }, 600)
+        }
+      }
     } catch (error: any) {
       console.error("Erro ao atualizar quadra:", error?.message || error)
-      alert("Erro ao atualizar quadra. Tente novamente.")
+      toast.error("Erro ao atualizar quadra")
     }
   }
 
   const handleAddDnvClick = () => {
-    // Tenta pegar a localização atual primeiro
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -220,8 +252,6 @@ export default function TerritoryMapPage() {
         },
         (error) => {
           console.warn("Geolocalização indisponível, ativando Pin Mode", error)
-          // Falha ou negado, ativa Pin Mode
-          // Falha ou negado, ativa Pin Mode no mapa
           setPinMode(true)
         },
         { enableHighAccuracy: true, timeout: 5000 }
@@ -259,11 +289,9 @@ export default function TerritoryMapPage() {
   const isFullyCompleted = progress === 100
 
   return (
-    <div className="-mx-6 -mb-6 -mt-20 md:-mt-6 flex flex-col bg-slate-50 overflow-hidden relative" style={{ height: '100dvh' }}>
+    <div className="flex flex-col bg-slate-50 overflow-hidden relative" style={{ height: '100dvh' }}>
       {/* Header Fixo Sólido (Mobile) / Flutuante (Desktop) */}
-      <div className="absolute top-0 left-0 right-0 h-16 z-[40] bg-white shadow-sm flex items-center justify-between pl-16 pr-4 md:relative md:h-auto md:bg-transparent md:shadow-none md:px-4 md:pt-4">
-        
-        {/* Lado Esquerdo (Voltar + Nome do Território) */}
+      <div className="absolute top-0 left-0 right-0 h-16 z-[40] bg-white/95 backdrop-blur-sm shadow-sm flex items-center justify-between px-2 md:relative md:h-auto md:bg-transparent md:shadow-none md:px-4 md:pt-4">
         <div className="flex items-center gap-2 overflow-hidden">
           <Button
             variant="ghost"
@@ -285,7 +313,6 @@ export default function TerritoryMapPage() {
           </div>
         </div>
 
-        {/* Lado Direito (% de Conclusão) */}
         <div className="flex items-center gap-2 flex-shrink-0 ml-2">
           <div className="text-slate-700 font-bold md:bg-white/95 md:backdrop-blur-sm md:border md:border-slate-200 md:px-3 md:py-1.5 md:rounded-full text-sm md:shadow-sm">
             {progress}%
@@ -294,69 +321,83 @@ export default function TerritoryMapPage() {
       </div>
 
       <div className="flex flex-col flex-1 min-h-0 pt-16 md:pt-4 relative w-full">
+        {/* Mapa */}
+        <div className={`flex-1 min-h-0 shrink-0 border-y-0 md:border md:rounded-xl overflow-hidden shadow-sm relative z-0 ${pinMode ? 'border-red-500 ring-inset ring-4 ring-red-500/30 cursor-crosshair' : 'border-slate-200'}`}>
+          <TerritoryMapViewer
+            territory={territory}
+            onSubdivisionClick={handleSubdivisionClick}
+            pinMode={pinMode}
+            onPinConfirm={handlePinConfirm}
+            onPinCancel={handlePinCancel}
+          />
+          
+          {/* Animação de Conclusão Overlay */}
+          <style jsx global>{`
+            .subdivision-animating-${animatingSubdivisionId} {
+              transform-origin: center;
+              animation: completion-pop 0.8s ease-out;
+            }
+            @keyframes completion-pop {
+              0% { transform: scale(1); opacity: 0.7; }
+              40% { transform: scale(1.05); opacity: 1; filter: brightness(1.2); }
+              100% { transform: scale(1); opacity: 0.8; }
+            }
+          `}</style>
+        </div>
 
-      {/* Mapa (Edge-to-Edge no mobile) */}
-      <div className={`flex-1 min-h-0 shrink-0 border-y-0 md:border md:rounded-xl overflow-hidden shadow-sm relative z-0 ${pinMode ? 'border-red-500 ring-inset ring-4 ring-red-500/30 cursor-crosshair' : 'border-slate-200'}`}>
-        <TerritoryMapViewer 
-          territory={territory} 
-          onSubdivisionClick={handleSubdivisionClick}
-          pinMode={pinMode}
-          onPinConfirm={handlePinConfirm}
-          onPinCancel={handlePinCancel}
+        {/* Botões Bottom/Native Bar */}
+        <div className="flex gap-2 p-4 pb-6 md:pb-4 bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.05)] z-[40] relative shrink-0">
+          <Button
+            variant="outline"
+            className={`flex-1 min-h-[48px] border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 font-bold rounded-xl ${pinMode ? 'bg-red-50 animate-pulse' : 'bg-white'}`}
+            onClick={handleAddDnvClick}
+            disabled={pinMode}
+          >
+            <MapPinOff className="h-4 w-4 mr-2" />
+            Não Visitar
+          </Button>
+          <Button
+            className={`flex-1 min-h-[48px] text-white font-bold shadow-sm rounded-xl ${isFullyCompleted
+                ? 'bg-green-600 hover:bg-green-700'
+                : 'bg-orange-600 hover:bg-orange-700 active:scale-[0.98]'
+              }`}
+            onClick={() => setShowCompleteDialog(true)}
+          >
+            {isFullyCompleted ? 'Concluir' : 'Devolver'}
+          </Button>
+        </div>
+
+        {/* Drawer para Subdivisão Selecionada */}
+        {selectedSubdivision && (
+          <SubdivisionDrawer
+            open={drawerOpen}
+            onOpenChange={(val) => {
+              setDrawerOpen(val)
+              if (!val) setSelectedSubdivision(null)
+            }}
+            subdivision={selectedSubdivision}
+            onToggle={handleToggleSubdivision}
+          />
+        )}
+
+        {/* Dialog para Devolução */}
+        <CompleteAssignmentDialog
+          open={showCompleteDialog}
+          onOpenChange={setShowCompleteDialog}
+          territory={territory}
+          activeAssignmentDate={(territory as any).assignments?.find((a: any) => a.status === 'active')?.assigned_at}
+          onConfirm={handleConfirmCompletion}
         />
-      </div>
 
-      {/* Botões Bottom/Native Bar */}
-      <div className="flex gap-2 p-4 pb-6 md:pb-4 bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.05)] z-[40] relative shrink-0">
-        <Button 
-          variant="outline"
-          className={`flex-1 min-h-[48px] border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 font-bold ${pinMode ? 'bg-red-50 animate-pulse' : 'bg-white'}`}
-          onClick={handleAddDnvClick}
-          disabled={pinMode}
-        >
-          <MapPinOff className="h-4 w-4 mr-2" />
-          Não Visitar
-        </Button>
-        <Button 
-          className={`flex-1 min-h-[48px] text-white font-bold shadow-sm ${
-            isFullyCompleted 
-            ? 'bg-green-600 hover:bg-green-700' 
-            : 'bg-orange-600 hover:bg-orange-700'
-          }`}
-          onClick={() => setShowCompleteDialog(true)}
-        >
-          {isFullyCompleted ? 'Concluir' : 'Devolver'}
-        </Button>
-      </div>
-
-      {/* Drawer para Subdivisão Selecionada */}
-      {selectedSubdivision && (
-        <SubdivisionDrawer
-          open={drawerOpen}
-          onOpenChange={setDrawerOpen}
-          subdivision={selectedSubdivision}
-          onToggle={() => handleToggleSubdivision(selectedSubdivision)}
+        {/* Dialog para Adicionar Não Visitar */}
+        <AddDoNotVisitDialog
+          open={dnvDialogOpen}
+          onOpenChange={setDnvDialogOpen}
+          territoryId={territory.id}
+          latitude={dnvCoords?.lat || null}
+          longitude={dnvCoords?.lng || null}
+          onSuccess={() => fetchTerritory()}
         />
-      )}
-
-      {/* Dialog para Devolução */}
-      <CompleteAssignmentDialog
-        open={showCompleteDialog}
-        onOpenChange={setShowCompleteDialog}
-        territory={territory}
-        activeAssignmentDate={(territory as any).assignments?.find((a: any) => a.status === 'active')?.assigned_at}
-        onConfirm={handleConfirmCompletion}
-      />
-
-      {/* Dialog para Adicionar Não Visitar */}
-      <AddDoNotVisitDialog
-        open={dnvDialogOpen}
-        onOpenChange={setDnvDialogOpen}
-        territoryId={territory.id}
-        latitude={dnvCoords?.lat || null}
-        longitude={dnvCoords?.lng || null}
-        onSuccess={() => fetchTerritory()}
-      />
       </div>
     </div>
   )

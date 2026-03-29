@@ -22,17 +22,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { 
-  ArrowLeft, 
-  Loader2, 
-  Save, 
-  MapPin, 
-  Check, 
+import {
+  ArrowLeft,
+  Loader2,
+  Save,
+  MapPin,
+  Check,
   Clock,
   Eye,
   Edit3,
   Trash2,
-  ChevronRight
+  ChevronRight,
+  Pencil,
+  Plus,
+  X,
+  TrendingUp
 } from "lucide-react"
 import type { TerritoryWithSubdivisions, Subdivision } from "@/lib/types"
 
@@ -62,17 +66,31 @@ export default function TerritoryMapPage({
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [selectedSubdivision, setSelectedSubdivision] = useState<Subdivision | null>(null)
+
+  // Modals
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [dnvDialogOpen, setDnvDialogOpen] = useState(false)
+  const [createDnvDialogOpen, setCreateDnvDialogOpen] = useState(false)
+  const [editTerritoryDialogOpen, setEditTerritoryDialogOpen] = useState(false)
+
+  // Subdivision Forms
   const [newSubdivisionName, setNewSubdivisionName] = useState("")
   const [editSubdivisionName, setEditSubdivisionName] = useState("")
   const [editSubdivisionNotes, setEditSubdivisionNotes] = useState("")
   const [pendingCoordinates, setPendingCoordinates] = useState<[number, number][][] | null>(null)
   const [focusedSubdivisionId, setFocusedSubdivisionId] = useState<string | null>(null)
-  const [showMobileSidebar, setShowMobileSidebar] = useState(false)
-  const [dnvDialogOpen, setDnvDialogOpen] = useState(false)
+
+  // DNV Forms
+  const [isAddingDnv, setIsAddingDnv] = useState(false)
+  const [newDnvCoords, setNewDnvCoords] = useState<[number, number] | null>(null)
   const [editingDnv, setEditingDnv] = useState<any>(null)
   const [dnvFormData, setDnvFormData] = useState({ address: "", notes: "" })
+
+  // Territory Edit Form
+  const [territoryForm, setTerritoryForm] = useState({ name: "", number: "", color: "" })
+
+  const [showMobileSidebar, setShowMobileSidebar] = useState(false)
   const supabase = getSupabaseBrowserClient()
 
   useEffect(() => {
@@ -99,18 +117,23 @@ export default function TerritoryMapPage({
 
     if (data) {
       setTerritory(data as TerritoryWithSubdivisions)
+      setTerritoryForm({
+        name: data.name || "",
+        number: data.number || "",
+        color: data.color || "#C65D3B"
+      })
     }
     setLoading(false)
   }
 
   const handleSubdivisionCreate = async (coordinates: [number, number][][]) => {
     setPendingCoordinates(coordinates)
-    
+
     // Nome automático baseado no número do território + letra sequencial
     const tNumber = territory?.number || "??"
     const count = territory?.subdivisions?.length || 0
-    const suffix = String.fromCharCode(65 + count) 
-    
+    const suffix = String.fromCharCode(65 + count)
+
     setNewSubdivisionName(`${tNumber}-${suffix}`)
     setDialogOpen(true)
   }
@@ -145,33 +168,33 @@ export default function TerritoryMapPage({
       .from("subdivisions")
       .update({ coordinates })
       .eq("id", subdivisionId)
-    
+
     if (error) {
       console.error("Erro ao atualizar subdivisão:", error)
     }
-    
+
     setSaving(false)
     fetchTerritory()
   }
 
   const handleSubdivisionDelete = async (subdivisionId: string) => {
     if (!confirm("Tem certeza que deseja excluir esta subdivisão?")) return
-    
+
     setSaving(true)
     const { error } = await supabase
       .from("subdivisions")
       .delete()
       .eq("id", subdivisionId)
-    
+
     if (error) {
       console.error("Erro ao deletar subdivisão:", error)
       alert("Erro ao deletar: " + error.message)
     }
-    
+
     if (selectedSubdivision?.id === subdivisionId) {
       setSelectedSubdivision(null)
     }
-    
+
     setSaving(false)
     fetchTerritory()
   }
@@ -181,9 +204,11 @@ export default function TerritoryMapPage({
   }
 
   const handleFocusSubdivision = (subdivision: Subdivision) => {
-    setFocusedSubdivisionId(subdivision.id)
-    setSelectedSubdivision(subdivision)
-    // O mapa vai reagir a essa mudança via prop
+    setFocusedSubdivisionId(null) // Reset first
+    setTimeout(() => {
+      setFocusedSubdivisionId(subdivision.id)
+      setSelectedSubdivision(subdivision)
+    }, 10)
   }
 
   const handleEditSubdivision = () => {
@@ -199,9 +224,9 @@ export default function TerritoryMapPage({
 
     const { error } = await supabase
       .from("subdivisions")
-      .update({ 
+      .update({
         name: editSubdivisionName,
-        notes: editSubdivisionNotes 
+        notes: editSubdivisionNotes
       })
       .eq("id", selectedSubdivision.id)
 
@@ -221,7 +246,7 @@ export default function TerritoryMapPage({
 
     const { error } = await supabase
       .from("subdivisions")
-      .update({ 
+      .update({
         completed: newCompleted,
         status: newStatus
       })
@@ -234,13 +259,61 @@ export default function TerritoryMapPage({
     fetchTerritory()
   }
 
+  // --- DNV Handlers ---
+
+  const handleMapClick = async (latlng: [number, number]) => {
+    if (isAddingDnv) {
+      setNewDnvCoords(latlng)
+      setDnvFormData({ address: "Carregando endereço...", notes: "" })
+      setCreateDnvDialogOpen(true)
+      setIsAddingDnv(false)
+
+      try {
+        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng[0]}&lon=${latlng[1]}`)
+        const data = await res.json()
+        if (data && data.display_name) {
+          // Extrair uma versão curta do endereço
+          const parts = data.display_name.split(',')
+          const shortAddress = parts.slice(0, 3).join(', ')
+          setDnvFormData(prev => ({ ...prev, address: shortAddress }))
+        } else {
+          setDnvFormData(prev => ({ ...prev, address: "" }))
+        }
+      } catch (err) {
+        setDnvFormData(prev => ({ ...prev, address: "" }))
+      }
+    }
+  }
+
+  const handleCreateDnv = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newDnvCoords) return
+    setSaving(true)
+    try {
+      const { error } = await supabase.from("do_not_visits").insert({
+        territory_id: id,
+        latitude: newDnvCoords[0],
+        longitude: newDnvCoords[1],
+        address: dnvFormData.address,
+        notes: dnvFormData.notes,
+      })
+      if (error) throw error
+      setCreateDnvDialogOpen(false)
+      fetchTerritory()
+    } catch (error: any) {
+      alert("Erro ao criar Não Visitar: " + error.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const handleDnvClick = (dnv: any) => {
     setEditingDnv(dnv)
     setDnvFormData({ address: dnv.address || "", notes: dnv.notes || "" })
     setDnvDialogOpen(true)
   }
 
-  const handleDnvSubmit = async (e: React.FormEvent) => {
+  const handleDnvUpdate = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingDnv) return
     setSaving(true)
@@ -260,7 +333,7 @@ export default function TerritoryMapPage({
   }
 
   const handleDeleteDnv = async () => {
-    if (!editingDnv || !confirm("Tem certeza que deseja excluir?" )) return
+    if (!editingDnv || !confirm("Tem certeza que deseja excluir?")) return
     setSaving(true)
     try {
       const { error } = await supabase.from("do_not_visits").delete().eq("id", editingDnv.id)
@@ -274,19 +347,40 @@ export default function TerritoryMapPage({
     }
   }
 
+  // --- Territory Handlers ---
+
+  const handleUpdateTerritory = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      const { error } = await supabase.from("territories").update({
+        name: territoryForm.name,
+        number: territoryForm.number,
+        color: territoryForm.color,
+      }).eq("id", id)
+      if (error) throw error
+      setEditTerritoryDialogOpen(false)
+      fetchTerritory()
+    } catch (error: any) {
+      alert("Erro ao atualizar território: " + error.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const getStatusBadge = (subdivision: Subdivision) => {
     if (subdivision.completed || subdivision.status === 'completed') {
-      return <Badge className="bg-green-600 text-white text-xs">Concluída</Badge>
+      return <Badge className="bg-green-600 text-white text-xs shadow-none">Concluída</Badge>
     }
     if (subdivision.status === 'assigned') {
-      return <Badge className="bg-yellow-500 text-white text-xs">Designada</Badge>
+      return <Badge className="bg-blue-600 text-white text-xs shadow-none">Designada</Badge>
     }
-    return <Badge variant="outline" className="text-xs">Disponível</Badge>
+    return <Badge variant="outline" className="text-xs bg-slate-50 border-slate-200">Disponível</Badge>
   }
 
   const getProgressStats = () => {
     if (!territory?.subdivisions) return { completed: 0, total: 0, percentage: 0 }
-    
+
     const total = territory.subdivisions.length
     const completed = territory.subdivisions.filter(s => s.completed || s.status === 'completed').length
     const percentage = total > 0 ? Math.round((completed / total) * 100) : 0
@@ -299,7 +393,7 @@ export default function TerritoryMapPage({
       <div className="flex items-center justify-center min-h-[80vh]">
         <div className="text-center space-y-2">
           <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-          <p className="text-sm text-muted-foreground">Carregando território...</p>
+          <p className="text-sm text-muted-foreground font-medium">Sincronizando território...</p>
         </div>
       </div>
     )
@@ -322,52 +416,61 @@ export default function TerritoryMapPage({
   const stats = getProgressStats()
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col gap-0">
-      {/* Header Compacto */}
-      <div className="border-b bg-white px-6 py-3 flex items-center justify-between sticky top-0 z-20">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" asChild>
+    <div className="flex h-[calc(100vh-4rem)] flex-col gap-0 bg-slate-50">
+      {/* Header Compacto Premium */}
+      <div className="border-b bg-white px-6 py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="sm" asChild className="text-slate-500 hover:text-slate-900">
             <Link href="/dashboard/territories">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Territórios
+              <span className="hidden sm:inline">Territórios</span>
             </Link>
           </Button>
-          
-          <div className="h-6 w-px bg-border" />
-          
+
+          <div className="h-6 w-px bg-slate-200" />
+
           <div className="flex items-center gap-3">
             <div
-              className="h-6 w-6 rounded-md flex-shrink-0"
+              className="h-8 w-8 rounded-lg flex-shrink-0 flex items-center justify-center text-white font-bold shadow-sm"
               style={{ backgroundColor: territory.color }}
-            />
+            >
+              {territory.number.slice(0, 2)}
+            </div>
             <div>
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="font-mono text-xs">
-                  #{territory.number}
+                <Badge variant="outline" className="font-mono text-xs bg-slate-50 border-slate-200 text-slate-600">
+                  T-{territory.number}
                 </Badge>
-                <h1 className="text-lg font-bold">{territory.name}</h1>
+                <h1 className="text-lg font-bold text-slate-900 tracking-tight">{territory.name}</h1>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-primary" onClick={() => setEditTerritoryDialogOpen(true)}>
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Progress Badge */}
-          <div className="flex items-center gap-2 px-3 py-1 rounded-md bg-slate-100 border">
-            <span className="text-xs font-medium">Progresso:</span>
-            <span className="text-sm font-bold">
-              {stats.completed}/{stats.total}
-            </span>
-            <div className="h-2 w-20 bg-slate-200 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-green-600 transition-all"
-                style={{ width: `${stats.percentage}%` }}
-              />
+        <div className="flex items-center gap-4">
+          {/* Progress Section */}
+          <div className="hidden sm:flex items-center gap-3 px-4 py-1.5 rounded-full bg-slate-50 border border-slate-200 shadow-inner">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider leading-none mb-1">Status de Campo</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-black text-slate-800 leading-none">
+                  {stats.completed}/{stats.total} <span className="text-[10px] text-slate-400 font-normal">áreas</span>
+                </span>
+                <div className="h-2 w-24 bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-green-500 transition-all duration-500 rounded-full"
+                    style={{ width: `${stats.percentage}%` }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
 
           {saving && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 text-sm text-primary font-medium animate-pulse">
               <Loader2 className="h-4 w-4 animate-spin" />
               <span className="text-xs">Salvando...</span>
             </div>
@@ -379,14 +482,24 @@ export default function TerritoryMapPage({
       <div className="flex flex-1 overflow-hidden relative">
         {/* Overlay do mobile quando sidebar tá aberta */}
         {showMobileSidebar && (
-          <div 
-            className="md:hidden fixed inset-0 bg-black/40 z-[1900] transition-opacity" 
+          <div
+            className="md:hidden fixed inset-0 bg-black/40 z-[1900] backdrop-blur-sm transition-opacity"
             onClick={() => setShowMobileSidebar(false)}
           />
         )}
 
         {/* MAP - Ocupa a maior parte */}
         <div className="flex-1 relative" style={{ zIndex: 1 }}>
+          {isAddingDnv && (
+            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-red-600 text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 animate-bounce">
+              <MapPin className="h-4 w-4" />
+              <span className="text-sm font-bold">Clique no endereço no mapa</span>
+              <Button size="icon" variant="ghost" className="h-6 w-6 text-white" onClick={() => setIsAddingDnv(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
+
           <TerritoryMap
             territory={territory}
             subdivisions={territory.subdivisions || []}
@@ -395,21 +508,21 @@ export default function TerritoryMapPage({
             onSubdivisionUpdate={handleSubdivisionUpdate}
             onSubdivisionDelete={handleSubdivisionDelete}
             onSubdivisionSelect={handleSubdivisionSelect}
+            onMapClick={handleMapClick}
             focusedSubdivisionId={focusedSubdivisionId}
           />
-          
-          {/* Botão Flutuante Mobile para abrir a Sidebar */}
+
           <Button
-            className="md:hidden absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] shadow-lg rounded-full px-6 bg-slate-900 hover:bg-slate-800 text-white"
+            className="md:hidden absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] shadow-xl rounded-full px-8 bg-slate-900 hover:bg-slate-800 text-white border-2 border-white/20 backdrop-blur-md"
             onClick={() => setShowMobileSidebar(true)}
           >
-            <MapPin className="h-4 w-4 mr-2" />
-            Painel de Quadras
+            <MapPin className="h-4 w-4 mr-2 text-primary" />
+            <span className="font-bold">Painel de Quadras</span>
           </Button>
         </div>
 
         {/* SIDEBAR - Lista de Subdivisões */}
-        <div 
+        <div
           className={`
             fixed inset-y-0 right-0 z-[2000] w-80 bg-white flex flex-col overflow-hidden shadow-2xl transition-transform duration-300 ease-in-out
             ${showMobileSidebar ? 'translate-x-0' : 'translate-x-full'}
@@ -417,55 +530,53 @@ export default function TerritoryMapPage({
           `}
         >
           {/* Botão Fechar (só mobile) */}
-          <div className="md:hidden flex items-center justify-between p-3 border-b bg-slate-100">
-            <span className="font-semibold text-sm">Painel de Quadras</span>
-            <Button variant="ghost" size="sm" onClick={() => setShowMobileSidebar(false)}>
+          <div className="md:hidden flex items-center justify-between p-4 border-b bg-slate-50">
+            <span className="font-bold text-slate-800 tracking-tight">Painel de Trabalho</span>
+            <Button variant="outline" size="sm" className="rounded-full h-8" onClick={() => setShowMobileSidebar(false)}>
               Fechar
             </Button>
           </div>
+
           <Tabs defaultValue="quadras" className="flex flex-col h-full overflow-hidden">
-            {/* Sidebar Header with Tabs */}
-            <div className="p-3 border-b bg-slate-50">
-              <TabsList className="w-full grid grid-cols-2 bg-slate-200/50">
-                <TabsTrigger value="quadras" className="text-xs font-semibold data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                  Quadras <Badge variant="secondary" className="ml-1 bg-slate-100 text-[10px] px-1 py-0">{territory.subdivisions?.length || 0}</Badge>
+            <div className="p-4 border-b bg-slate-50/50">
+              <TabsList className="w-full grid grid-cols-2 bg-slate-200/40 p-1 h-10">
+                <TabsTrigger value="quadras" className="text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
+                  Quadras <Badge variant="secondary" className="ml-2 bg-slate-100 text-[10px] px-1.5 py-0">{territory.subdivisions?.length || 0}</Badge>
                 </TabsTrigger>
-                <TabsTrigger value="dnv" className="text-xs font-semibold data-[state=active]:bg-red-50 data-[state=active]:text-red-700 data-[state=active]:shadow-sm">
-                  Não Visitar <Badge variant="secondary" className="ml-1 bg-white text-[10px] px-1 py-0">{((territory as any).do_not_visits?.length) || 0}</Badge>
+                <TabsTrigger value="dnv" className="text-xs font-bold data-[state=active]:bg-red-50 data-[state=active]:text-red-700 data-[state=active]:shadow-sm">
+                  Não Visitar <Badge variant="secondary" className="ml-2 bg-white text-red-600 border-red-100 text-[10px] px-1.5 py-0">{((territory as any).do_not_visits?.length) || 0}</Badge>
                 </TabsTrigger>
               </TabsList>
             </div>
 
-            <TabsContent value="quadras" className="flex-1 flex flex-col m-0 overflow-hidden outline-none data-[state=inactive]:hidden">
-              {/* Stats compactos */}
-              <div className="grid grid-cols-3 gap-2 text-xs p-3 border-b bg-slate-50/50 shrink-0">
-                <div className="flex flex-col items-center p-2 rounded bg-white border">
-                  <Clock className="h-3 w-3 text-slate-400 mb-1" />
-                  <span className="font-bold">{stats.total - stats.completed}</span>
-                  <span className="text-[10px] text-muted-foreground">Pendentes</span>
+            <TabsContent value="quadras" className="flex-1 flex flex-col m-0 overflow-hidden outline-none data-[state=inactive]:hidden bg-white">
+              <div className="grid grid-cols-3 gap-3 text-xs p-4 border-b bg-slate-50/30 shrink-0">
+                <div className="flex flex-col p-2.5 rounded-xl bg-white border border-slate-200 shadow-sm">
+                  <Clock className="h-4 w-4 text-slate-400 mb-1" />
+                  <span className="font-black text-slate-800 text-sm">{stats.total - stats.completed}</span>
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Pendentes</span>
                 </div>
-                <div className="flex flex-col items-center p-2 rounded bg-white border">
-                  <Check className="h-3 w-3 text-green-600 mb-1" />
-                  <span className="font-bold">{stats.completed}</span>
-                  <span className="text-[10px] text-muted-foreground">Concluídas</span>
+                <div className="flex flex-col p-2.5 rounded-xl bg-white border border-slate-200 shadow-sm">
+                  <Check className="h-4 w-4 text-green-600 mb-1" />
+                  <span className="font-black text-slate-800 text-sm">{stats.completed}</span>
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Concluídas</span>
                 </div>
-                <div className="flex flex-col items-center p-2 rounded bg-white border">
-                  <MapPin className="h-3 w-3 text-blue-600 mb-1" />
-                  <span className="font-bold">{stats.percentage}%</span>
-                  <span className="text-[10px] text-muted-foreground">Progresso</span>
+                <div className="flex flex-col p-2.5 rounded-xl bg-white border border-slate-200 shadow-sm">
+                  <TrendingUp className="h-4 w-4 text-blue-600 mb-1" />
+                  <span className="font-black text-slate-800 text-sm">{stats.percentage}%</span>
+                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Meta</span>
                 </div>
               </div>
 
-              {/* Lista de Subdivisões */}
-              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
                 {territory.subdivisions?.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center px-4">
-                    <MapPin className="h-12 w-12 text-muted-foreground mb-3 opacity-50" />
-                    <p className="text-sm font-medium text-slate-700 mb-1">
-                      Nenhuma subdivisão criada
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Desenhe polígonos no mapa usando as ferramentas
+                  <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+                    <div className="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 border-2 border-dashed border-slate-200">
+                      <MapPin className="h-8 w-8 text-slate-300" />
+                    </div>
+                    <p className="text-base font-bold text-slate-800 mb-2">Sem quadras definidas</p>
+                    <p className="text-sm text-slate-500 leading-relaxed">
+                      Use a ferramenta de desenho no mapa para criar as divisões desse território.
                     </p>
                   </div>
                 ) : (
@@ -477,100 +588,81 @@ export default function TerritoryMapPage({
                       <div
                         key={subdivision.id}
                         className={`
-                          group relative rounded-lg border p-3 transition-all cursor-pointer
-                          ${isSelected 
-                            ? 'border-primary bg-primary/5 shadow-sm' 
-                            : 'hover:bg-slate-50 hover:border-slate-300'
+                          group relative rounded-xl border p-4 transition-all cursor-pointer shadow-sm
+                          ${isSelected
+                            ? 'border-primary ring-2 ring-primary/10 bg-primary/5'
+                            : 'bg-white hover:border-slate-300 hover:shadow-md'
                           }
-                          ${isCompleted ? 'bg-green-50/50' : ''}
+                          ${isCompleted && !isSelected ? 'bg-green-50/30' : ''}
                         `}
                         onClick={() => handleFocusSubdivision(subdivision)}
                       >
-                        {/* Header */}
-                        <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex items-start justify-between gap-3 mb-2">
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="font-semibold text-sm truncate">
+                            <div className="flex items-center gap-2 mb-1.5">
+                              <span className="font-black text-slate-900 text-base tracking-tight truncate">
                                 {subdivision.name}
                               </span>
-                              {isSelected && (
-                                <ChevronRight className="h-4 w-4 text-primary flex-shrink-0" />
-                              )}
                             </div>
                             {getStatusBadge(subdivision)}
                           </div>
 
-                          {/* Quick Actions */}
-                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <div className={`flex items-center gap-1 transition-opacity ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
                             <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 w-7 p-0"
+                              size="icon"
+                              variant="secondary"
+                              className="h-8 w-8 rounded-full bg-white border shadow-sm"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleFocusSubdivision(subdivision)
                               }}
-                              title="Centralizar no mapa"
                             >
-                              <Eye className="h-3.5 w-3.5" />
+                              <Eye className="h-4 w-4 text-slate-600" />
                             </Button>
                           </div>
                         </div>
 
-                        {/* Notes */}
                         {subdivision.notes && (
-                          <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-                            {subdivision.notes}
-                          </p>
+                          <div className="bg-slate-50/80 p-2 rounded-lg border border-slate-100 mb-3">
+                            <p className="text-[11px] text-slate-500 font-medium line-clamp-2">
+                              {subdivision.notes}
+                            </p>
+                          </div>
                         )}
 
-                        {/* Actions quando selecionada */}
                         {isSelected && (
-                          <div className="flex gap-1 pt-2 border-t mt-2">
+                          <div className="flex gap-2 pt-3 border-t mt-3 border-primary/20">
                             <Button
                               size="sm"
-                              variant="outline"
-                              className="flex-1 h-8 text-xs"
+                              className={`flex-1 h-9 rounded-lg font-bold text-xs ${isCompleted ? 'bg-slate-800' : 'bg-green-600 hover:bg-green-700'}`}
                               onClick={(e) => {
                                 e.stopPropagation()
                                 toggleSubdivisionStatus(subdivision)
                               }}
                             >
-                              {isCompleted ? (
-                                <>
-                                  <Clock className="h-3 w-3 mr-1" />
-                                  Marcar Pendente
-                                </>
-                              ) : (
-                                <>
-                                  <Check className="h-3 w-3 mr-1" />
-                                  Marcar Concluída
-                                </>
-                              )}
+                              {isCompleted ? 'Marcar Pendente' : 'Marcar Concluída'}
                             </Button>
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-8 px-2"
+                              className="h-9 px-3 rounded-lg border-slate-200"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleEditSubdivision()
                               }}
-                              title="Editar"
                             >
-                              <Edit3 className="h-3.5 w-3.5" />
+                              <Edit3 className="h-4 w-4" />
                             </Button>
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-8 px-2"
+                              className="h-9 px-3 rounded-lg border-red-100 hover:bg-red-50 hover:text-red-700 hover:border-red-200"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleSubdivisionDelete(subdivision.id)
                               }}
-                              title="Excluir"
                             >
-                              <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                              <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         )}
@@ -581,13 +673,23 @@ export default function TerritoryMapPage({
               </div>
             </TabsContent>
 
-            <TabsContent value="dnv" className="flex-1 overflow-y-auto p-3 m-0 outline-none data-[state=inactive]:hidden bg-slate-50/30">
-              <div className="space-y-3">
+            <TabsContent value="dnv" className="flex-1 flex flex-col m-0 outline-none data-[state=inactive]:hidden bg-white">
+              <div className="p-4 border-b bg-red-50/20 shrink-0">
+                <Button className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-10 shadow-lg shadow-red-100" onClick={() => setIsAddingDnv(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Não visitar
+                </Button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {!(territory as any).do_not_visits || (territory as any).do_not_visits.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 text-center px-4">
-                    <MapPin className="h-10 w-10 text-muted-foreground mb-3 opacity-30" />
-                    <p className="text-sm text-muted-foreground">
-                      Nenhum registro de "Não Visitar".
+                  <div className="flex flex-col items-center justify-center py-16 text-center px-6">
+                    <div className="h-16 w-16 bg-red-50 rounded-full flex items-center justify-center mb-4 border-2 border-dashed border-red-100 text-red-300">
+                      <MapPin className="h-8 w-8" />
+                    </div>
+                    <p className="text-base font-bold text-slate-800 mb-2">Sem restrições de visita</p>
+                    <p className="text-sm text-slate-500 leading-relaxed">
+                      Clique no botão acima e depois no mapa para registrar endereços que não devem ser visitados.
                     </p>
                   </div>
                 ) : (
@@ -595,30 +697,32 @@ export default function TerritoryMapPage({
                     const date = new Date(dnv.created_at)
                     const isExpired = new Date().getTime() - date.getTime() > 365 * 24 * 60 * 60 * 1000
                     return (
-                      <div key={dnv.id} className={`p-3 rounded-lg border text-sm transition-all ${isExpired ? 'bg-orange-50 border-orange-200' : 'bg-white border-red-100 shadow-sm'}`}>
-                        <div className="flex justify-between items-start gap-2 mb-2">
-                          <h4 className="font-bold text-slate-800 line-clamp-2 leading-tight">
-                            {dnv.address || "Endereço não informado"}
-                          </h4>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-6 w-6 text-slate-400 hover:text-primary shrink-0 -mt-1 -mr-1"
+                      <div key={dnv.id} className={`group p-4 rounded-xl border text-sm transition-all shadow-sm ${isExpired ? 'bg-orange-50 border-orange-200' : 'bg-white border-red-100'}`}>
+                        <div className="flex justify-between items-start gap-3 mb-2">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-black text-slate-800 line-clamp-2 leading-[1.2] text-sm mb-1">
+                              {dnv.address || "Endereço não informado"}
+                            </h4>
+                            {isExpired ? (
+                              <Badge className="bg-orange-500 text-white text-[9px] uppercase tracking-wider h-4">Expirado</Badge>
+                            ) : (
+                              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Desde {date.toLocaleDateString("pt-BR")}</span>
+                            )}
+                          </div>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-8 w-8 rounded-full bg-slate-50 border shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
                             onClick={(e) => { e.stopPropagation(); handleDnvClick(dnv); }}
                           >
-                            <Edit3 className="h-3.5 w-3.5" />
+                            <Pencil className="h-3.5 w-3.5 text-slate-600" />
                           </Button>
                         </div>
-                        {isExpired ? (
-                          <Badge variant="outline" className="text-[10px] mb-2 bg-orange-100/50 text-orange-800 border-orange-200">
-                            Expirado (Acima de 1 ano)
-                          </Badge>
-                        ) : (
-                          <div className="text-[10px] text-slate-500 mb-2 font-medium">Marcado em: {date.toLocaleDateString("pt-BR")}</div>
+                        {dnv.notes && (
+                          <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 mt-2 text-xs text-slate-600 leading-relaxed">
+                            {dnv.notes}
+                          </div>
                         )}
-                        <p className="text-xs text-slate-600 bg-slate-50 p-2 rounded border border-slate-100">
-                          {dnv.notes || "Sem observações."}
-                        </p>
                       </div>
                     )
                   })
@@ -627,33 +731,158 @@ export default function TerritoryMapPage({
             </TabsContent>
           </Tabs>
 
-          {/* Assigned User Info */}
+          {/* Assigned User Info Desktop Footer */}
           {territory.assigned_to && (
-            <div className="p-3 border-t bg-slate-50">
-              <p className="text-xs text-muted-foreground mb-1">Designado para:</p>
-              <p className="font-medium text-sm">{territory.assigned_to_user?.name || territory.assigned_to}</p>
+            <div className="p-4 border-t bg-slate-900 text-white">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center font-bold text-xs">
+                  {territory.assigned_to_user?.name?.slice(0, 2).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Designado agora</p>
+                  <p className="font-bold text-sm truncate">{territory.assigned_to_user?.name}</p>
+                </div>
+              </div>
             </div>
           )}
         </div>
       </div>
 
+      {/* --- MODALS --- */}
+
+      {/* Territory Edit Dialog */}
+      <Dialog open={editTerritoryDialogOpen} onOpenChange={setEditTerritoryDialogOpen}>
+        <DialogContent className="z-[9999]">
+          <form onSubmit={handleUpdateTerritory}>
+            <DialogHeader>
+              <DialogTitle>Configurar Território</DialogTitle>
+              <DialogDescription>
+                Atualize as informações básicas de identificação do território
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6 py-6">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2 col-span-1">
+                  <Label htmlFor="t-number">Número</Label>
+                  <Input
+                    id="t-number"
+                    value={territoryForm.number}
+                    className="font-mono font-bold"
+                    onChange={(e) => setTerritoryForm({ ...territoryForm, number: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2 col-span-2">
+                  <Label htmlFor="t-name">Nome do Território</Label>
+                  <Input
+                    id="t-name"
+                    value={territoryForm.name}
+                    className="font-bold"
+                    onChange={(e) => setTerritoryForm({ ...territoryForm, name: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-3">
+                <Label>Cor de Destaque</Label>
+                <div className="flex flex-wrap gap-2">
+                  {['#C65D3B', '#2563eb', '#16a34a', '#d97706', '#7c3aed', '#db2777', '#4b5563'].map(c => (
+                    <button
+                      key={c}
+                      type="button"
+                      className={`h-8 w-8 rounded-full border-2 transition-all ${territoryForm.color === c ? 'border-primary ring-2 ring-primary/20 scale-110' : 'border-transparent'}`}
+                      style={{ backgroundColor: c }}
+                      onClick={() => setTerritoryForm({ ...territoryForm, color: c })}
+                    />
+                  ))}
+                  <div className="relative">
+                    <Input
+                      type="color"
+                      className="w-8 h-8 p-0 border-none rounded-full overflow-hidden cursor-pointer"
+                      value={territoryForm.color}
+                      onChange={(e) => setTerritoryForm({ ...territoryForm, color: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditTerritoryDialogOpen(false)}>Cancelar</Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar Alterações"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create DNV Dialog */}
+      <Dialog open={createDnvDialogOpen} onOpenChange={setCreateDnvDialogOpen}>
+        <DialogContent className="z-[9999]">
+          <form onSubmit={handleCreateDnv}>
+            <DialogHeader>
+              <DialogTitle className="text-red-700">Bloquear Localização</DialogTitle>
+              <DialogDescription>
+                Este endereço será marcado com uma bolinha vermelha e deve ser evitado pelos publicadores.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="bg-red-50 p-3 rounded-lg border border-red-100 flex gap-3 items-center">
+                <div className="bg-red-600 p-2 rounded-md">
+                  <MapPin className="h-4 w-4 text-white" />
+                </div>
+                <div className="text-[11px] text-red-800 leading-tight">
+                  <p className="font-bold mb-0.5">Coordenadas capturadas:</p>
+                  <p className="font-mono">{newDnvCoords?.[0].toFixed(6)}, {newDnvCoords?.[1].toFixed(6)}</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dnv-create-address">Confirmar Endereço</Label>
+                <Input
+                  id="dnv-create-address"
+                  value={dnvFormData.address}
+                  onChange={(e) => setDnvFormData({ ...dnvFormData, address: e.target.value })}
+                  placeholder="Ex: Rua das Flores, 123"
+                  className="font-bold"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dnv-create-notes">Observações/Motivo</Label>
+                <Textarea
+                  id="dnv-create-notes"
+                  value={dnvFormData.notes}
+                  onChange={(e) => setDnvFormData({ ...dnvFormData, notes: e.target.value })}
+                  placeholder="Ex: Morador agressivo / Pediu para não ser visitado."
+                  className="min-h-[100px]"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setCreateDnvDialogOpen(false)}>Cancelar</Button>
+              <Button type="submit" className="bg-red-600 hover:bg-red-700 text-white font-bold" disabled={saving}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmar Bloqueio"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* New Subdivision Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="z-[9999]">
           <DialogHeader>
-            <DialogTitle>Nova Subdivisão</DialogTitle>
+            <DialogTitle>Nova Quadra</DialogTitle>
             <DialogDescription>
-              Configure os detalhes da subdivisão desenhada
+              Configure o identificador dessa nova área de trabalho.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="subdivisionName">Nome da subdivisão</Label>
+              <Label htmlFor="subdivisionName">Nome do Setor/Quadra</Label>
               <Input
                 id="subdivisionName"
                 value={newSubdivisionName}
                 onChange={(e) => setNewSubdivisionName(e.target.value)}
                 placeholder="Ex: 05-A, Setor Norte, Rua Principal"
+                className="font-bold text-lg h-12"
                 autoFocus
               />
             </div>
@@ -668,18 +897,12 @@ export default function TerritoryMapPage({
             >
               Cancelar
             </Button>
-            <Button 
-              onClick={handleSaveNewSubdivision} 
+            <Button
+              onClick={handleSaveNewSubdivision}
+              className="bg-primary hover:bg-primary/90 font-bold"
               disabled={saving || !newSubdivisionName.trim()}
             >
-              {saving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Salvar
-                </>
-              )}
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Criar Quadra"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -689,90 +912,79 @@ export default function TerritoryMapPage({
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className="z-[9999]">
           <DialogHeader>
-            <DialogTitle>Editar Subdivisão</DialogTitle>
-            <DialogDescription>
-              Altere o nome e observações
-            </DialogDescription>
+            <DialogTitle>Ajustar Detalhes da Quadra</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="editName">Nome</Label>
+              <Label htmlFor="editName">Identificador</Label>
               <Input
                 id="editName"
                 value={editSubdivisionName}
                 onChange={(e) => setEditSubdivisionName(e.target.value)}
+                className="font-bold"
                 autoFocus
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="editNotes">Observações (opcional)</Label>
-              <Input
+              <Label htmlFor="editNotes">Notas de Campo (opcional)</Label>
+              <Textarea
                 id="editNotes"
                 value={editSubdivisionNotes}
                 onChange={(e) => setEditSubdivisionNotes(e.target.value)}
-                placeholder="Ex: Área comercial, casas numeradas..."
+                placeholder="Ex: Área comercial, casas numeradas no portão..."
+                className="min-h-[100px]"
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button 
-              onClick={handleSaveEditSubdivision} 
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
+            <Button
+              onClick={handleSaveEditSubdivision}
+              className="font-bold"
               disabled={saving || !editSubdivisionName.trim()}
             >
-              {saving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                "Salvar Alterações"
-              )}
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar Alterações"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* DNV Edit Dialog */}
+      {/* DNV Update Dialog */}
       <Dialog open={dnvDialogOpen} onOpenChange={setDnvDialogOpen}>
         <DialogContent className="z-[9999]">
-          <form onSubmit={handleDnvSubmit}>
+          <form onSubmit={handleDnvUpdate}>
             <DialogHeader>
               <div className="flex items-center justify-between mt-2">
-                <DialogTitle>Editar Não Visitar</DialogTitle>
+                <DialogTitle>Editar Bloqueio</DialogTitle>
                 <Button type="button" variant="ghost" size="sm" className="text-red-500 hover:text-red-700 hover:bg-red-50 -mr-4 -mt-6" onClick={handleDeleteDnv} disabled={saving}>
                   <Trash2 className="h-4 w-4 mr-1" /> Excluir
                 </Button>
               </div>
-              <DialogDescription>
-                Atualize o endereço ou as observações desta casa bloqueada.
-              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="dnv-address">Endereço (opcional)</Label>
+                <Label htmlFor="dnv-edit-address">Endereço</Label>
                 <Input
-                  id="dnv-address"
+                  id="dnv-edit-address"
                   value={dnvFormData.address}
                   onChange={(e) => setDnvFormData({ ...dnvFormData, address: e.target.value })}
-                  placeholder="Ex: Rua das Flores, 123"
+                  className="font-bold"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="dnv-notes">Observações</Label>
+                <Label htmlFor="dnv-edit-notes">Notas</Label>
                 <Textarea
-                  id="dnv-notes"
+                  id="dnv-edit-notes"
                   value={dnvFormData.notes}
                   onChange={(e) => setDnvFormData({ ...dnvFormData, notes: e.target.value })}
-                  placeholder="Ex: Morador pediu para não bater no portão."
+                  className="min-h-[100px]"
                 />
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDnvDialogOpen(false)} disabled={saving}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={saving}>
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar Alterações"}
+              <Button type="button" variant="outline" onClick={() => setDnvDialogOpen(false)} disabled={saving}>Cancelar</Button>
+              <Button type="submit" className="font-bold" disabled={saving}>
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Atualizar"}
               </Button>
             </DialogFooter>
           </form>

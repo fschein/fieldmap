@@ -4,6 +4,7 @@ import React from "react"
 
 import { useEffect, useState } from "react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { getLocalTodayStr, formatSafeDate } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -64,25 +65,26 @@ export default function CampaignsPage() {
         .select("*", { count: 'exact', head: true })
         .neq("status", "inactive")
 
-      // Fetch territories linked to campaigns (numerator)
-      const { data: terrs } = await supabase
-        .from("territories")
-        .select("id, status, campaign_id")
-        .not("campaign_id", "is", null)
-        .neq("status", "inactive")
+      // Fetch COMPLETED assignments for unique territory count per campaign
+      const { data: completedAssignments } = await supabase
+        .from("assignments")
+        .select("territory_id, campaign_id")
+        .eq("status", "completed")
 
       const newStats: Record<string, { total: number, completed: number }> = {}
       
       // Initialize stats for each campaign with the TOTAL active territories
       campaignsData.forEach((c: Campaign) => {
-        newStats[c.id] = { total: totalActive || 0, completed: 0 }
-      })
+        // Count unique territories completed in this campaign
+        const uniqueCompleted = new Set(
+          completedAssignments
+            ?.filter((a: any) => a.campaign_id === c.id)
+            .map((a: any) => a.territory_id)
+        ).size
 
-      // Count completed territories for each campaign
-      terrs?.forEach((t: any) => {
-        if (!t.campaign_id || !newStats[t.campaign_id]) return
-        if (t.status === 'completed') {
-          newStats[t.campaign_id].completed++
+        newStats[c.id] = { 
+          total: totalActive || 0, 
+          completed: uniqueCompleted 
         }
       })
       
@@ -105,7 +107,7 @@ export default function CampaignsPage() {
       setFormData({
         name: "",
         description: "",
-        start_date: new Date().toISOString().split("T")[0],
+        start_date: getLocalTodayStr(),
         end_date: "",
       })
     }
@@ -326,19 +328,34 @@ export default function CampaignsPage() {
                 <div className="flex items-center justify-between">
                   <div className="text-sm text-muted-foreground">
                     <p>
-                      Início: {campaign.start_date
-                        ? new Date(campaign.start_date + "T12:00:00").toLocaleDateString("pt-BR")
-                        : "Não definida"}
+                      Início: {formatSafeDate(campaign.start_date) || "Não definida"}
                     </p>
-                    {campaign.end_date && campaign.end_date !== "" && (
+                    {campaign.end_date && (
                       <p>
-                        Término: {new Date(campaign.end_date + "T12:00:00").toLocaleDateString("pt-BR")}
+                        Término: {formatSafeDate(campaign.end_date)}
                       </p>
                     )}
                   </div>
-                  <Badge variant={campaign.active ? "default" : "secondary"}>
-                    {campaign.active ? "Ativa" : "Inativa"}
-                  </Badge>
+                  <div className="flex flex-col items-end gap-1">
+                    {(() => {
+                      const todayStr = getLocalTodayStr()
+                      const isExpired = campaign.end_date && campaign.end_date < todayStr
+                      
+                      if (!campaign.active) {
+                        return <Badge variant="secondary">Inativa</Badge>
+                      }
+                      
+                      if (isExpired) {
+                        return (
+                          <Badge variant="outline" className="bg-amber-50 text-amber-600 border-amber-200 font-bold">
+                            Finalizada
+                          </Badge>
+                        )
+                      }
+                      
+                      return <Badge variant="default">Ativa</Badge>
+                    })()}
+                  </div>
                 </div>
 
                 {/* Progress Bar */}
