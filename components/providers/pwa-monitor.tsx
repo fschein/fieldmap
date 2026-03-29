@@ -2,42 +2,58 @@
 
 import { useEffect } from "react"
 
+/**
+ * PWAMonitor — detecta SW travado de forma cirúrgica.
+ *
+ * Estratégia:
+ * - Escuta o evento "controllerchange" para saber quando um novo SW assumiu
+ *   e recarrega a página nesse momento (evita estado misto).
+ * - Escuta "online" para forçar update do SW quando o dispositivo volta
+ *   a ter rede — resolve o caso de app aberto offline por muito tempo.
+ * - NÃO usa timer fixo de 15s (causava updates desnecessários em toda sessão).
+ * - NÃO recarrega a página sozinho sem motivo real.
+ */
 export function PWAMonitor() {
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return
 
-    let timeoutId: NodeJS.Timeout
-
-    const checkPWAStatus = () => {
-      // Se estivermos em uma tela de loading ou se o app parecer travado
-      // (aqui usamos um timer simples de 15s desde a montagem do layout)
-      timeoutId = setTimeout(async () => {
-        try {
-          const registration = await navigator.serviceWorker.getRegistration()
-          if (registration) {
-            console.log("Detectado possível travamento do PWA, tentando atualização...")
-            await registration.update()
-            
-            // Se houver um novo worker esperando, avisa para pular
-            if (registration.waiting) {
-              registration.waiting.postMessage({ type: "SKIP_WAITING" })
-            }
-            
-            // Só recarrega se ainda estivermos "travados" (baseado na lógica do app)
-            // Por simplicidade, vamos apenas logar e deixar o usuário decidir ou recarregar se for crítico
-            // Mas seguindo o pedido do usuário: "chamar registration.update() e recarregar"
-            // window.location.reload()
-          }
-        } catch (err) {
-          console.error("Erro ao monitorar PWA:", err)
-        }
-      }, 15000)
+    const handleControllerChange = () => {
+      // Um novo SW assumiu o controle — recarregar garante que o app
+      // está usando os assets da versão nova, sem estado misto.
+      console.log("[PWA] Novo service worker ativo, recarregando...")
+      window.location.reload()
     }
 
-    checkPWAStatus()
+    const handleOnline = async () => {
+      // Voltou a ter rede — verifica se há atualização do SW pendente
+      try {
+        const registration = await navigator.serviceWorker.getRegistration()
+        if (registration) {
+          await registration.update()
+          // Se houver worker esperando (baixado enquanto offline), ativa agora
+          if (registration.waiting) {
+            registration.waiting.postMessage({ type: "SKIP_WAITING" })
+          }
+        }
+      } catch (err) {
+        console.warn("[PWA] Erro ao atualizar SW após reconexão:", err)
+      }
+    }
+
+    navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange)
+    window.addEventListener("online", handleOnline)
+
+    // Ao montar: se já há um SW esperando (sessão antiga aberta),
+    // ativa imediatamente em vez de deixar em estado misto indefinidamente
+    navigator.serviceWorker.getRegistration().then((registration) => {
+      if (registration?.waiting) {
+        registration.waiting.postMessage({ type: "SKIP_WAITING" })
+      }
+    })
 
     return () => {
-      if (timeoutId) clearTimeout(timeoutId)
+      navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange)
+      window.removeEventListener("online", handleOnline)
     }
   }, [])
 
