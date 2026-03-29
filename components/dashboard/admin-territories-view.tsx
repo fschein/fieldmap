@@ -11,20 +11,20 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle
 } from "@/components/ui/dialog"
-import { 
-  Plus, 
-  Map, 
-  Loader2, 
-  MapPin, 
-  User, 
+import {
+  Plus,
+  Map,
+  Loader2,
+  MapPin,
+  User,
   Calendar,
   AlertTriangle,
   TrendingUp,
@@ -86,7 +86,7 @@ interface PriorityScore {
 function calculatePriorityScore(territory: TerritoryWithDetails & { assignments?: any[] }): PriorityScore {
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  
+
   let score = 0
   let daysInactive = 0
   let daysAssigned = 0
@@ -103,7 +103,7 @@ function calculatePriorityScore(territory: TerritoryWithDetails & { assignments?
   daysInactive = Math.max(0, Math.floor(diffInactive / (1000 * 60 * 60 * 24)))
 
   // 2. Status Devolvido: última designação foi devolvida e não está designado agora
-  const latestAssignment = [...(territory.assignments || [])].sort((a, b) => 
+  const latestAssignment = [...(territory.assignments || [])].sort((a, b) =>
     new Date(b.assigned_at).getTime() - new Date(a.assigned_at).getTime()
   )[0]
   const isReturned = !territory.assigned_to && latestAssignment?.status === 'returned'
@@ -173,8 +173,8 @@ const FilterPill = ({ label, count, active, onClick, emoji }: any) => (
     onClick={onClick}
     className={cn(
       "whitespace-nowrap px-4 py-1.5 rounded-full text-[11px] font-black uppercase tracking-tight transition-all flex items-center gap-2 border shadow-sm",
-      active 
-        ? "bg-[#C65D3B] text-white border-[#C65D3B] shadow-md" 
+      active
+        ? "bg-[#C65D3B] text-white border-[#C65D3B] shadow-md"
         : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"
     )}
   >
@@ -197,7 +197,7 @@ export function AdminTerritoriesView() {
   const [searchTerm, setSearchTerm] = useState("")
   const [activeFilter, setActiveFilter] = useState("all")
   const [errorMsg, setErrorMsg] = useState("")
-  
+
   // Assignment modal
   const [assignDialogOpen, setAssignDialogOpen] = useState(false)
   const [selectedTerritory, setSelectedTerritory] = useState<TerritoryWithDetails | null>(null)
@@ -206,7 +206,7 @@ export function AdminTerritoriesView() {
   const [searchUser, setSearchUser] = useState("")
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null)
-  
+
   // Novas datas do Modal Retroativo
   const formatToday = () => {
     const today = new Date()
@@ -235,10 +235,10 @@ export function AdminTerritoriesView() {
     else if (activeFilter === "parados") list = activeResults.filter(p => !p.territory.assigned_to && p.daysInactive > 10 && p.daysInactive <= 30)
     else if (activeFilter === "livres") list = activeResults.filter(p => !p.territory.assigned_to)
     else if (activeFilter === "inactive") list = inactiveTerritories
-    
+
     if (searchTerm) {
       const lowerSearch = searchTerm.toLowerCase()
-      list = list.filter(p => 
+      list = list.filter(p =>
         p.territory.name.toLowerCase().includes(lowerSearch) ||
         p.territory.number.toLowerCase().includes(lowerSearch)
       )
@@ -259,7 +259,7 @@ export function AdminTerritoriesView() {
     try {
       setLoading(true)
       setErrorMsg("")
-      
+
       const [terrRes, usersRes, campRes] = await Promise.all([
         supabase
           .from("territories")
@@ -295,7 +295,7 @@ export function AdminTerritoriesView() {
         const territoriesData = terrRes.data as unknown as TerritoryWithDetails[]
         const priorities = territoriesData
           .map(t => calculatePriorityScore(t))
-          // .sort((a, b) => b.score - a.score)
+        // .sort((a, b) => b.score - a.score)
         setPriorityTerritories(priorities)
       }
     } catch (err: any) {
@@ -352,7 +352,7 @@ export function AdminTerritoriesView() {
           user_id: selectedUserId,
           territory_id: selectedTerritory.id,
           created_by: (await supabase.auth.getUser()).data.user?.id
-        }).catch(err => console.error("Erro ao inserir notificação:", err))
+        }).catch((err: unknown) => console.error("Erro ao inserir notificação:", err))
       }
 
       const territoryUpdates: any = {}
@@ -379,7 +379,7 @@ export function AdminTerritoriesView() {
     }
   }
 
-  const filteredUsers = users.filter(u => 
+  const filteredUsers = users.filter(u =>
     u.name.toLowerCase().includes(searchUser.toLowerCase()) ||
     u.email.toLowerCase().includes(searchUser.toLowerCase())
   )
@@ -422,7 +422,7 @@ export function AdminTerritoriesView() {
   const TerritoryCard = ({ p }: { p: PriorityScore }) => {
     const territory = p.territory
     const isLivre = !territory.assigned_to
-    
+
     // Borda lateral e cor do texto baseadas na prioridade
     let borderColor = "border-slate-100"
     let daysColor = "text-slate-400"
@@ -439,7 +439,7 @@ export function AdminTerritoriesView() {
     }
 
     return (
-      <div 
+      <div
         onClick={() => router.push(`/dashboard/territories/${territory.id}/map`)}
         className={cn(
           "bg-white p-4 rounded-xl border-y border-r shadow-sm transition-all active:scale-[0.98] cursor-pointer hover:shadow-md h-full flex items-center justify-between gap-4",
@@ -455,33 +455,33 @@ export function AdminTerritoriesView() {
               {territory.name || "Sem nome"}
             </h3>
           </div>
-          
+
           <div className="flex items-center gap-2 text-xs">
-             {isLivre ? (
-               <div className="flex items-center gap-2">
-                 {p.isReturned ? (
-                   <span className="bg-orange-50 text-orange-600 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight border border-orange-100">
-                     DEVOLVIDO
-                   </span>
-                 ) : (
-                   <span className="bg-emerald-50 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight border border-emerald-100">
-                     LIVRE
-                   </span>
-                 )}
-                 <span className={cn("font-bold flex items-center gap-1", daysColor)}>
-                   ⌛ {p.daysInactive}d
-                 </span>
-               </div>
-             ) : (
-               <div className="flex items-center gap-1.5 min-w-0">
-                 <span className="font-extrabold text-[#C65D3B] truncate max-w-[90px]">
-                   {territory.assigned_to_user?.name?.split(' ')[0]}
-                 </span>
-                 <span className="font-bold text-slate-400 shrink-0">
-                   ⌛ {p.daysAssigned}d
-                 </span>
-               </div>
-             )}
+            {isLivre ? (
+              <div className="flex items-center gap-2">
+                {p.isReturned ? (
+                  <span className="bg-orange-50 text-orange-600 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight border border-orange-100">
+                    DEVOLVIDO
+                  </span>
+                ) : (
+                  <span className="bg-emerald-50 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight border border-emerald-100">
+                    LIVRE
+                  </span>
+                )}
+                <span className={cn("font-bold flex items-center gap-1", daysColor)}>
+                  ⌛ {p.daysInactive}d
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="font-extrabold text-[#C65D3B] truncate max-w-[90px]">
+                  {territory.assigned_to_user?.name?.split(' ')[0]}
+                </span>
+                <span className="font-bold text-slate-400 shrink-0">
+                  ⌛ {p.daysAssigned}d
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -555,36 +555,36 @@ export function AdminTerritoriesView() {
       <div className="flex flex-col gap-6">
         {/* Pills Filters */}
         <div className="flex gap-2 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-hide">
-          <FilterPill 
-            active={activeFilter === "all"} 
+          <FilterPill
+            active={activeFilter === "all"}
             onClick={() => setActiveFilter("all")}
             label="Todos"
             count={counts.all}
           />
-          <FilterPill 
+          <FilterPill
             emoji="🔥"
-            active={activeFilter === "urgentes"} 
+            active={activeFilter === "urgentes"}
             onClick={() => setActiveFilter("urgentes")}
             label="Urgentes"
             count={counts.urgentes}
           />
-          <FilterPill 
+          <FilterPill
             emoji="⏳"
-            active={activeFilter === "parados"} 
+            active={activeFilter === "parados"}
             onClick={() => setActiveFilter("parados")}
             label="Parados"
             count={counts.parados}
           />
-          <FilterPill 
+          <FilterPill
             emoji="🆕"
-            active={activeFilter === "livres"} 
+            active={activeFilter === "livres"}
             onClick={() => setActiveFilter("livres")}
             label="Livres"
             count={counts.livres}
           />
           {counts.inactive > 0 && (
-            <FilterPill 
-              active={activeFilter === "inactive"} 
+            <FilterPill
+              active={activeFilter === "inactive"}
               onClick={() => setActiveFilter("inactive")}
               label="Inativos"
               count={counts.inactive}
@@ -607,45 +607,45 @@ export function AdminTerritoriesView() {
 
       <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
         <DialogContent className="sm:max-w-[450px]">
-           {/* Assignment Modal Content */}
-           <DialogHeader>
-             <DialogTitle>Designar Território</DialogTitle>
-           </DialogHeader>
-           {/* Logic remains same as original */}
-           <div className="space-y-4 py-4">
-             <div className="space-y-2">
-               <Label>Publicador Responsável</Label>
-               <Input 
-                 placeholder="Buscar..." 
-                 value={searchUser} 
-                 onChange={(e) => setSearchUser(e.target.value)} 
-               />
-               <div className="border rounded-md max-h-32 overflow-y-auto mt-1">
-                 {filteredUsers.map(u => (
-                   <button 
-                     key={u.id} 
-                     className={cn("w-full text-left p-2 hover:bg-slate-50", selectedUserId === u.id && "bg-slate-100")}
-                     onClick={() => { setSelectedUserId(u.id); setSearchUser(u.name) }}
-                   >
-                     {u.name}
-                   </button>
-                 ))}
-               </div>
-             </div>
-             <div className="grid grid-cols-2 gap-4">
-               <div>
-                  <Label>Início</Label>
-                  <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
-               </div>
-               <div>
-                  <Label>Fim (Retroativo)</Label>
-                  <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
-               </div>
-             </div>
-           </div>
-           <DialogFooter>
-             <Button onClick={handleAssign} disabled={assigning}>Designar</Button>
-           </DialogFooter>
+          {/* Assignment Modal Content */}
+          <DialogHeader>
+            <DialogTitle>Designar Território</DialogTitle>
+          </DialogHeader>
+          {/* Logic remains same as original */}
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Publicador Responsável</Label>
+              <Input
+                placeholder="Buscar..."
+                value={searchUser}
+                onChange={(e) => setSearchUser(e.target.value)}
+              />
+              <div className="border rounded-md max-h-32 overflow-y-auto mt-1">
+                {filteredUsers.map(u => (
+                  <button
+                    key={u.id}
+                    className={cn("w-full text-left p-2 hover:bg-slate-50", selectedUserId === u.id && "bg-slate-100")}
+                    onClick={() => { setSelectedUserId(u.id); setSearchUser(u.name) }}
+                  >
+                    {u.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Início</Label>
+                <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+              </div>
+              <div>
+                <Label>Fim (Retroativo)</Label>
+                <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleAssign} disabled={assigning}>Designar</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
