@@ -14,6 +14,7 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "default",
     title: "FieldMap",
+    startupImage: ["/icons/icon-512x512.png"],
   },
   formatDetection: {
     telephone: false,
