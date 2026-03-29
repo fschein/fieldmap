@@ -248,7 +248,7 @@ export function AssignmentCreateModal({
             message: `Você recebeu o território ${selectedTerr?.number} - ${selectedTerr?.name}.`,
             url: `/dashboard/my-assignments/${selectedTerritoryId}/map`
           })
-        }).catch(err => console.error("Erro ao disparar push:", err))
+        }).catch((err: unknown) => console.error("Erro ao disparar push:", err))
       }
 
       toast.success(
@@ -323,9 +323,8 @@ export function AssignmentCreateModal({
                 {filteredTerritories.map((t) => (
                   <button
                     key={t.id}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 transition-colors ${
-                      selectedTerritoryId === t.id ? "bg-primary/5 border-l-2 border-l-primary" : ""
-                    }`}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 transition-colors ${selectedTerritoryId === t.id ? "bg-primary/5 border-l-2 border-l-primary" : ""
+                      }`}
                     onClick={() => setSelectedTerritoryId(t.id)}
                   >
                     <div
@@ -380,9 +379,8 @@ export function AssignmentCreateModal({
                 {filteredPublishers.map((p) => (
                   <button
                     key={p.id}
-                    className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors ${
-                      selectedPublisherId === p.id ? "bg-primary/5 border-l-2 border-l-primary font-medium" : ""
-                    }`}
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors ${selectedPublisherId === p.id ? "bg-primary/5 border-l-2 border-l-primary font-medium" : ""
+                      }`}
                     onClick={() => setSelectedPublisherId(p.id)}
                   >
                     {p.name}
