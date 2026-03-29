@@ -179,7 +179,7 @@ export function AssignmentHistorySheet({
           user_id: selectedPublisher,
           territory_id: territoryId,
           created_by: (await supabase.auth.getUser()).data.user?.id
-        }).catch(err => console.error("Erro ao inserir notificação:", err))
+        }).catch((err: unknown) => console.error("Erro ao inserir notificação:", err))
       }
 
       toast.success("Nova designação criada!")
@@ -236,12 +236,12 @@ export function AssignmentHistorySheet({
 
   const handleDeleteAssignment = async (assignmentId: string) => {
     if (!window.confirm("Atenção! Pressione OK para EXCLUIR DEFINITIVAMENTE esta designação. Isso não pode ser desfeito.")) return
-    
+
     try {
       setLoading(true)
       const { error } = await supabase.from("assignments").delete().eq("id", assignmentId)
       if (error) throw error
-      
+
       if (territory) await syncTerritoryOwner(territory.id)
 
       toast.success("Designação excluída com sucesso!")
@@ -266,7 +266,7 @@ export function AssignmentHistorySheet({
         .eq("status", "active")
         .order("assigned_at", { ascending: false })
         .limit(1)
-        
+
       if (activeAssignments && activeAssignments.length > 0) {
         await supabase.from("territories").update({ assigned_to: activeAssignments[0].user_id, status: "assigned" }).eq("id", territoryId)
       } else {
@@ -374,10 +374,9 @@ export function AssignmentHistorySheet({
 
                     return (
                       <div key={assignment.id} className="relative pl-5">
-                        <div className={`absolute -left-[9px] top-1 h-4 w-4 rounded-full border-2 bg-white ${
-                          isActive ? 'border-primary ring-4 ring-primary/20' :
-                          isCompleted ? 'border-green-500' : 'border-slate-400'
-                        }`} />
+                        <div className={`absolute -left-[9px] top-1 h-4 w-4 rounded-full border-2 bg-white ${isActive ? 'border-primary ring-4 ring-primary/20' :
+                            isCompleted ? 'border-green-500' : 'border-slate-400'
+                          }`} />
 
                         <div className={`p-3 rounded-lg border ${isActive ? 'bg-primary/5 border-primary/20 shadow-sm' : 'bg-slate-50 border-slate-200'}`}>
                           {/* Header */}
@@ -387,10 +386,9 @@ export function AssignmentHistorySheet({
                               {assignment.profiles?.name}
                             </span>
                             <div className="flex items-center gap-1.5">
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                                isActive ? 'bg-primary/10 text-primary' :
-                                isCompleted ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-700'
-                              }`}>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${isActive ? 'bg-primary/10 text-primary' :
+                                  isCompleted ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-700'
+                                }`}>
                                 {isActive ? 'Em Campo' : isCompleted ? 'Concluído' : 'Devolvido'}
                               </span>
                               {canEdit && !isEditing && (
@@ -437,7 +435,7 @@ export function AssignmentHistorySheet({
                                   </div>
                                 </div>
                               </div>
-                              
+
                               {(assignment.notes || assignment.return_reason) && (
                                 <div className="bg-amber-50/50 border border-amber-100 p-2 rounded text-[11px] text-amber-900 italic">
                                   <span className="font-semibold not-italic text-[10px] text-amber-700 block mb-0.5 uppercase">Motivo:</span>
