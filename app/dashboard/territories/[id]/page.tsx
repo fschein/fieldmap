@@ -175,16 +175,13 @@ export default function TerritoryDetailPage({
     try {
       const payload = {
         territory_id: id,
-        geometry: null, // Will be set via map editor
+        name: formData.name,
+        notes: formData.notes,
         order_index: territory?.subdivisions?.length || 0,
         completed: false,
       }
 
       if (editingBlock) {
-        // Block table doesn't have 'name' and 'notes' in your schema
-        // Only has: geometry, order_index, completed
-        // You may need to add these columns or handle differently
-        console.warn("Block schema doesn't support name/notes. Update schema first.")
         
         const { error } = await supabase
           .from("subdivisions")

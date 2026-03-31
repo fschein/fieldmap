@@ -421,22 +421,36 @@ export function AdminTerritoriesView() {
   }
 
   const handleSaveEdit = async () => {
-    if (!editingTerritory) return
     setEditSaving(true)
-    const newStatus = editInactive ? 'inactive' : (editingTerritory.status === 'inactive' ? 'available' : editingTerritory.status)
+    const newStatus = editInactive ? 'inactive' : 'available'
+    
     try {
-      const { error } = await supabase
-        .from("territories")
-        .update({
-          name: editName,
-          number: editNumber,
-          color: editGroupId ? groups.find(g => g.id === editGroupId)?.color || editColor : editColor,
-          group_id: editGroupId,
-          status: newStatus,
-          assigned_to: editInactive ? null : editingTerritory.assigned_to,
-        })
-        .eq("id", editingTerritory.id)
-      if (error) throw error
+      if (editingTerritory) {
+        // UPDATE
+        const { error } = await supabase
+          .from("territories")
+          .update({
+            name: editName,
+            number: editNumber,
+            group_id: editGroupId,
+            status: newStatus,
+            assigned_to: editInactive ? null : editingTerritory.assigned_to,
+          })
+          .eq("id", editingTerritory.id)
+        if (error) throw error
+      } else {
+        // INSERT
+        const { error } = await supabase
+          .from("territories")
+          .insert({
+            name: editName,
+            number: editNumber,
+            group_id: editGroupId,
+            status: 'available',
+            color: '#C65D3B'
+          })
+        if (error) throw error
+      }
       setEditDialogOpen(false)
       loadData()
     } catch (e: any) {
@@ -444,6 +458,16 @@ export function AdminTerritoriesView() {
     } finally {
       setEditSaving(false)
     }
+  }
+
+  const handleOpenCreate = () => {
+    setEditingTerritory(null)
+    setEditName("")
+    setEditNumber("")
+    setEditColor("#C65D3B")
+    setEditGroupId(null)
+    setEditInactive(false)
+    setEditDialogOpen(true)
   }
 
 
@@ -470,25 +494,27 @@ export function AdminTerritoriesView() {
       <div
         onClick={() => router.push(`/dashboard/territories/${territory.id}/map`)}
         className={cn(
-          "bg-card p-4 rounded-xl border-y border-r shadow-sm transition-all active:scale-[0.98] cursor-pointer hover:shadow-md h-full flex items-center justify-between gap-4",
+          "bg-card p-4 rounded-xl border shadow-sm transition-all active:scale-[0.98] cursor-pointer hover:shadow-md h-full flex items-center justify-between gap-4",
           borderColor
         )}
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-mono font-semibold text-muted-foreground">
+            {territory.group ? (
+              <span 
+                className="w-2.5 h-2.5 rounded-full shrink-0 shadow-inner" 
+                style={{ backgroundColor: territory.group.color }} 
+                title={`Grupo: ${territory.group.name}`}
+              />
+            ) : (
+              <span className="w-2.5 h-2.5 rounded-full shrink-0 border border-dashed border-border" />
+            )}
+            <span className="text-xs font-mono font-semibold text-muted-foreground mr-1">
               [#{territory.number}]
             </span>
             <h3 className="font-bold text-foreground truncate text-sm">
               {territory.name || "Sem nome"}
             </h3>
-            {territory.group && (
-              <span
-                className="w-2 h-2 rounded-full shrink-0 shadow-sm"
-                style={{ backgroundColor: territory.group.color }}
-                title={`Grupo: ${territory.group.name}`}
-              />
-            )}
           </div>
 
           <div className="flex items-center gap-2 text-xs">
@@ -598,11 +624,9 @@ export function AdminTerritoriesView() {
               className="pl-9 bg-card border-border"
             />
           </div>
-          <Button asChild className="shrink-0 shadow-sm">
-            <Link href="/dashboard/territories/new">
-              <Plus className="mr-2 h-4 w-4" />
-              Novo
-            </Link>
+          <Button onClick={handleOpenCreate} className="shrink-0 shadow-sm">
+            <Plus className="mr-2 h-4 w-4" />
+            Novo
           </Button>
         </div>
       </div>
@@ -708,25 +732,18 @@ export function AdminTerritoriesView() {
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className="sm:max-w-[450px]">
           <DialogHeader>
-            <DialogTitle>Editar Território {editNumber}</DialogTitle>
+            <DialogTitle>{editingTerritory ? `Editar Território ${editNumber}` : "Novo Território"}</DialogTitle>
             <DialogDescription>
-              Ajuste as informações básicas e o grupo responsável.
+              {editingTerritory 
+                ? "Ajuste as informações básicas e o grupo responsável."
+                : "Cadastre um novo território para começar a mapear."}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label>Número</Label>
-                <Input value={editNumber} onChange={e => setEditNumber(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label>Cor Padrão</Label>
-                <div className="flex gap-2 items-center">
-                  <Input type="color" value={editColor} onChange={e => setEditColor(e.target.value)} className="w-12 p-1 h-9 bg-card border-border" />
-                  <span className="text-xs text-muted-foreground font-mono uppercase">{editColor}</span>
-                </div>
-              </div>
+            <div className="space-y-1">
+              <Label>Número</Label>
+              <Input value={editNumber} onChange={e => setEditNumber(e.target.value)} />
             </div>
 
             <div className="space-y-1">

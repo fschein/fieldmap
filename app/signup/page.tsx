@@ -9,68 +9,50 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { MapPin, Loader2 } from "lucide-react"
+import { Loader2, ArrowLeft } from "lucide-react"
 import { FieldMapLogoBrand } from "@/components/icons/fieldmap-logo"
 
-export default function LoginPage() {
+export default function SignupPage() {
+  const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const { signIn, user, loading, isReady } = useAuth()
+  const [isSuccess, setIsSuccess] = useState(false)
+  
+  const { signUp, user, isReady } = useAuth()
   const router = useRouter()
-  const [isEmpty, setIsEmpty] = useState(false)
 
   useEffect(() => {
-    async function checkEmpty() {
-      const { getSupabaseBrowserClient } = await import("@/lib/supabase/client")
-      const supabase = getSupabaseBrowserClient()
-      const { count, error: countError } = await supabase
-        .from("profiles")
-        .select("*", { count: "exact", head: true })
-      
-      if (!countError && count === 0) {
-        setIsEmpty(true)
-      }
-    }
-
-    if (isReady) {
-      checkEmpty()
-    }
-
     if (isReady && user) {
       router.replace("/dashboard")
     }
   }, [user, isReady, router])
 
-if (!isReady) return <Loader2 className="animate-spin" />
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
     if (isSubmitting) return
     
     setError(null)
     setIsSubmitting(true)
 
     try {
-      const { error: signInError } = await signIn(email, password)
+      const { error: signUpError } = await signUp(email, password, fullName)
 
-      if (signInError) {
-        setError(signInError.message === "Invalid login credentials" 
-          ? "E-mail ou senha incorretos" 
-          : signInError.message)
+      if (signUpError) {
+        setError(signUpError.message)
         setIsSubmitting(false)
+      } else {
+        setIsSuccess(true)
+        // O Supabase handle_new_user trigger criará o profile
       }
-      // If successful, the auth state will update and trigger the redirect
-    } catch {
-      setError("Erro ao fazer login. Tente novamente.")
+    } catch (err: any) {
+      setError("Erro ao criar conta. Tente novamente.")
       setIsSubmitting(false)
     }
   }
 
-  // Show loading state while auth is initializing
-  if (!isReady || loading) {
+  if (!isReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted/30">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -78,19 +60,52 @@ if (!isReady) return <Loader2 className="animate-spin" />
     )
   }
 
-  // Don't render login form if already authenticated
-  if (user) {
+  if (isSuccess) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/30">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
+        <Card className="w-full max-w-md text-center py-10">
+          <CardHeader>
+            <div className="flex justify-center mb-4">
+               <div className="h-16 w-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center">
+                 <Loader2 className="h-8 w-8 animate-spin" />
+               </div>
+            </div>
+            <CardTitle className="text-2xl">Conta Criada!</CardTitle>
+            <CardDescription className="text-base mt-2">
+              Estamos preparando seu acesso. <br/>
+              Se você é o primeiro usuário, já entrará como **Administrador**.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Redirecionando para o painel em instantes...
+            </p>
+          </CardContent>
+          <CardFooter className="flex justify-center">
+             <Button asChild variant="outline">
+               <Link href="/login">Ir para Login</Link>
+             </Button>
+          </CardFooter>
+        </Card>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4 py-12">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center pt-10 pb-2">
+        <CardHeader className="text-center pt-10 pb-2 relative">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="absolute left-4 top-4" 
+            asChild
+          >
+            <Link href="/login">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          
           <div className="flex items-center justify-center gap-3 mb-4">
             <FieldMapLogoBrand className="h-10 w-10 shrink-0" />
             <CardTitle className="text-4xl font-black tracking-tighter">
@@ -99,7 +114,7 @@ if (!isReady) return <Loader2 className="animate-spin" />
             </CardTitle>
           </div>
           <CardDescription>
-            Entre com suas credenciais para acessar o sistema
+            Crie sua conta para começar a gerenciar territórios
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -109,6 +124,19 @@ if (!isReady) return <Loader2 className="animate-spin" />
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="fullName">Nome Completo</Label>
+              <Input
+                id="fullName"
+                placeholder="Seu nome"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                required
+                disabled={isSubmitting}
+              />
+            </div>
+            
             <div className="space-y-2">
               <Label htmlFor="email">E-mail</Label>
               <Input
@@ -122,56 +150,41 @@ if (!isReady) return <Loader2 className="animate-spin" />
                 autoComplete="email"
               />
             </div>
+            
             <div className="space-y-2">
               <Label htmlFor="password">Senha</Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="Sua senha"
+                placeholder="Mínimo 6 caracteres"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 disabled={isSubmitting}
-                autoComplete="current-password"
+                minLength={6}
+                autoComplete="new-password"
               />
             </div>
           </CardContent>
-          <CardFooter className="flex flex-col gap-4 mt-4">
+          <CardFooter className="flex flex-col gap-4 mt-6">
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Entrando...
+                  Criando conta...
                 </>
               ) : (
-                "Entrar"
+                "Criar Conta"
               )}
             </Button>
+            <p className="text-center text-sm text-muted-foreground mt-2">
+              Já tem uma conta?{" "}
+              <Link href="/login" className="text-primary font-bold hover:underline">
+                Entrar
+              </Link>
+            </p>
           </CardFooter>
         </form>
-
-        {isEmpty && (
-          <div className="px-6 pb-8">
-            <div className="pt-6 border-t border-dashed border-slate-200">
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-sm">
-                <div className="flex flex-col gap-4">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 bg-[#C65D3B] text-white rounded text-[9px] font-black uppercase tracking-tighter shadow-sm">Onboarding</span>
-                    <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">Primeira Instalação?</h3>
-                  </div>
-                  
-                  <p className="text-sm text-slate-600 leading-relaxed font-medium">
-                    Detectamos que este banco está vazio. Se você é o responsável pela montagem do sistema, crie a primeira conta agora:
-                  </p>
-                  
-                  <Button asChild variant="default" className="w-full bg-[#C65D3B] hover:bg-[#A84A2B] text-white shadow-md font-bold py-6">
-                    <Link href="/signup">Criar Conta de Administrador</Link>
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </Card>
     </div>
   )

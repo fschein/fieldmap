@@ -43,6 +43,7 @@ interface AggregatedTerritory {
   completionsInPeriod: number
   lastCompletedAt: string | null
   campaignId: string | null
+  groupColor: string | null
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -91,7 +92,7 @@ export default function AssignmentsPage() {
 
       const { data: territories, error: terrErr } = await supabase
         .from("territories")
-        .select("id, name, number, color, status, campaign_id, assigned_to, subdivisions(completed)")
+        .select("id, name, number, color, status, campaign_id, assigned_to, subdivisions(completed), group:groups(color)")
         .order("number", { ascending: true })
 
       if (terrErr) throw new Error(`Territories: ${terrErr.message}`)
@@ -210,7 +211,8 @@ export default function AssignmentsPage() {
         completionsInPeriod,
         lastCompletedAt,
         campaignId: t.campaign_id,
-        assignedTo: t.assigned_to
+        assignedTo: t.assigned_to,
+        groupColor: (t as any).group?.color || null
       }
     }).filter(t => t.status !== 'inactive')
 
@@ -492,7 +494,11 @@ export default function AssignmentsPage() {
                   >
                     <TableCell className="py-2.5 text-xs font-bold text-foreground whitespace-nowrap">
                       <span className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full print:hidden" style={{ backgroundColor: t.color }} />
+                        {t.groupColor ? (
+                          <span className="w-2 h-2 rounded-full print:hidden" style={{ backgroundColor: t.groupColor }} />
+                        ) : (
+                          <span className="w-2 h-2 rounded-full border border-dashed border-border print:hidden" />
+                        )}
                         {t.number}
                       </span>
                     </TableCell>
@@ -574,10 +580,14 @@ export default function AssignmentsPage() {
               >
                 <CardContent className="p-3">
                   <div className="flex items-center gap-3 mb-2">
-                    <div
-                      className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: t.color }}
-                    />
+                    {t.groupColor ? (
+                      <div
+                        className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm"
+                        style={{ backgroundColor: t.groupColor }}
+                      />
+                    ) : (
+                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 border border-dashed border-border" />
+                    )}
                     <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
                       <p className="font-semibold text-sm text-foreground truncate">{t.name}</p>
                       <Badge

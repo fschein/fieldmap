@@ -92,7 +92,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password,
       options: {
         data: {
-          name: fullName,
+          full_name: fullName,
+          must_change_password: false,
         },
       },
     })

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { useAuth } from "@/hooks/use-auth"
 import { useRouter } from "next/navigation"
@@ -12,7 +12,7 @@ import { Loader2, Lock, Eye, EyeOff, CheckCircle2, ShieldAlert } from "lucide-re
 import { toast } from "sonner"
 
 export default function SetupPasswordPage() {
-  const { user, profile, refreshProfile } = useAuth()
+  const { user, profile, refreshProfile, isReady } = useAuth()
   const router = useRouter()
   const [changingPassword, setChangingPassword] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -22,13 +22,49 @@ export default function SetupPasswordPage() {
   })
   const supabase = getSupabaseBrowserClient()
 
-  if (!profile?.must_change_password) {
-    // Se não precisa mudar, não deveria estar aqui
+  useEffect(() => {
+    if (isReady && profile && !profile.must_change_password) {
+      // Delay curto para o usuário ver o feedback de "Tudo pronto"
+      const timer = setTimeout(() => {
+        router.replace("/dashboard/my-assignments")
+      }, 1500)
+      return () => clearTimeout(timer)
+    }
+  }, [profile, isReady, router])
+
+  // 1. Estado de Carregamento Inicial (Auth não está pronto)
+  if (!isReady) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-        <CheckCircle2 className="h-12 w-12 text-green-500" />
-        <h2 className="text-xl font-bold">Sua senha já está segura!</h2>
-        <Button onClick={() => router.push("/dashboard/my-assignments")}> Ir para o Início </Button>
+        <Loader2 className="h-8 w-8 animate-spin text-[#C65D3B]" />
+        <p className="text-muted-foreground animate-pulse font-medium">Validando sua conta...</p>
+      </div>
+    )
+  }
+
+  // 2. Estado de Perfil Inexistente (Raro, mas possível se o trigger do banco atrasar)
+  if (!profile) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 text-center px-6">
+        <Loader2 className="h-8 w-8 animate-spin text-[#C65D3B]" />
+        <h2 className="text-xl font-bold">Quase lá!</h2>
+        <p className="text-muted-foreground">Estamos configurando seu perfil pela primeira vez...</p>
+      </div>
+    )
+  }
+
+  // 3. Estado de Sucesso (Já configurou a senha e agora está sendo redirecionado)
+  if (!profile.must_change_password) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 animate-in fade-in duration-700">
+        <div className="relative">
+          <CheckCircle2 className="h-16 w-16 text-green-500" />
+          <Loader2 className="absolute inset-0 h-16 w-16 animate-spin text-green-200/50 -z-10" />
+        </div>
+        <div className="text-center space-y-2">
+          <h2 className="text-2xl font-black uppercase tracking-tighter">Tudo pronto!</h2>
+          <p className="text-muted-foreground font-medium">Sua conta está ativa. Entrando no sistema...</p>
+        </div>
       </div>
     )
   }

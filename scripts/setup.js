@@ -29,13 +29,14 @@ SUPABASE_SERVICE_ROLE_KEY=${serviceRole.trim()}
     console.log(`\n✅ Arquivo .env.local criado com sucesso em: ${envPath}\n`);
     
     console.log("---------------------------------------------------------");
-    console.log("🎉 PRÓXIMO PASSO: INICIALIZAR O BANCO DE DADOS");
+    console.log("🎉 PRÓXIMO PASSO: INICIALIZAR O BANCO DE DADOS (2025)");
     console.log("---------------------------------------------------------");
     console.log("1. Entre no painel do Supabase (https://app.supabase.com)");
     console.log("2. Vá em 'SQL Editor'");
     console.log("3. Clique em 'New Query'");
-    console.log("4. Copie o conteúdo do arquivo 'full-setup.sql' que está na raiz deste projeto.");
-    console.log("5. Cole no editor do Supabase e clique em 'RUN'.");
+    console.log("4. Abra o arquivo 'full-setup.sql' (na raiz do projeto).");
+    console.log("5. Copie TODO o conteúdo e cole no editor do Supabase.");
+    console.log("6. Clique em 'RUN'.");
     console.log("---------------------------------------------------------\n");
     console.log("Após isso, você pode rodar 'npm run dev' ou 'pnpm dev' para iniciar!\n");
 

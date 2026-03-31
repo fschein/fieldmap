@@ -10,9 +10,10 @@ Uma ferramenta robusta para gestão de territórios, designações e quadras, fo
 - **Mapa Interativo**: Integração com Leaflet para visualização de quadras e pontos.
 - **Designações Inteligentes**: Atribua territórios a publicadores e acompanhe o status em tempo real.
 - **Quadras (Subdivisions)**: Gerenciamento detalhado de cada setor do território.
+- **Escalas por Grupo**: Suporte a arranjos coletivos para saídas de campo (ex: domingos), onde territórios são vinculados a grupos inteiros.
 - **Não Visitar (DNV)**: Marque residências que não devem ser visitadas com histórico e edição.
 - **Histórico Completo**: Acompanhe todas as designações e conclusões passadas.
-- **Segurança**: Fluxo de alteração de senha obrigatório no primeiro acesso ou após redefinição.
+- **Segurança**: Fluxo de alteração de senha obrigatório ou simplificado para novos cadastros.
 - **Notificações**: Alertas administrativos para pedidos de designação e conclusões.
 
 ## 🚀 Como Publicar sua Instância
@@ -24,8 +25,10 @@ Uma ferramenta robusta para gestão de territórios, designações e quadras, fo
 
 ### 2. Configurando o Supabase
 1. Crie um novo projeto no Supabase.
-2. Vá em **SQL Editor** e execute os scripts localizados na pasta `/scripts` em ordem numérica (001, 002, etc.).
-3. Em **Project Settings > API**, anote a `URL`, `anon public key` e `service_role key`.
+2. Vá em **SQL Editor** e clique em **New Query**.
+3. Copie o conteúdo do arquivo `full-setup.sql` (localizado na raiz deste projeto) e cole no editor.
+4. Clique em **RUN**. Isso criará todas as tabelas, funções e políticas de segurança necessárias de uma só vez.
+5. Em **Project Settings > API**, anote a `URL`, `anon public key` e `service_role key`.
 
 ### 3. Deploy na Vercel
 Clique no botão **Deploy to Vercel** no topo deste README. 
@@ -42,9 +45,10 @@ Clique no botão **Deploy to Vercel** no topo deste README.
 | `NEXT_PUBLIC_APP_URL` | URL do seu App | URL da Vercel ou localhost:3000 |
 
 ### 4. Primeiro Acesso (Admin)
-1. Crie sua conta normalmente via email/senha.
-2. No painel do Supabase, vá na tabela `profiles` e mude o campo `role` do seu usuário para `admin`.
-3. Pronto! Você agora terá acesso a todas as ferramentas de gestão.
+1. No painel do Supabase, vá em **Authentication > Settings > Sign In / Up** e desative a opção **Confirm email** (para testar sem e-mails reais).
+2. Acesse o seu App e clique em **"Criar Conta de Administrador"** no alerta de primeira instalação (ou vá em `/signup`).
+3. Cadastre seu e-mail e senha.
+4. **Pronto!** Como você é o primeiro usuário, o sistema te tornará **Admin automaticamente**. O menu de Administração será liberado imediatamente.
 
 ## 💻 Desenvolvimento Local
 
@@ -66,4 +70,4 @@ Se quiser rodar o projeto na sua máquina para testar antes:
 Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
 
 ---
-Desenvolvido com ❤️ para facilitar a organização ministerial.
+Desenvolvido para facilitar a organização ministerial.
