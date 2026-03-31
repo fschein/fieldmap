@@ -308,8 +308,20 @@ BEGIN
     DROP POLICY IF EXISTS "Admin All Territories" ON public.territories;
     CREATE POLICY "Admin All Territories" ON public.territories FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'dirigente')));
     
+    DROP POLICY IF EXISTS "Admin All Subdivisions" ON public.subdivisions;
+    CREATE POLICY "Admin All Subdivisions" ON public.subdivisions FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'dirigente')));
+    
     DROP POLICY IF EXISTS "Admin All Assignments" ON public.assignments;
     CREATE POLICY "Admin All Assignments" ON public.assignments FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'dirigente')));
+
+    DROP POLICY IF EXISTS "Admin All Schedules" ON public.schedules;
+    CREATE POLICY "Admin All Schedules" ON public.schedules FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'dirigente')));
+
+    DROP POLICY IF EXISTS "Admin All Arrangements" ON public.schedule_arrangements;
+    CREATE POLICY "Admin All Arrangements" ON public.schedule_arrangements FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'dirigente')));
+
+    DROP POLICY IF EXISTS "Admin All Leader Arrangements" ON public.leader_arrangements;
+    CREATE POLICY "Admin All Leader Arrangements" ON public.leader_arrangements FOR ALL TO authenticated USING (EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'dirigente')));
 
     -- Reader Policies
     DROP POLICY IF EXISTS "Read All Groups" ON public.groups;
@@ -320,6 +332,15 @@ BEGIN
     
     DROP POLICY IF EXISTS "Read All Territories" ON public.territories;
     CREATE POLICY "Read All Territories" ON public.territories FOR SELECT TO authenticated USING (true);
+
+    DROP POLICY IF EXISTS "Read All Subdivisions" ON public.subdivisions;
+    CREATE POLICY "Read All Subdivisions" ON public.subdivisions FOR SELECT TO authenticated USING (true);
+
+    DROP POLICY IF EXISTS "Read All Schedules" ON public.schedules;
+    CREATE POLICY "Read All Schedules" ON public.schedules FOR SELECT TO authenticated USING (true);
+
+    DROP POLICY IF EXISTS "Read All Arrangements" ON public.schedule_arrangements;
+    CREATE POLICY "Read All Arrangements" ON public.schedule_arrangements FOR SELECT TO authenticated USING (true);
     
     DROP POLICY IF EXISTS "Read My Assignments" ON public.assignments;
     CREATE POLICY "Read My Assignments" ON public.assignments FOR SELECT TO authenticated USING (user_id = auth.uid());
