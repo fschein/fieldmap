@@ -15,10 +15,10 @@ import { cn } from "@/lib/utils"
 
 function NotifIcon({ type }: { type: AppNotification["type"] }) {
   if (type === "request") return <MapPin className="h-4 w-4 text-blue-500" />
-  if (type === "returned") return <ArrowDownToLine className="h-4 w-4 text-green-600" />
-  if (type === "idle") return <UserX className="h-4 w-4 text-orange-500" />
-  if (type === "assigned") return <MapPin className="h-4 w-4 text-blue-600" />
-  return <Bell className="h-4 w-4 text-slate-400" />
+  if (type === "returned") return <ArrowDownToLine className="h-4 w-4 text-emerald-500" />
+  if (type === "idle") return <UserX className="h-4 w-4 text-amber-500" />
+  if (type === "assigned") return <MapPin className="h-4 w-4 text-primary" />
+  return <Bell className="h-4 w-4 text-muted-foreground" />
 }
 
 export function NotificationBell() {
@@ -35,21 +35,21 @@ export function NotificationBell() {
         <Button
           variant="ghost"
           size="icon"
-          className="relative h-9 w-9 rounded-full text-slate-500 hover:text-slate-900 hover:bg-slate-100"
+          className="relative h-9 w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
         >
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm animate-pulse">
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm animate-pulse">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent align="end" className="w-80 p-0 shadow-xl border-slate-200 rounded-xl overflow-hidden">
+      <PopoverContent align="end" className="w-80 p-0 shadow-xl border-border rounded-xl overflow-hidden bg-card">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b bg-slate-50">
-          <h3 className="font-bold text-sm text-slate-800">Notificações</h3>
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/50">
+          <h3 className="font-bold text-sm text-foreground">Notificações</h3>
           {unreadCount > 0 && (
             <button
               onClick={markAllAsRead}
@@ -62,13 +62,13 @@ export function NotificationBell() {
         </div>
 
         {/* List */}
-        <div className="max-h-[22rem] overflow-y-auto divide-y divide-slate-100">
+        <div className="max-h-[22rem] overflow-y-auto divide-y divide-border">
           {loading ? (
-            <div className="py-8 text-center text-sm text-slate-400">Carregando...</div>
+            <div className="py-8 text-center text-sm text-muted-foreground">Carregando...</div>
           ) : notifications.length === 0 ? (
             <div className="py-10 text-center">
-              <Bell className="h-8 w-8 mx-auto text-slate-200 mb-2" />
-              <p className="text-sm text-slate-400">Nenhuma notificação ainda.</p>
+              <Bell className="h-8 w-8 mx-auto text-muted mb-2" />
+              <p className="text-sm text-muted-foreground">Nenhuma notificação ainda.</p>
             </div>
           ) : (
             notifications.map((notif) => (
@@ -85,28 +85,28 @@ export function NotificationBell() {
                   }
                 }}
                 className={cn(
-                  "w-full text-left flex items-start gap-3 p-3.5 transition-colors hover:bg-slate-50",
-                  !notif.read && "bg-blue-50/40"
+                  "w-full text-left flex items-start gap-3 p-3.5 transition-colors hover:bg-muted",
+                  !notif.read && "bg-primary/5"
                 )}
               >
                 <span className={cn(
                   "mt-0.5 p-1.5 rounded-full shrink-0",
-                  notif.type === "request" && "bg-blue-100",
-                  notif.type === "returned" && "bg-green-100",
-                  notif.type === "idle" && "bg-orange-100",
-                  notif.type === "assigned" && "bg-blue-50",
+                  notif.type === "request" && "bg-primary/10",
+                  notif.type === "returned" && "bg-emerald-500/10",
+                  notif.type === "idle" && "bg-amber-500/10",
+                  notif.type === "assigned" && "bg-primary/10",
                 )}>
                   <NotifIcon type={notif.type} />
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-xs text-slate-800 line-clamp-1">{notif.title}</p>
-                  <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">{notif.message}</p>
-                  <p className="text-[10px] text-slate-400 mt-1">
+                  <p className="font-semibold text-xs text-foreground line-clamp-1">{notif.title}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{notif.message}</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">
                     {new Date(notif.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                   </p>
                 </div>
                 {!notif.read && (
-                  <span className="mt-1.5 h-2 w-2 rounded-full bg-blue-500 shrink-0" />
+                  <span className="mt-1.5 h-2 w-2 rounded-full bg-primary shrink-0 animate-pulse" />
                 )}
               </button>
             ))

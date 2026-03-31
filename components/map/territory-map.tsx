@@ -36,9 +36,9 @@ interface TerritoryMapProps {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  available: "#22c55e",
-  assigned: "#3b82f6",
-  completed: "#6b7280",
+  available: "hsl(142, 71%, 45%)",
+  assigned: "hsl(15, 54%, 55%)",
+  completed: "hsl(215, 16%, 47%)",
 }
 
 const DEFAULT_CENTER: [number, number] = [-29.9447, -50.9919]
@@ -288,12 +288,12 @@ export function TerritoryMap({
 
   return (
     <div className="relative h-full w-full overflow-hidden">
-      <div ref={mapRef} className="h-full w-full" style={{ zIndex: 1 }} />
+      <div ref={mapRef} className="h-full w-full bg-background" style={{ zIndex: 1 }} />
 
       {editable && (
-        <div className="absolute bottom-4 left-4 z-10 rounded-lg bg-white/90 backdrop-blur-sm p-3 shadow-lg border border-slate-200 pointer-events-none sm:pointer-events-auto">
-          <p className="text-sm font-bold text-slate-800">Instruções:</p>
-          <ul className="mt-1 text-[11px] text-slate-600 space-y-1 font-medium">
+        <div className="absolute bottom-4 left-4 z-10 rounded-lg bg-card/90 backdrop-blur-sm p-3 shadow-lg border border-border pointer-events-none sm:pointer-events-auto">
+          <p className="text-sm font-bold text-foreground">Instruções:</p>
+          <ul className="mt-1 text-[11px] text-muted-foreground space-y-1 font-medium">
             <li>• Use o polígono (topo dir.) para novas quadras</li>
             <li>• Clique em uma quadra para selecioná-la</li>
             <li>• Clique na aba "Não Visitar" para restrições</li>
@@ -322,21 +322,21 @@ export function TerritoryMap({
            Mantém o display:block original do Leaflet Draw.
            Só ajustamos visual (cor, fonte, borda). */
         .leaflet-draw-actions {
-          background: white !important;
-          border: 1px solid #e2e8f0 !important;
+          background: hsl(var(--card)) !important;
+          border: 1px solid hsl(var(--border)) !important;
           border-radius: 0 8px 8px 0 !important;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.12) !important;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
           padding: 0 !important;
           overflow: hidden !important;
         }
         .leaflet-draw-actions li {
           list-style: none !important;
-          border-bottom: 1px solid #f1f5f9 !important;
+          border-bottom: 1px solid hsl(var(--border) / 0.5) !important;
         }
         .leaflet-draw-actions li:last-child { border-bottom: none !important; }
         .leaflet-draw-actions a {
-          background: white !important;
-          color: #475569 !important;
+          background: hsl(var(--card)) !important;
+          color: hsl(var(--muted-foreground)) !important;
           font-size: 12px !important;
           font-weight: 600 !important;
           font-family: inherit !important;
@@ -346,7 +346,7 @@ export function TerritoryMap({
           white-space: nowrap !important;
           transition: background 0.15s !important;
         }
-        .leaflet-draw-actions a:hover { background: #f8fafc !important; }
+        .leaflet-draw-actions a:hover { background: hsl(var(--muted) / 0.5) !important; }
         /* Primeiro item = Save → verde */
         .leaflet-draw-actions li:first-child a { color: #16a34a !important; }
         .leaflet-draw-actions li:first-child a:hover { background: #f0fdf4 !important; }
@@ -357,11 +357,11 @@ export function TerritoryMap({
         /* ── Tooltip de instrução (segue o mouse durante edição) ──
            max-width + nowrap evita o bloco largo da imagem. */
         .leaflet-draw-tooltip {
-          background: #1e293b !important;
-          border: none !important;
+          background: hsl(var(--secondary)) !important;
+          border: 1px solid hsl(var(--border)) !important;
           border-radius: 8px !important;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
-          color: #f8fafc !important;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+          color: hsl(var(--secondary-foreground)) !important;
           font-size: 11px !important;
           font-weight: 500 !important;
           font-family: inherit !important;
@@ -376,11 +376,11 @@ export function TerritoryMap({
 
         /* ── Labels das quadras ── */
         .subdivision-tooltip-pill {
-          background: rgba(255,255,255,0.95) !important;
-          border: 1px solid rgba(0,0,0,0.1) !important;
+          background: hsl(var(--card) / 0.95) !important;
+          border: 1px solid hsl(var(--border)) !important;
           border-radius: 999px !important;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
-          color: #1e293b !important;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.2) !important;
+          color: hsl(var(--foreground)) !important;
           font-size: 11px !important;
           font-weight: 700 !important;
           padding: 2px 9px !important;
@@ -392,14 +392,30 @@ export function TerritoryMap({
 
         /* ── Tooltips de Não Visitar ── */
         .dnv-tooltip {
-          background: white !important;
-          border: 1px solid #fee2e2 !important;
+          background: hsl(var(--card)) !important;
+          border: 1px solid hsl(var(--destructive) / 0.2) !important;
           border-radius: 8px !important;
-          box-shadow: 0 4px 12px rgba(220,38,38,0.1) !important;
+          box-shadow: 0 4px 12px rgba(220,38,38,0.15) !important;
           padding: 8px 12px !important;
         }
-        .dnv-tip-title { font-size: 12px; font-weight: 700; color: #b91c1c; margin-bottom: 2px; white-space: nowrap; }
-        .dnv-tip-addr  { font-size: 11px; color: #64748b; }
+        .dnv-tip-title { font-size: 12px; font-weight: 700; color: hsl(var(--destructive)); margin-bottom: 2px; white-space: nowrap; }
+        .dnv-tip-addr  { font-size: 11px; color: hsl(var(--muted-foreground)); }
+
+        /* ── Dark Mode Map Filter ── */
+        .dark .leaflet-tile-container {
+          filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+        }
+        .dark .leaflet-container {
+          background: hsl(222, 15%, 7%) !important;
+        }
+        .dark .leaflet-bar a {
+          background-color: hsl(var(--secondary)) !important;
+          color: hsl(var(--secondary-foreground)) !important;
+          border-bottom: 1px solid hsl(var(--border)) !important;
+        }
+        .dark .leaflet-bar a:hover {
+          background-color: hsl(var(--muted)) !important;
+        }
       `}</style>
     </div>
   )

@@ -13,6 +13,7 @@ type AuthContextType = {
   isReady: boolean
   loading: boolean
   isAdmin: boolean
+  isSupervisor: boolean
   isDirigente: boolean
   signIn: (email: string, password: string) => Promise<{ data: any; error: any }>
   signUp: (email: string, password: string, fullName: string) => Promise<{ data: any; error: any }>
@@ -126,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(safetyTimeout)
       
       if (session?.user) {
-        // Buscamos o profile de forma não-bloqueante
+        // Buscamos o profile de forma asíncrona mas sincronizada com o estado 'ready'
         fetchProfile(session.user.id).then(p => {
           if (mounted) {
             if (p && p.is_active === false) {
@@ -135,15 +136,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setProfile(p)
               setUser(session.user)
             }
+            setIsReady(true)
+            setLoading(false)
           }
         })
       } else {
         setUser(null)
         setProfile(null)
+        setIsReady(true)
+        setLoading(false)
       }
-      
-      setIsReady(true)
-      setLoading(false)
     }
 
     // 2. Proactive Session Check (Immediate)
@@ -172,10 +174,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (event === "SIGNED_IN" && session?.user) {
           setUser(session.user)
-          setIsReady(true)
-          setLoading(false)
           fetchProfile(session.user.id).then(p => {
-            if (mounted) setProfile(p)
+            if (mounted) {
+              setProfile(p)
+              setIsReady(true)
+              setLoading(false)
+            }
           })
           return
         }
@@ -202,7 +206,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchProfile])
 
   const isAdmin = profile?.role === "admin"
-  const isDirigente = profile?.role === "dirigente" || isAdmin
+  const isSupervisor = profile?.role === "supervisor" || isAdmin
+  const isDirigente = profile?.role === "dirigente" || isSupervisor || isAdmin
 
   return (
     <AuthContext.Provider value={{
@@ -211,6 +216,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isReady,
       loading,
       isAdmin,
+      isSupervisor,
       isDirigente,
       signIn,
       signUp,

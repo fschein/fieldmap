@@ -115,14 +115,14 @@ export function MobileTerritoriesView() {
   }
 
   return (
-    <div className="space-y-6 px-2 py-8 md:p-6 pb-24 max-w-2xl mx-auto animate-in fade-in duration-500">
-      <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Territórios</h1>
+    <div className="space-y-6 px-4 py-8 max-w-2xl mx-auto animate-in fade-in duration-500">
+      <h1 className="text-2xl font-black uppercase tracking-tight text-foreground">Territórios</h1>
 
       {/* Ativos Agora */}
       <section className="space-y-3">
-        <h2 className="text-[12px] font-bold text-slate-400 uppercase tracking-widest px-1">Ativos agora</h2>
+        <h2 className="text-[12px] font-bold text-muted-foreground uppercase tracking-widest px-1">Ativos agora</h2>
         {active.length === 0 ? (
-          <div className="py-12 flex flex-col items-center justify-center space-y-3 text-slate-400 bg-white rounded-xl border border-dashed border-slate-200">
+          <div className="py-12 flex flex-col items-center justify-center space-y-3 text-muted-foreground bg-card rounded-xl border border-dashed border-border">
             <MapPin className="h-8 w-8 opacity-20" />
             <p className="text-xs font-medium">Nenhum território ativo</p>
           </div>
@@ -139,14 +139,14 @@ export function MobileTerritoriesView() {
                   key={t.id}
                   onClick={() => router.push(`/dashboard/my-assignments/${t.id}/map`)}
                   className={cn(
-                    "bg-white p-4 rounded-xl mx-0 space-y-3 shadow-sm border transition-all active:scale-[0.98] cursor-pointer",
-                    isOverdue ? "border-red-200 bg-red-50/10" : "border-slate-100"
+                    "bg-card p-4 rounded-xl mx-0 space-y-3 shadow-sm border transition-all active:scale-[0.98] cursor-pointer",
+                    isOverdue ? "border-destructive/20 bg-destructive/5" : "border-border"
                   )}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-2.5 h-2.5 rounded-full shadow-inner" style={{ backgroundColor: t.color || '#C65D3B' }} />
-                      <span className="font-extrabold text-slate-900 text-base">Território {t.number}</span>
+                      <div className="w-2.5 h-2.5 rounded-full shadow-inner" style={{ backgroundColor: t.color || 'hsl(var(--primary))' }} />
+                      <span className="font-extrabold text-foreground text-base">Território {t.number}</span>
                     </div>
                     <div className={cn(
                       "text-[10px] font-black px-2 py-0.5 rounded-full border",
@@ -155,9 +155,9 @@ export function MobileTerritoriesView() {
                       {progress}%
                     </div>
                   </div>
-                  <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden">
+                  <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
                     <div
-                      className={cn("h-full transition-all rounded-full", progress > 60 ? "bg-green-500" : "bg-red-500")}
+                      className={cn("h-full transition-all rounded-full", progress > 60 ? "bg-emerald-500" : "bg-destructive")}
                       style={{ width: `${progress}%` }}
                     />
                   </div>
@@ -170,24 +170,24 @@ export function MobileTerritoriesView() {
 
       {/* Histórico */}
       <section className="space-y-3">
-        <h2 className="text-[13px] font-bold text-slate-400 uppercase tracking-widest px-1">Histórico</h2>
-        <div className="bg-white rounded-xl border border-slate-100 overflow-hidden shadow-sm">
+        <h2 className="text-[13px] font-bold text-muted-foreground uppercase tracking-widest px-1">Histórico</h2>
+        <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
           {history.length === 0 ? (
-            <p className="p-10 text-center text-xs text-slate-400">Nenhum registro encontrado.</p>
+            <p className="p-10 text-center text-xs text-muted-foreground">Nenhum registro encontrado.</p>
           ) : (
-            <div className="divide-y divide-slate-50">
+            <div className="divide-y divide-border/50">
               {history.map((h) => {
                 const date = h.completed_at || h.returned_at
                 const isCompleted = h.status === "completed"
                 const progress = h.final_progress ?? (isCompleted ? 100 : 0)
 
                 return (
-                  <div key={h.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                  <div key={h.id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
                     <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-slate-200" />
+                      <div className="w-2 h-2 rounded-full bg-muted" />
                       <div className="space-y-0.5">
-                        <p className="font-bold text-slate-900 text-[15px]">Território {h.territory?.number}</p>
-                        <p className="text-[13px] text-slate-400 font-bold uppercase tracking-tight">
+                        <p className="font-bold text-foreground text-[15px]">Território {h.territory?.number}</p>
+                        <p className="text-[13px] text-muted-foreground font-bold uppercase tracking-tight">
                           {isCompleted ? 'Concluído' : 'Devolvido'} • {date ? format(new Date(date), "MMM yyyy", { locale: ptBR }) : '-'}
                         </p>
                       </div>
@@ -195,8 +195,8 @@ export function MobileTerritoriesView() {
                     <div className={cn(
                       "text-[10px] font-black px-2 py-0.5 rounded-full border shadow-sm",
                       progress >= 100
-                        ? "bg-slate-50 text-slate-500 border-slate-100"
-                        : "bg-orange-50 text-orange-600 border-orange-100"
+                        ? "bg-muted text-muted-foreground border-border/50"
+                        : "bg-primary/10 text-primary border-primary/20"
                     )}>
                       {progress}%
                     </div>

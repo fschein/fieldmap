@@ -27,19 +27,20 @@ import {
 } from "lucide-react"
 import { useState, useCallback } from "react"
 import { NotificationBell } from "@/components/dashboard/notification-bell"
+import { A11yControls } from "@/components/dashboard/a11y-controls"
 
 const navItems = [
   {
     title: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
-    roles: ["admin"],
+    roles: ["admin", "supervisor"],
   },
   {
     title: "Territórios",
     href: "/dashboard/territories",
     icon: Map,
-    roles: ["admin"],
+    roles: ["admin", "supervisor"],
   },
   {
     title: "Grupos",
@@ -57,13 +58,25 @@ const navItems = [
     title: "Minhas Designações",
     href: "/dashboard/my-assignments",
     icon: MapPin,
-    roles: ["admin", "dirigente", "publicador"],
+    roles: ["admin", "supervisor", "dirigente", "publicador"],
   },
   {
     title: "Campanhas",
     href: "/dashboard/campaigns",
     icon: Calendar,
     roles: ["admin"],
+  },
+  {
+    title: "Gestão de Escalas",
+    href: "/dashboard/schedule",
+    icon: ClipboardList,
+    roles: ["admin"],
+  },
+  {
+    title: "Escala",
+    href: "/dashboard/my-schedule",
+    icon: ClipboardList,
+    roles: ["admin", "supervisor", "dirigente", "publicador"],
   },
   {
     title: "Usuários",
@@ -75,7 +88,7 @@ const navItems = [
     title: "Perfil",
     href: "/dashboard/profile",
     icon: User,
-    roles: ["admin", "dirigente", "publicador"],
+    roles: ["admin", "supervisor", "dirigente", "publicador"],
   },
 ]
 
@@ -89,22 +102,22 @@ export function Sidebar() {
     (item) => profile && item.roles.includes(profile.role)
   )
 
-const handleSignOut = useCallback(async () => {
-  if (isSigningOut) return
+  const handleSignOut = useCallback(async () => {
+    if (isSigningOut) return
 
-  setIsSigningOut(true)
-  setMobileOpen(false)
+    setIsSigningOut(true)
+    setMobileOpen(false)
 
-  try {
-    await signOut()
-  } catch (error) {
-    console.error("Erro ao invalidar sessão, mas forçando saída:", error)
-  } finally {
-    localStorage.clear()
+    try {
+      await signOut()
+    } catch (error) {
+      console.error("Erro ao invalidar sessão, mas forçando saída:", error)
+    } finally {
+      localStorage.clear()
 
-    window.location.href = "/login"
-  }
-}, [signOut, isSigningOut])
+      window.location.href = "/login"
+    }
+  }, [signOut, isSigningOut])
 
   const closeMobileMenu = useCallback(() => {
     setMobileOpen(false)
@@ -114,8 +127,8 @@ const handleSignOut = useCallback(async () => {
 
   return (
     <>
-      {/* Mobile menu button - Only for Admins */}
-      {isAdmin && (
+      {/* Mobile menu button - Only for Admins or if on Map page */}
+      {(isAdmin || profile?.role === "supervisor") && (
         <Button
           variant="ghost"
           size="icon"
@@ -127,8 +140,8 @@ const handleSignOut = useCallback(async () => {
         </Button>
       )}
 
-      {/* Overlay - Only for Admins on mobile */}
-      {isAdmin && mobileOpen && (
+      {/* Overlay - Only for authorized users on mobile */}
+      {(isAdmin || profile?.role === "supervisor") && mobileOpen && (
         <div
           className="fixed inset-0 z-[90] bg-background/80 backdrop-blur-sm md:hidden"
           onClick={closeMobileMenu}
@@ -147,20 +160,22 @@ const handleSignOut = useCallback(async () => {
       >
         <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="flex h-16 items-center justify-between gap-2 border-b border-sidebar-border px-6 dark:bg-sidebar">
-            <div className="flex items-center gap-2">
+          <div className="flex h-16 items-center justify-between gap-2 border-b border-border px-6">
+            <div className="flex items-center gap-2 min-w-0">
               <FieldMapLogoBrand className="h-6 w-6 shrink-0" />
-              <span className="font-bold text-foreground tracking-tight text-xl">
+              <span className="font-bold text-foreground tracking-tight text-xl truncate">
                 Field<span className="text-primary">Map</span>
               </span>
             </div>
-            {/* <NotificationBell /> */}
+            <div className="shrink-0 flex items-center">
+              <A11yControls />
+            </div>
           </div>
 
           {/* Navigation */}
           <nav className="flex-1 space-y-1 overflow-y-auto p-4">
             {filteredNavItems.map((item) => {
-              const isActive = pathname === item.href || 
+              const isActive = pathname === item.href ||
                 (item.href !== "/dashboard" && pathname.startsWith(item.href))
               return (
                 <Link
@@ -170,7 +185,7 @@ const handleSignOut = useCallback(async () => {
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                     isActive
-                      ? "bg-primary text-primary-foreground"
+                      ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                   aria-current={isActive ? "page" : undefined}
@@ -190,14 +205,15 @@ const handleSignOut = useCallback(async () => {
                 <span>{profile?.name || profile?.email}</span>
               </Link>
               <p className="text-xs text-muted-foreground capitalize">
-                {profile?.role === "admin" ? "Administrador" : 
-                 profile?.role === "dirigente" ? "Dirigente" : 
-                 "Publicador"}
+                {profile?.role === "admin" ? "Administrador" :
+                  profile?.role === "supervisor" ? "Supervisor" :
+                    profile?.role === "dirigente" ? "Dirigente" :
+                      "Publicador"}
               </p>
             </div>
             <Button
               variant="ghost"
-              className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground hover:bg-muted"
+              className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground hover:bg-destructive/10 hover:text-destructive"
               onClick={handleSignOut}
               disabled={isSigningOut}
             >

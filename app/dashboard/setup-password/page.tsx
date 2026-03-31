@@ -84,7 +84,7 @@ export default function SetupPasswordPage() {
           </p>
         </div>
 
-        <Card className="border-primary/20 shadow-xl bg-white/50 backdrop-blur-sm">
+        <Card className="border-border shadow-xl bg-card/50 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="text-xl">Configurar Senha</CardTitle>
             <CardDescription>
@@ -108,7 +108,7 @@ export default function SetupPasswordPage() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
@@ -145,7 +145,7 @@ export default function SetupPasswordPage() {
           </CardContent>
         </Card>
 
-        <div className="flex items-center gap-2 p-4 bg-amber-50 rounded-lg border border-amber-100 text-amber-800 text-sm">
+        <div className="flex items-center gap-2 p-4 bg-primary/5 rounded-lg border border-primary/10 text-primary text-sm">
           <ShieldAlert className="h-5 w-5 shrink-0" />
           <p>Dica: Use uma combinação de letras, números e símbolos.</p>
         </div>

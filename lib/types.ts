@@ -1,4 +1,4 @@
-export type UserRole = "admin" | "dirigente" | "publicador"
+export type UserRole = "admin" | "dirigente" | "publicador" | "supervisor"
 export type TerritoryType = "residencial" | "comercial"
 export type AssignmentStatus = "active" | "completed" | "returned"
 export type SubdivisionStatus = "available" | "assigned" | "completed"

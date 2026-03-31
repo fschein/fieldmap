@@ -18,6 +18,7 @@ import {
   PlusCircle, RotateCcw, PlayCircle, Pencil, Save, X, Trash2
 } from "lucide-react"
 import { toast } from "sonner"
+import { Badge } from "@/components/ui/badge"
 import type { AssignmentStatus } from "@/lib/types"
 
 interface Profile { id: string; name: string }
@@ -29,8 +30,10 @@ interface Assignment {
   completed_at: string | null
   returned_at: string | null
   user_id: string
+  group_id: string | null
   territory_id: string
   profiles: { name: string } | null
+  groups: { name: string } | null
   notes: string | null
   return_reason: string | null
 }
@@ -102,9 +105,10 @@ export function AssignmentHistorySheet({
       const { data: aData, error } = await supabase
         .from("assignments")
         .select(`
-          id, status, assigned_at, completed_at, returned_at, user_id, territory_id,
+          id, status, assigned_at, completed_at, returned_at, user_id, group_id, territory_id,
           notes, return_reason,
-          profiles!assignments_user_id_fkey(name)
+          profiles!assignments_user_id_fkey(name),
+          groups:groups(name)
         `)
         .eq("territory_id", territoryId)
         .order("assigned_at", { ascending: false })
@@ -313,9 +317,9 @@ export function AssignmentHistorySheet({
 
             {/* Nova Designação Rápida */}
             {canEdit && (
-              <div className="bg-slate-50 border rounded-lg p-3 space-y-3">
+              <div className="bg-muted/50 border border-border rounded-lg p-3 space-y-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold flex items-center gap-1.5 text-slate-700">
+                  <h3 className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
                     <PlayCircle className="w-4 h-4 text-primary" /> Nova Designação
                   </h3>
                   {!isAddingMode && (
@@ -359,14 +363,14 @@ export function AssignmentHistorySheet({
 
             {/* Linha do Tempo */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-slate-900 border-b pb-1">Linha do Tempo</h3>
+              <h3 className="text-sm font-semibold text-foreground border-b pb-1">Linha do Tempo</h3>
 
               {assignments.length === 0 ? (
-                <div className="text-center py-6 text-sm text-slate-400 border-2 border-dashed rounded-lg">
+                <div className="text-center py-6 text-sm text-muted-foreground border-2 border-dashed rounded-lg opacity-60">
                   Nenhum registro encontrado.
                 </div>
               ) : (
-                <div className="relative border-l-2 border-slate-200 ml-3 space-y-5">
+                <div className="relative border-l-2 border-border ml-3 space-y-5">
                   {assignments.map((assignment) => {
                     const isActive = assignment.status === 'active'
                     const isCompleted = assignment.status === 'completed'
@@ -374,20 +378,26 @@ export function AssignmentHistorySheet({
 
                     return (
                       <div key={assignment.id} className="relative pl-5">
-                        <div className={`absolute -left-[9px] top-1 h-4 w-4 rounded-full border-2 bg-white ${isActive ? 'border-primary ring-4 ring-primary/20' :
-                            isCompleted ? 'border-green-500' : 'border-slate-400'
+                        <div className={`absolute -left-[9px] top-1 h-4 w-4 rounded-full border-2 bg-card ${isActive ? 'border-primary ring-4 ring-primary/20' :
+                            isCompleted ? 'border-emerald-500' : 'border-border'
                           }`} />
 
-                        <div className={`p-3 rounded-lg border ${isActive ? 'bg-primary/5 border-primary/20 shadow-sm' : 'bg-slate-50 border-slate-200'}`}>
+                        <div className={`p-3 rounded-lg border ${isActive ? 'bg-primary/5 border-primary/20 shadow-sm' : 'bg-muted/50 border-border'}`}>
                           {/* Header */}
                           <div className="flex justify-between items-start mb-2">
-                            <span className="font-semibold text-sm text-slate-900 flex items-center gap-1.5">
-                              <User className="w-3.5 h-3.5 text-slate-500" />
-                              {assignment.profiles?.name}
+                            <span className="font-semibold text-sm text-foreground flex items-center gap-1.5 min-w-0 flex-1">
+                              <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                              <span className="truncate">{assignment.profiles?.name || assignment.groups?.name || "Desconhecido"}</span>
+                              {assignment.group_id && (
+                                <Badge variant="secondary" className="h-4 px-1 text-[8px] font-black bg-muted text-muted-foreground shrink-0">GRUPO</Badge>
+                              )}
+                              {assignment.assigned_at && new Date(assignment.assigned_at).getDay() === 0 && (
+                                <span className="text-xs shrink-0" title="Domingo">☀️</span>
+                              )}
                             </span>
                             <div className="flex items-center gap-1.5">
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${isActive ? 'bg-primary/10 text-primary' :
-                                  isCompleted ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-700'
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${isActive ? 'bg-primary/20 text-primary' :
+                                  isCompleted ? 'bg-emerald-500/10 text-emerald-500' : 'bg-muted text-muted-foreground'
                                 }`}>
                                 {isActive ? 'Em Campo' : isCompleted ? 'Concluído' : 'Devolvido'}
                               </span>
@@ -395,17 +405,17 @@ export function AssignmentHistorySheet({
                                 <div className="flex items-center gap-1">
                                   <button
                                     onClick={() => startEditing(assignment)}
-                                    className="p-1 rounded hover:bg-slate-200 transition-colors"
+                                    className="p-1 rounded hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
                                     title="Editar datas"
                                   >
-                                    <Pencil className="w-3.5 h-3.5 text-slate-400 hover:text-slate-700" />
+                                    <Pencil className="w-3.5 h-3.5" />
                                   </button>
                                   <button
                                     onClick={() => handleDeleteAssignment(assignment.id)}
-                                    className="p-1 rounded hover:bg-slate-200 transition-colors"
+                                    className="p-1 rounded hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
                                     title="Excluir designação"
                                   >
-                                    <Trash2 className="w-3.5 h-3.5 text-slate-400 hover:text-red-600" />
+                                    <Trash2 className="w-3.5 h-3.5" />
                                   </button>
                                 </div>
                               )}
@@ -415,20 +425,20 @@ export function AssignmentHistorySheet({
                           {!isEditing ? (
                             <div className="space-y-2">
                               <div className="grid grid-cols-2 gap-2 text-xs">
-                                <div className="space-y-0.5 bg-white p-1.5 rounded border border-slate-100">
-                                  <span className="text-[10px] text-slate-400 uppercase font-semibold">Início</span>
-                                  <div className="flex items-center gap-1 text-slate-700 font-mono">
-                                    <Calendar className="w-3 h-3 text-slate-400" /> {formatDate(assignment.assigned_at)}
+                                <div className="space-y-0.5 bg-card p-1.5 rounded border border-border">
+                                  <span className="text-[10px] text-muted-foreground uppercase font-semibold">Início</span>
+                                  <div className="flex items-center gap-1 text-foreground font-mono">
+                                    <Calendar className="w-3 h-3 text-muted-foreground" /> {formatDate(assignment.assigned_at)}
                                   </div>
                                 </div>
-                                <div className="space-y-0.5 bg-white p-1.5 rounded border border-slate-100">
-                                  <span className="text-[10px] text-slate-400 uppercase font-semibold">Fim</span>
-                                  <div className="flex items-center gap-1 text-slate-700 font-mono">
+                                <div className="space-y-0.5 bg-card p-1.5 rounded border border-border">
+                                  <span className="text-[10px] text-muted-foreground uppercase font-semibold">Fim</span>
+                                  <div className="flex items-center gap-1 text-foreground font-mono">
                                     {isActive ? (
                                       <span className="text-primary italic">— ativo —</span>
                                     ) : (
                                       <>
-                                        <Calendar className="w-3 h-3 text-slate-400" />
+                                        <Calendar className="w-3 h-3 text-muted-foreground" />
                                         {formatDate(assignment.completed_at || assignment.returned_at)}
                                       </>
                                     )}
@@ -437,18 +447,18 @@ export function AssignmentHistorySheet({
                               </div>
 
                               {(assignment.notes || assignment.return_reason) && (
-                                <div className="bg-amber-50/50 border border-amber-100 p-2 rounded text-[11px] text-amber-900 italic">
-                                  <span className="font-semibold not-italic text-[10px] text-amber-700 block mb-0.5 uppercase">Motivo:</span>
+                                <div className="bg-amber-500/10 border border-amber-500/20 p-2 rounded text-[11px] text-amber-500 italic">
+                                  <span className="font-semibold not-italic text-[10px] text-amber-500/60 block mb-0.5 uppercase">Motivo:</span>
                                   "{assignment.notes || assignment.return_reason}"
                                 </div>
                               )}
                             </div>
                           ) : (
                             /* Datas — modo edição */
-                            <div className="space-y-2 pt-2 border-t border-slate-200">
+                            <div className="space-y-2 pt-2 border-t border-border">
                               <div className="grid grid-cols-2 gap-2">
                                 <div className="space-y-1">
-                                  <Label className="text-[10px] text-slate-500 uppercase font-semibold">Início</Label>
+                                  <Label className="text-[10px] text-muted-foreground uppercase font-semibold">Início</Label>
                                   <Input
                                     type="date"
                                     value={editStart}

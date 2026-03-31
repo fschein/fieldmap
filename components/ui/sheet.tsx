@@ -74,7 +74,7 @@ function SheetContent({
       <SheetPrimitive.Content
         data-slot="sheet-content"
         className={cn(
-          'bg-white/95 backdrop-blur-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed z-[9999] gap-4 p-6 shadow-xl border-white/20 duration-200',
+          'bg-card/95 backdrop-blur-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed z-[9999] gap-4 p-6 shadow-xl border-border/20 duration-200',
           sideStyles[side],
           className,
         )}

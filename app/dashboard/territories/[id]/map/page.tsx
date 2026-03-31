@@ -46,7 +46,7 @@ const TerritoryMap = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-full items-center justify-center bg-slate-50">
+      <div className="flex h-full items-center justify-center bg-background">
         <div className="text-center space-y-2">
           <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
           <p className="text-sm text-muted-foreground">Carregando mapa...</p>
@@ -373,9 +373,9 @@ export default function TerritoryMapPage({
       return <Badge className="bg-green-600 text-white text-xs shadow-none">Concluída</Badge>
     }
     if (subdivision.status === 'assigned') {
-      return <Badge className="bg-blue-600 text-white text-xs shadow-none">Designada</Badge>
+      return <Badge className="bg-primary text-primary-foreground text-xs shadow-none">Designada</Badge>
     }
-    return <Badge variant="outline" className="text-xs bg-slate-50 border-slate-200">Disponível</Badge>
+    return <Badge variant="outline" className="text-xs bg-muted border-border">Disponível</Badge>
   }
 
   const getProgressStats = () => {
@@ -416,18 +416,18 @@ export default function TerritoryMapPage({
   const stats = getProgressStats()
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col gap-0 bg-slate-50">
+    <div className="flex h-[calc(100vh-4rem)] flex-col gap-0 bg-background">
       {/* Header Compacto Premium */}
-      <div className="border-b bg-white px-6 py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm">
+      <div className="border-b bg-card px-6 py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild className="text-slate-500 hover:text-slate-900">
+          <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
             <Link href="/dashboard/territories">
               <ArrowLeft className="h-4 w-4 mr-2" />
               <span className="hidden sm:inline">Territórios</span>
             </Link>
           </Button>
 
-          <div className="h-6 w-px bg-slate-200" />
+          <div className="h-6 w-px bg-border" />
 
           <div className="flex items-center gap-3">
             <div
@@ -438,11 +438,11 @@ export default function TerritoryMapPage({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="font-mono text-xs bg-slate-50 border-slate-200 text-slate-600">
+                <Badge variant="outline" className="font-mono text-xs bg-muted border-border text-muted-foreground">
                   T-{territory.number}
                 </Badge>
-                <h1 className="text-lg font-bold text-slate-900 tracking-tight">{territory.name}</h1>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-primary" onClick={() => setEditTerritoryDialogOpen(true)}>
+                <h1 className="text-lg font-bold text-foreground tracking-tight">{territory.name}</h1>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => setEditTerritoryDialogOpen(true)}>
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -452,14 +452,14 @@ export default function TerritoryMapPage({
 
         <div className="flex items-center gap-4">
           {/* Progress Section */}
-          <div className="hidden sm:flex items-center gap-3 px-4 py-1.5 rounded-full bg-slate-50 border border-slate-200 shadow-inner">
+          <div className="hidden sm:flex items-center gap-3 px-4 py-1.5 rounded-full bg-muted border border-border shadow-inner">
             <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider leading-none mb-1">Status de Campo</span>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider leading-none mb-1">Status de Campo</span>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-black text-slate-800 leading-none">
-                  {stats.completed}/{stats.total} <span className="text-[10px] text-slate-400 font-normal">áreas</span>
+                <span className="text-sm font-black text-foreground leading-none">
+                  {stats.completed}/{stats.total} <span className="text-[10px] text-muted-foreground/50 font-normal">áreas</span>
                 </span>
-                <div className="h-2 w-24 bg-slate-200 rounded-full overflow-hidden">
+                <div className="h-2 w-24 bg-border rounded-full overflow-hidden">
                   <div
                     className="h-full bg-green-500 transition-all duration-500 rounded-full"
                     style={{ width: `${stats.percentage}%` }}
@@ -513,7 +513,7 @@ export default function TerritoryMapPage({
           />
 
           <Button
-            className="md:hidden absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] shadow-xl rounded-full px-8 bg-slate-900 hover:bg-slate-800 text-white border-2 border-white/20 backdrop-blur-md"
+            className="md:hidden absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] shadow-xl rounded-full px-8 bg-secondary hover:bg-secondary/80 text-secondary-foreground border-2 border-white/10 backdrop-blur-md"
             onClick={() => setShowMobileSidebar(true)}
           >
             <MapPin className="h-4 w-4 mr-2 text-primary" />
@@ -524,58 +524,58 @@ export default function TerritoryMapPage({
         {/* SIDEBAR - Lista de Subdivisões */}
         <div
           className={`
-            fixed inset-y-0 right-0 z-[2000] w-80 bg-white flex flex-col overflow-hidden shadow-2xl transition-transform duration-300 ease-in-out
+            fixed inset-y-0 right-0 z-[2000] w-80 bg-card flex flex-col overflow-hidden shadow-2xl transition-transform duration-300 ease-in-out
             ${showMobileSidebar ? 'translate-x-0' : 'translate-x-full'}
             md:relative md:translate-x-0 md:w-96 md:border-l md:shadow-none
           `}
         >
           {/* Botão Fechar (só mobile) */}
-          <div className="md:hidden flex items-center justify-between p-4 border-b bg-slate-50">
-            <span className="font-bold text-slate-800 tracking-tight">Painel de Trabalho</span>
+          <div className="md:hidden flex items-center justify-between p-4 border-b bg-muted">
+            <span className="font-bold text-foreground tracking-tight">Painel de Trabalho</span>
             <Button variant="outline" size="sm" className="rounded-full h-8" onClick={() => setShowMobileSidebar(false)}>
               Fechar
             </Button>
           </div>
 
           <Tabs defaultValue="quadras" className="flex flex-col h-full overflow-hidden">
-            <div className="p-4 border-b bg-slate-50/50">
-              <TabsList className="w-full grid grid-cols-2 bg-slate-200/40 p-1 h-10">
-                <TabsTrigger value="quadras" className="text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">
-                  Quadras <Badge variant="secondary" className="ml-2 bg-slate-100 text-[10px] px-1.5 py-0">{territory.subdivisions?.length || 0}</Badge>
+            <div className="p-4 border-b bg-muted/30">
+              <TabsList className="w-full grid grid-cols-2 bg-muted p-1 h-10 border">
+                <TabsTrigger value="quadras" className="text-xs font-bold data-[state=active]:bg-card data-[state=active]:shadow-sm">
+                  Quadras <Badge variant="secondary" className="ml-2 bg-muted-foreground/10 text-[10px] px-1.5 py-0">{territory.subdivisions?.length || 0}</Badge>
                 </TabsTrigger>
-                <TabsTrigger value="dnv" className="text-xs font-bold data-[state=active]:bg-red-50 data-[state=active]:text-red-700 data-[state=active]:shadow-sm">
-                  Não Visitar <Badge variant="secondary" className="ml-2 bg-white text-red-600 border-red-100 text-[10px] px-1.5 py-0">{((territory as any).do_not_visits?.length) || 0}</Badge>
+                <TabsTrigger value="dnv" className="text-xs font-bold data-[state=active]:bg-red-500/10 data-[state=active]:text-red-500 data-[state=active]:shadow-sm">
+                  Não Visitar <Badge variant="secondary" className="ml-2 bg-card text-red-500 border-red-500/20 text-[10px] px-1.5 py-0">{((territory as any).do_not_visits?.length) || 0}</Badge>
                 </TabsTrigger>
               </TabsList>
             </div>
 
-            <TabsContent value="quadras" className="flex-1 flex flex-col m-0 overflow-hidden outline-none data-[state=inactive]:hidden bg-white">
-              <div className="grid grid-cols-3 gap-3 text-xs p-4 border-b bg-slate-50/30 shrink-0">
-                <div className="flex flex-col p-2.5 rounded-xl bg-white border border-slate-200 shadow-sm">
-                  <Clock className="h-4 w-4 text-slate-400 mb-1" />
-                  <span className="font-black text-slate-800 text-sm">{stats.total - stats.completed}</span>
-                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Pendentes</span>
+            <TabsContent value="quadras" className="flex-1 flex flex-col m-0 overflow-hidden outline-none data-[state=inactive]:hidden bg-card">
+              <div className="grid grid-cols-3 gap-3 text-xs p-4 border-b bg-muted/20 shrink-0">
+                <div className="flex flex-col p-2.5 rounded-xl bg-card border border-border shadow-sm">
+                  <Clock className="h-4 w-4 text-muted-foreground/40 mb-1" />
+                  <span className="font-black text-foreground text-sm">{stats.total - stats.completed}</span>
+                  <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Pendentes</span>
                 </div>
-                <div className="flex flex-col p-2.5 rounded-xl bg-white border border-slate-200 shadow-sm">
-                  <Check className="h-4 w-4 text-green-600 mb-1" />
-                  <span className="font-black text-slate-800 text-sm">{stats.completed}</span>
-                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Concluídas</span>
+                <div className="flex flex-col p-2.5 rounded-xl bg-card border border-border shadow-sm">
+                  <Check className="h-4 w-4 text-emerald-500 mb-1" />
+                  <span className="font-black text-foreground text-sm">{stats.completed}</span>
+                  <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Concluídas</span>
                 </div>
-                <div className="flex flex-col p-2.5 rounded-xl bg-white border border-slate-200 shadow-sm">
-                  <TrendingUp className="h-4 w-4 text-blue-600 mb-1" />
-                  <span className="font-black text-slate-800 text-sm">{stats.percentage}%</span>
-                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">Meta</span>
+                <div className="flex flex-col p-2.5 rounded-xl bg-card border border-border shadow-sm">
+                  <TrendingUp className="h-4 w-4 text-primary mb-1" />
+                  <span className="font-black text-foreground text-sm">{stats.percentage}%</span>
+                  <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Meta</span>
                 </div>
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
                 {territory.subdivisions?.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center px-6">
-                    <div className="h-16 w-16 bg-slate-50 rounded-full flex items-center justify-center mb-4 border-2 border-dashed border-slate-200">
-                      <MapPin className="h-8 w-8 text-slate-300" />
+                    <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center mb-4 border-2 border-dashed border-border">
+                      <MapPin className="h-8 w-8 text-muted-foreground/30" />
                     </div>
-                    <p className="text-base font-bold text-slate-800 mb-2">Sem quadras definidas</p>
-                    <p className="text-sm text-slate-500 leading-relaxed">
+                    <p className="text-base font-bold text-foreground mb-2">Sem quadras definidas</p>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
                       Use a ferramenta de desenho no mapa para criar as divisões desse território.
                     </p>
                   </div>
@@ -591,16 +591,16 @@ export default function TerritoryMapPage({
                           group relative rounded-xl border p-4 transition-all cursor-pointer shadow-sm
                           ${isSelected
                             ? 'border-primary ring-2 ring-primary/10 bg-primary/5'
-                            : 'bg-white hover:border-slate-300 hover:shadow-md'
+                            : 'bg-card hover:border-muted-foreground/30 hover:shadow-md'
                           }
-                          ${isCompleted && !isSelected ? 'bg-green-50/30' : ''}
+                          ${isCompleted && !isSelected ? 'bg-emerald-500/10' : ''}
                         `}
                         onClick={() => handleFocusSubdivision(subdivision)}
                       >
                         <div className="flex items-start justify-between gap-3 mb-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1.5">
-                              <span className="font-black text-slate-900 text-base tracking-tight truncate">
+                              <span className="font-black text-foreground text-base tracking-tight truncate">
                                 {subdivision.name}
                               </span>
                             </div>
@@ -611,20 +611,20 @@ export default function TerritoryMapPage({
                             <Button
                               size="icon"
                               variant="secondary"
-                              className="h-8 w-8 rounded-full bg-white border shadow-sm"
+                              className="h-8 w-8 rounded-full bg-card border border-border shadow-sm"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleFocusSubdivision(subdivision)
                               }}
                             >
-                              <Eye className="h-4 w-4 text-slate-600" />
+                              <Eye className="h-4 w-4 text-muted-foreground" />
                             </Button>
                           </div>
                         </div>
 
                         {subdivision.notes && (
-                          <div className="bg-slate-50/80 p-2 rounded-lg border border-slate-100 mb-3">
-                            <p className="text-[11px] text-slate-500 font-medium line-clamp-2">
+                          <div className="bg-muted p-2 rounded-lg border border-border mb-3">
+                            <p className="text-[11px] text-muted-foreground font-medium line-clamp-2">
                               {subdivision.notes}
                             </p>
                           </div>
@@ -634,7 +634,7 @@ export default function TerritoryMapPage({
                           <div className="flex gap-2 pt-3 border-t mt-3 border-primary/20">
                             <Button
                               size="sm"
-                              className={`flex-1 h-9 rounded-lg font-bold text-xs ${isCompleted ? 'bg-slate-800' : 'bg-green-600 hover:bg-green-700'}`}
+                              className={`flex-1 h-9 rounded-lg font-bold text-xs ${isCompleted ? 'bg-secondary text-secondary-foreground' : 'bg-emerald-600 hover:bg-emerald-700'}`}
                               onClick={(e) => {
                                 e.stopPropagation()
                                 toggleSubdivisionStatus(subdivision)
@@ -645,7 +645,7 @@ export default function TerritoryMapPage({
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-9 px-3 rounded-lg border-slate-200"
+                              className="h-9 px-3 rounded-lg border-border"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleEditSubdivision()
@@ -656,7 +656,7 @@ export default function TerritoryMapPage({
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-9 px-3 rounded-lg border-red-100 hover:bg-red-50 hover:text-red-700 hover:border-red-200"
+                              className="h-9 px-3 rounded-lg border-destructive/20 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 handleSubdivisionDelete(subdivision.id)
@@ -673,9 +673,9 @@ export default function TerritoryMapPage({
               </div>
             </TabsContent>
 
-            <TabsContent value="dnv" className="flex-1 flex flex-col m-0 outline-none data-[state=inactive]:hidden bg-white">
-              <div className="p-4 border-b bg-red-50/20 shrink-0">
-                <Button className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-10 shadow-lg shadow-red-100" onClick={() => setIsAddingDnv(true)}>
+            <TabsContent value="dnv" className="flex-1 flex flex-col m-0 outline-none data-[state=inactive]:hidden bg-card">
+              <div className="p-4 border-b bg-red-500/5 shrink-0">
+                <Button className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-10 shadow-lg shadow-red-500/10" onClick={() => setIsAddingDnv(true)}>
                   <Plus className="h-4 w-4 mr-2" />
                   Não visitar
                 </Button>
@@ -684,11 +684,11 @@ export default function TerritoryMapPage({
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {!(territory as any).do_not_visits || (territory as any).do_not_visits.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-16 text-center px-6">
-                    <div className="h-16 w-16 bg-red-50 rounded-full flex items-center justify-center mb-4 border-2 border-dashed border-red-100 text-red-300">
+                    <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center mb-4 border-2 border-dashed border-border text-red-500/30">
                       <MapPin className="h-8 w-8" />
                     </div>
-                    <p className="text-base font-bold text-slate-800 mb-2">Sem restrições de visita</p>
-                    <p className="text-sm text-slate-500 leading-relaxed">
+                    <p className="text-base font-bold text-foreground mb-2">Sem restrições de visita</p>
+                    <p className="text-sm text-muted-foreground leading-relaxed">
                       Clique no botão acima e depois no mapa para registrar endereços que não devem ser visitados.
                     </p>
                   </div>
@@ -697,29 +697,29 @@ export default function TerritoryMapPage({
                     const date = new Date(dnv.created_at)
                     const isExpired = new Date().getTime() - date.getTime() > 365 * 24 * 60 * 60 * 1000
                     return (
-                      <div key={dnv.id} className={`group p-4 rounded-xl border text-sm transition-all shadow-sm ${isExpired ? 'bg-orange-50 border-orange-200' : 'bg-white border-red-100'}`}>
+                      <div key={dnv.id} className={`group p-4 rounded-xl border text-sm transition-all shadow-sm ${isExpired ? 'bg-orange-500/10 border-orange-500/20' : 'bg-card border-red-500/10'}`}>
                         <div className="flex justify-between items-start gap-3 mb-2">
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-black text-slate-800 line-clamp-2 leading-[1.2] text-sm mb-1">
+                            <h4 className="font-black text-foreground line-clamp-2 leading-[1.2] text-sm mb-1">
                               {dnv.address || "Endereço não informado"}
                             </h4>
                             {isExpired ? (
-                              <Badge className="bg-orange-500 text-white text-[9px] uppercase tracking-wider h-4">Expirado</Badge>
+                              <Badge className="bg-destructive text-destructive-foreground text-[9px] uppercase tracking-wider h-4">Expirado</Badge>
                             ) : (
-                              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Desde {date.toLocaleDateString("pt-BR")}</span>
+                              <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-tight">Desde {date.toLocaleDateString("pt-BR")}</span>
                             )}
                           </div>
                           <Button
                             variant="secondary"
                             size="icon"
-                            className="h-8 w-8 rounded-full bg-slate-50 border shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="h-8 w-8 rounded-full bg-card border border-border shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
                             onClick={(e) => { e.stopPropagation(); handleDnvClick(dnv); }}
                           >
-                            <Pencil className="h-3.5 w-3.5 text-slate-600" />
+                            <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                           </Button>
                         </div>
                         {dnv.notes && (
-                          <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 mt-2 text-xs text-slate-600 leading-relaxed">
+                          <div className="bg-muted/50 p-2.5 rounded-lg border border-border mt-2 text-xs text-muted-foreground leading-relaxed">
                             {dnv.notes}
                           </div>
                         )}
@@ -733,13 +733,13 @@ export default function TerritoryMapPage({
 
           {/* Assigned User Info Desktop Footer */}
           {territory.assigned_to && (
-            <div className="p-4 border-t bg-slate-900 text-white">
+            <div className="p-4 border-t bg-secondary text-secondary-foreground">
               <div className="flex items-center gap-3">
-                <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center font-bold text-xs">
+                <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center font-bold text-xs text-primary-foreground">
                   {territory.assigned_to_user?.name?.slice(0, 2).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-0.5">Designado agora</p>
+                  <p className="text-[10px] text-secondary-foreground/50 font-bold uppercase tracking-widest mb-0.5">Designado agora</p>
                   <p className="font-bold text-sm truncate">{territory.assigned_to_user?.name}</p>
                 </div>
               </div>
@@ -825,13 +825,13 @@ export default function TerritoryMapPage({
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="bg-red-50 p-3 rounded-lg border border-red-100 flex gap-3 items-center">
-                <div className="bg-red-600 p-2 rounded-md">
-                  <MapPin className="h-4 w-4 text-white" />
+              <div className="bg-destructive/10 p-3 rounded-lg border border-destructive/20 flex gap-3 items-center">
+                <div className="bg-destructive p-2 rounded-md">
+                  <MapPin className="h-4 w-4 text-destructive-foreground" />
                 </div>
-                <div className="text-[11px] text-red-800 leading-tight">
+                <div className="text-[11px] text-foreground leading-tight">
                   <p className="font-bold mb-0.5">Coordenadas capturadas:</p>
-                  <p className="font-mono">{newDnvCoords?.[0].toFixed(6)}, {newDnvCoords?.[1].toFixed(6)}</p>
+                  <p className="font-mono text-muted-foreground">{newDnvCoords?.[0].toFixed(6)}, {newDnvCoords?.[1].toFixed(6)}</p>
                 </div>
               </div>
               <div className="space-y-2">
@@ -956,7 +956,7 @@ export default function TerritoryMapPage({
             <DialogHeader>
               <div className="flex items-center justify-between mt-2">
                 <DialogTitle>Editar Bloqueio</DialogTitle>
-                <Button type="button" variant="ghost" size="sm" className="text-red-500 hover:text-red-700 hover:bg-red-50 -mr-4 -mt-6" onClick={handleDeleteDnv} disabled={saving}>
+                <Button type="button" variant="ghost" size="sm" className="text-destructive hover:text-destructive hover:bg-destructive/10 -mr-4 -mt-6" onClick={handleDeleteDnv} disabled={saving}>
                   <Trash2 className="h-4 w-4 mr-1" /> Excluir
                 </Button>
               </div>

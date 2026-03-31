@@ -48,7 +48,7 @@ export function AssignmentDialog({ assignment, onSuccess, trigger }: AssignmentD
     async function loadData() {
       const [tRes, pRes, cRes] = await Promise.all([
         supabase.from("territories").select("id, number, name, campaign_id").order("number"),
-        supabase.from("profiles").select("id, name, email").in("role", ["admin", "dirigente", "publicador"]).order("name"),
+        supabase.from("profiles").select("id, name, email").in("role", ["admin", "dirigente", "publicador", "supervisor"]).order("name"),
         supabase.from("campaigns").select("id, name").eq("active", true).order("name")
       ])
       setTerritories(tRes.data || [])
@@ -198,11 +198,11 @@ export function AssignmentDialog({ assignment, onSuccess, trigger }: AssignmentD
           </DialogHeader>
         </div>
 
-        <div className="px-6 py-6 space-y-5 bg-white -mt-4 rounded-t-2xl relative border-t z-20">
+        <div className="px-6 py-6 space-y-5 bg-card -mt-4 rounded-t-2xl relative border-t border-border z-20 shadow-[-4px_0_24px_rgba(0,0,0,0.1)]">
           <div className="space-y-2">
-            <Label className="text-slate-700 font-semibold">Território *</Label>
+            <Label className="text-foreground font-semibold">Território *</Label>
             <select
-              className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm shadow-sm focus:ring-primary focus:border-primary outline-none"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm shadow-sm focus:ring-primary focus:border-primary outline-none"
               value={selectedTerritory}
               onChange={(e) => setSelectedTerritory(e.target.value)}
             >
@@ -214,9 +214,9 @@ export function AssignmentDialog({ assignment, onSuccess, trigger }: AssignmentD
           </div>
 
           <div className="space-y-2">
-            <Label className="text-slate-700 font-semibold">Publicador Responsável *</Label>
+            <Label className="text-foreground font-semibold">Publicador Responsável *</Label>
             <div className="relative group">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Buscar pelo nome..."
                 value={searchUser}
@@ -224,19 +224,19 @@ export function AssignmentDialog({ assignment, onSuccess, trigger }: AssignmentD
                   setSearchUser(e.target.value)
                   if (!e.target.value) setSelectedProfile("") // Limpa se apagar a busca
                 }}
-                className="pl-9 shadow-sm border-slate-200"
+                className="pl-9 shadow-sm border-border bg-background"
               />
               {searchUser && (
                 <button onClick={() => { setSearchUser(""); setSelectedProfile("") }} className="absolute right-3 top-1/2 -translate-y-1/2">
-                  <X className="h-4 w-4 text-slate-400 hover:text-slate-600" />
+                  <X className="h-4 w-4 text-muted-foreground hover:text-foreground" />
                 </button>
               )}
             </div>
 
             {searchUser && !selectedProfile && (
-              <div className="border border-slate-200 rounded-lg max-h-[160px] overflow-y-auto shadow-sm mt-1">
+              <div className="border border-border rounded-lg max-h-[160px] overflow-y-auto shadow-sm mt-1 bg-background">
                 {filteredUsers.length === 0 ? (
-                  <p className="p-4 text-sm text-slate-500 text-center">Nenhum usuário encontrado</p>
+                  <p className="p-4 text-sm text-muted-foreground text-center">Nenhum usuário encontrado</p>
                 ) : (
                   filteredUsers.map((user) => (
                     <button
@@ -245,10 +245,10 @@ export function AssignmentDialog({ assignment, onSuccess, trigger }: AssignmentD
                         setSelectedProfile(user.id)
                         setSearchUser(user.name)
                       }}
-                      className="w-full text-left p-3 hover:bg-slate-50 border-b border-slate-100 last:border-0"
+                      className="w-full text-left p-3 hover:bg-muted border-b border-border last:border-0 transition-colors"
                     >
-                      <p className="font-semibold text-sm text-slate-800">{user.name}</p>
-                      <p className="text-xs text-slate-500">{user.email}</p>
+                      <p className="font-semibold text-sm text-foreground">{user.name}</p>
+                      <p className="text-xs text-muted-foreground">{user.email}</p>
                     </button>
                   ))
                 )}
@@ -257,9 +257,9 @@ export function AssignmentDialog({ assignment, onSuccess, trigger }: AssignmentD
           </div>
 
           <div className="space-y-2">
-            <Label className="text-slate-700 font-semibold">Campanha (Opcional)</Label>
+            <Label className="text-foreground font-semibold">Campanha (Opcional)</Label>
             <select
-              className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm shadow-sm focus:ring-primary focus:border-primary outline-none"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm shadow-sm focus:ring-primary focus:border-primary outline-none"
               value={selectedCampaign}
               onChange={(e) => setSelectedCampaign(e.target.value)}
             >
@@ -272,34 +272,34 @@ export function AssignmentDialog({ assignment, onSuccess, trigger }: AssignmentD
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label className="text-slate-700 font-semibold flex items-center gap-1.5">
-                <Calendar className="h-4 w-4 text-slate-400" /> Início *
+              <Label className="text-foreground font-semibold flex items-center gap-1.5">
+                <Calendar className="h-4 w-4 text-muted-foreground" /> Início *
               </Label>
               <Input
                 type="date"
                 value={assignedAt}
                 onChange={(e) => setAssignedAt(e.target.value)}
-                className="shadow-sm border-slate-200 text-sm"
+                className="shadow-sm border-border bg-background text-sm"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label className="text-slate-700 font-semibold flex items-center gap-1.5">
-                <CheckCircle2 className="h-4 w-4 text-slate-400" /> Fim (Opcional)
+              <Label className="text-foreground font-semibold flex items-center gap-1.5">
+                <CheckCircle2 className="h-4 w-4 text-muted-foreground" /> Fim (Opcional)
               </Label>
               <Input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="shadow-sm border-slate-200 text-sm"
+                className="shadow-sm border-border bg-background text-sm"
               />
             </div>
           </div>
         </div>
 
-        <DialogFooter className="bg-slate-50 px-6 py-4 border-t border-slate-100">
-          <Button variant="ghost" onClick={() => setOpen(false)} className="text-slate-600">
+        <DialogFooter className="bg-muted/50 px-6 py-4 border-t border-border">
+          <Button variant="ghost" onClick={() => setOpen(false)} className="text-muted-foreground hover:text-foreground">
             Cancelar
           </Button>
           <Button

@@ -87,7 +87,7 @@ export function AssignmentCreateModal({
         supabase
           .from("profiles")
           .select("id, name")
-          .in("role", ["admin", "publicador", "dirigente"])
+          .in("role", ["admin", "publicador", "dirigente", "supervisor"])
           .order("name"),
         supabase
           .from("campaigns")
@@ -283,11 +283,11 @@ export function AssignmentCreateModal({
               <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-sm space-y-1">
                 {selectedTerr && (
                   <p>
-                    <span className="text-slate-500">Território:</span>{" "}
-                    <strong>{selectedTerr.name}</strong>{" "}
-                    <span className="text-slate-400">#{selectedTerr.number}</span>
+                    <span className="text-muted-foreground">Território:</span>{" "}
+                    <strong className="text-foreground">{selectedTerr.name}</strong>{" "}
+                    <span className="text-muted-foreground opacity-70">#{selectedTerr.number}</span>
                     {selectedTerr.assigned_to && (
-                      <span className="ml-2 text-xs text-orange-600 font-medium">
+                      <span className="ml-2 text-xs text-orange-500 font-medium">
                         (já em campo)
                       </span>
                     )}
@@ -295,8 +295,8 @@ export function AssignmentCreateModal({
                 )}
                 {selectedPub && (
                   <p>
-                    <span className="text-slate-500">Publicador:</span>{" "}
-                    <strong>{selectedPub.name}</strong>
+                    <span className="text-muted-foreground">Publicador:</span>{" "}
+                    <strong className="text-foreground">{selectedPub.name}</strong>
                   </p>
                 )}
               </div>
@@ -306,7 +306,7 @@ export function AssignmentCreateModal({
             <div className="space-y-2">
               <Label className="text-sm font-semibold">Território</Label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <Input
                   placeholder="Buscar por nome ou número..."
                   className="pl-8 h-8 text-sm"
@@ -314,16 +314,16 @@ export function AssignmentCreateModal({
                   onChange={(e) => setSearchTerritory(e.target.value)}
                 />
               </div>
-              <div className="border rounded-lg max-h-[160px] overflow-y-auto divide-y">
+              <div className="border rounded-lg max-h-[160px] overflow-y-auto divide-y bg-card">
                 {filteredTerritories.length === 0 && (
-                  <p className="text-center text-sm text-slate-400 py-4">
+                  <p className="text-center text-sm text-muted-foreground py-4">
                     Nenhum território encontrado
                   </p>
                 )}
                 {filteredTerritories.map((t) => (
                   <button
                     key={t.id}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50 transition-colors ${selectedTerritoryId === t.id ? "bg-primary/5 border-l-2 border-l-primary" : ""
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-accent transition-colors ${selectedTerritoryId === t.id ? "bg-primary/5 border-l-2 border-l-primary" : ""
                       }`}
                     onClick={() => setSelectedTerritoryId(t.id)}
                   >
@@ -332,13 +332,13 @@ export function AssignmentCreateModal({
                       style={{ backgroundColor: t.color || "#C65D3B" }}
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-900 truncate">
+                      <p className="text-sm font-medium text-foreground truncate">
                         {t.name}
                       </p>
-                      <p className="text-[10px] text-slate-400">
+                      <p className="text-[10px] text-muted-foreground">
                         #{t.number}
                         {t.assigned_to && (
-                          <span className="ml-2 text-orange-500 font-medium">
+                          <span className="ml-2 text-primary font-bold">
                             Com {t.assignedName} ({t.daysInField ?? 0} d)
                           </span>
                         )}
@@ -348,7 +348,7 @@ export function AssignmentCreateModal({
                       <AlertTriangle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
                     )}
                     {t.urgencyDays > 0 && t.urgencyDays < 9999 && !t.assigned_to && (
-                      <span className="text-[10px] text-slate-400 flex-shrink-0 flex items-center gap-0.5">
+                      <span className="text-[10px] text-muted-foreground flex-shrink-0 flex items-center gap-0.5">
                         <Clock className="w-3 h-3" />
                         {t.urgencyDays}d
                       </span>
@@ -367,7 +367,7 @@ export function AssignmentCreateModal({
             <div className="space-y-2">
               <Label className="text-sm font-semibold">Publicador</Label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 <Input
                   placeholder="Buscar publicador..."
                   className="pl-8 h-8 text-sm"
@@ -375,15 +375,15 @@ export function AssignmentCreateModal({
                   onChange={(e) => setSearchPublisher(e.target.value)}
                 />
               </div>
-              <div className="border rounded-lg max-h-[120px] overflow-y-auto divide-y">
+              <div className="border rounded-lg max-h-[120px] overflow-y-auto divide-y bg-card">
                 {filteredPublishers.map((p) => (
                   <button
                     key={p.id}
-                    className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors ${selectedPublisherId === p.id ? "bg-primary/5 border-l-2 border-l-primary font-medium" : ""
+                    className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent transition-colors ${selectedPublisherId === p.id ? "bg-primary/5 border-l-2 border-l-primary font-medium" : ""
                       }`}
                     onClick={() => setSelectedPublisherId(p.id)}
                   >
-                    {p.name}
+                    <span className="text-foreground">{p.name}</span>
                   </button>
                 ))}
               </div>
@@ -393,7 +393,7 @@ export function AssignmentCreateModal({
             <div className="space-y-2">
               <Label className="text-sm font-semibold">Campanha (Opcional)</Label>
               <select
-                className="w-full h-9 rounded-md border border-slate-200 px-3 py-1 text-sm shadow-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none text-foreground"
                 value={selectedCampaignId}
                 onChange={(e) => setSelectedCampaignId(e.target.value)}
               >
@@ -420,9 +420,9 @@ export function AssignmentCreateModal({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-sm font-semibold text-slate-600">
+                <Label className="text-sm font-semibold text-muted-foreground">
                   Data de Conclusão{" "}
-                  <span className="font-normal text-slate-400">(opcional)</span>
+                  <span className="font-normal opacity-70">(opcional)</span>
                 </Label>
                 <Input
                   type="date"
@@ -434,9 +434,9 @@ export function AssignmentCreateModal({
               </div>
             </div>
             {endDate && (
-              <p className="text-xs text-slate-500 bg-slate-50 border rounded-md p-2">
+              <p className="text-xs text-muted-foreground bg-muted/30 border border-muted-foreground/10 rounded-md p-2">
                 ℹ️ Data de conclusão preenchida — este registro será salvo como{" "}
-                <strong>histórico concluído</strong>.
+                <strong className="text-foreground">histórico concluído</strong>.
               </p>
             )}
           </div>

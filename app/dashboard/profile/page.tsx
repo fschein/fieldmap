@@ -143,7 +143,7 @@ export default function ProfilePage() {
           variant="outline" 
           size="sm" 
           onClick={() => signOut()} 
-          className="text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700 h-10 px-4 font-bold shadow-sm"
+          className="text-destructive border-destructive/20 hover:bg-destructive/10 hover:text-destructive h-10 px-4 font-bold shadow-sm"
         >
           <LogOut className="h-4 w-4 mr-2" />
           Sair do App
@@ -183,7 +183,7 @@ export default function ProfilePage() {
           </div>
 
           {message && (
-            <p className={`text-sm ${message.type === "success" ? "text-green-600" : "text-red-600"}`}>
+            <p className={`text-sm ${message.type === "success" ? "text-emerald-500" : "text-destructive"}`}>
               {message.text}
             </p>
           )}
@@ -201,7 +201,7 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      <Card className={cn(profile?.must_change_password && "border-primary ring-1 ring-primary/20", "bg-white")}>
+      <Card className={cn(profile?.must_change_password && "border-primary ring-1 ring-primary/20")}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Lock className="h-5 w-5 text-primary" />
@@ -227,7 +227,7 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>

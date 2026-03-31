@@ -10,8 +10,10 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { PushSubscriptionManager } from "@/components/dashboard/push-subscription-manager"
 import { useUnreadNotifications } from "@/hooks/use-unread-notifications"
 import { BottomNav } from "@/components/layout/bottom-nav"
+import { SettingsProvider } from "@/providers/settings-provider"
+import { GlobalHeader } from "@/components/layout/global-header"
 
-const BOTTOM_NAV_ROLES = ["dirigente", "publicador"]
+const BOTTOM_NAV_ROLES = ["dirigente", "publicador", "supervisor"]
 
 export default function DashboardLayout({
   children,
@@ -53,21 +55,21 @@ export default function DashboardLayout({
     // Atualiza o last_seen_at uma vez por sessão/dia
     const updateLastSeen = async () => {
       if (!user?.id) return
-      
+
       const lastSeenUpdate = sessionStorage.getItem(`last_seen_${user.id}`)
       const today = new Date().toDateString()
-      
+
       if (lastSeenUpdate === today) return
-      
+
       const supabase = getSupabaseBrowserClient()
       await supabase
         .from("profiles")
         .update({ last_seen_at: new Date().toISOString() })
         .eq("id", user.id)
-      
+
       sessionStorage.setItem(`last_seen_${user.id}`, today)
     }
-    
+
     updateLastSeen()
   }, [isReady, user, profile, pathname, router])
 
@@ -94,29 +96,34 @@ export default function DashboardLayout({
 
   const isSetupPage = pathname === "/dashboard/setup-password"
   const isMapPage = pathname.includes("/map")
+  const sidebarRoles = ["admin", "supervisor"]
+  const showSidebar = !isSetupPage && profile?.role && sidebarRoles.includes(profile.role)
   const showBottomNav = !isSetupPage && !isMapPage && profile?.role && BOTTOM_NAV_ROLES.includes(profile.role)
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      {!isSetupPage && <Sidebar />}
-      <main className={cn(
-        !isSetupPage && "md:ml-64",
-        showBottomNav && "pb-16 md:pb-0"
-      )}>
-        <div className={cn(
-          "container mx-auto p-2 pt-20 md:pt-6",
-          isSetupPage && "pt-6",
-          isMapPage && "p-0 pt-0" // Removendo padding do container no mapa para ser edge-to-edge
+    <SettingsProvider>
+      <div className="min-h-screen bg-background">
+        {!isSetupPage && <GlobalHeader />}
+        {showSidebar && <Sidebar />}
+        <main className={cn(
+          showSidebar ? "md:ml-64" : "",
+          showBottomNav && "pb-16 md:pb-0"
         )}>
-          <PushSubscriptionManager />
-          {children}
-        </div>
-      </main>
+          <div className={cn(
+            "container mx-auto p-2 pt-20 md:pt-6",
+            isSetupPage && "pt-6",
+            isMapPage && "p-0 pt-0" // Removendo padding do container no mapa para ser edge-to-edge
+          )}>
+            <PushSubscriptionManager />
+            {children}
+          </div>
+        </main>
 
-      {/* Bottom Nav visível apenas para Dirigentes e Publicadores no mobile, e se não for página de setup/mapa */}
-      {showBottomNav && (
-        <BottomNav unreadCount={unreadCount} />
-      )}
-    </div>
+        {/* Bottom Nav visível apenas para Dirigentes e Publicadores no mobile, e se não for página de setup/mapa */}
+        {showBottomNav && (
+          <BottomNav unreadCount={unreadCount} />
+        )}
+      </div>
+    </SettingsProvider>
   )
 }

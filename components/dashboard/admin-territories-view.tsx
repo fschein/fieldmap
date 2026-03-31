@@ -105,10 +105,16 @@ function calculatePriorityScore(territory: TerritoryWithDetails & { assignments?
   daysInactive = Math.max(0, Math.floor(diffInactive / (1000 * 60 * 60 * 24)))
 
   // 2. Status Devolvido: última designação foi devolvida e não está designado agora
-  const latestAssignment = [...(territory.assignments || [])].sort((a, b) =>
-    new Date(b.assigned_at).getTime() - new Date(a.assigned_at).getTime()
-  )[0]
-  const isReturned = !territory.assigned_to && latestAssignment?.status === 'returned'
+  const latestFinishedAssignment = [...(territory.assignments || [])]
+    .filter(a => a.status !== 'active')
+    .sort((a, b) => {
+      const dateA = new Date(a.completed_at || a.returned_at || a.assigned_at).getTime()
+      const dateB = new Date(b.completed_at || b.returned_at || b.assigned_at).getTime()
+      if (dateA !== dateB) return dateB - dateA
+      return b.id.localeCompare(a.id) // Tie-breaker estável
+    })[0]
+
+  const isReturned = !territory.assigned_to && latestFinishedAssignment?.status === 'returned'
 
   // 3. Dias Designado: hoje - (assigned_at da designação ativa)
   if (territory.assigned_to) {
@@ -176,15 +182,15 @@ const FilterPill = ({ label, count, active, onClick, emoji }: any) => (
     className={cn(
       "whitespace-nowrap px-4 py-1.5 rounded-full text-[11px] font-black uppercase tracking-tight transition-all flex items-center gap-2 border shadow-sm",
       active
-        ? "bg-[#C65D3B] text-white border-[#C65D3B] shadow-md"
-        : "bg-white text-slate-500 border-slate-200 hover:border-slate-300"
+        ? "bg-primary text-primary-foreground border-primary shadow-md"
+        : "bg-card text-muted-foreground border-border hover:border-muted-foreground/30"
     )}
   >
     {emoji && <span>{emoji}</span>}
     {label}
     <span className={cn(
       "text-[9px] px-1.5 py-0.5 rounded-full font-black min-w-[18px]",
-      active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-400"
+      active ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"
     )}>
       {count}
     </span>
@@ -276,7 +282,7 @@ export function AdminTerritoriesView() {
             assigned_to_user:profiles!territories_assigned_to_fkey(id, name, email),
             campaign:campaigns(id, name),
             subdivisions(id, territory_id, completed, status, name),
-            assignments(id, assigned_at, status)
+            assignments(id, assigned_at, status, completed_at, returned_at)
           `)
           .abortSignal(signal)
           .order("number"),
@@ -446,8 +452,8 @@ export function AdminTerritoriesView() {
     const isLivre = !territory.assigned_to
 
     // Borda lateral e cor do texto baseadas na prioridade
-    let borderColor = "border-slate-100"
-    let daysColor = "text-slate-400"
+    let borderColor = "border-border"
+    let daysColor = "text-muted-foreground"
     if (isLivre) {
       if (p.daysInactive >= 30) {
         borderColor = "border-l-4 border-red-500"
@@ -456,7 +462,7 @@ export function AdminTerritoriesView() {
         borderColor = "border-l-4 border-yellow-400"
         daysColor = "text-yellow-600"
       } else {
-        borderColor = "border-l-4 border-slate-200"
+        borderColor = "border-l-4 border-border"
       }
     }
 
@@ -464,21 +470,21 @@ export function AdminTerritoriesView() {
       <div
         onClick={() => router.push(`/dashboard/territories/${territory.id}/map`)}
         className={cn(
-          "bg-white p-4 rounded-xl border-y border-r shadow-sm transition-all active:scale-[0.98] cursor-pointer hover:shadow-md h-full flex items-center justify-between gap-4",
+          "bg-card p-4 rounded-xl border-y border-r shadow-sm transition-all active:scale-[0.98] cursor-pointer hover:shadow-md h-full flex items-center justify-between gap-4",
           borderColor
         )}
       >
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-mono font-semibold text-slate-500">
+            <span className="text-xs font-mono font-semibold text-muted-foreground">
               [#{territory.number}]
             </span>
-            <h3 className="font-bold text-slate-900 truncate text-sm">
+            <h3 className="font-bold text-foreground truncate text-sm">
               {territory.name || "Sem nome"}
             </h3>
             {territory.group && (
-              <span 
-                className="w-2 h-2 rounded-full shrink-0 shadow-sm" 
+              <span
+                className="w-2 h-2 rounded-full shrink-0 shadow-sm"
                 style={{ backgroundColor: territory.group.color }}
                 title={`Grupo: ${territory.group.name}`}
               />
@@ -489,11 +495,11 @@ export function AdminTerritoriesView() {
             {isLivre ? (
               <div className="flex items-center gap-2">
                 {p.isReturned ? (
-                  <span className="bg-orange-50 text-orange-600 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight border border-orange-100">
+                  <span className="bg-warning/10 text-warning text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight border border-warning/20">
                     DEVOLVIDO
                   </span>
                 ) : (
-                  <span className="bg-emerald-50 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight border border-emerald-100">
+                  <span className="bg-success/10 text-success text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight border border-success/20">
                     LIVRE
                   </span>
                 )}
@@ -503,16 +509,16 @@ export function AdminTerritoriesView() {
               </div>
             ) : (
               <div className="flex items-center gap-1.5 min-w-0">
-                <span className="font-extrabold text-[#C65D3B] truncate max-w-[90px]">
+                <span className="font-extrabold text-primary truncate max-w-[90px]">
                   {territory.assigned_to_user?.name?.split(' ')[0]}
                 </span>
-                <span className="font-bold text-slate-400 shrink-0">
+                <span className="font-bold text-muted-foreground shrink-0">
                   ⌛ {p.daysAssigned}d
                 </span>
               </div>
             )}
             {territory.group && (
-              <div className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
+              <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground">
                 <Map className="h-3 w-3" />
                 {territory.group.name}
               </div>
@@ -524,7 +530,7 @@ export function AdminTerritoriesView() {
           <Button
             size="icon"
             variant="ghost"
-            className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+            className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
             onClick={(e) => {
               e.stopPropagation();
               handleOpenEdit(territory);
@@ -537,7 +543,7 @@ export function AdminTerritoriesView() {
             <Button
               size="icon"
               variant="ghost"
-              className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-400 hover:text-primary transition-colors"
+              className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-primary transition-colors"
               onClick={(e) => {
                 e.stopPropagation();
                 handleOpenAssignDialog(territory);
@@ -553,7 +559,7 @@ export function AdminTerritoriesView() {
 
   if (loading && priorityTerritories.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-slate-500">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-muted-foreground">
         <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
         <p>Carregando territórios...</p>
       </div>
@@ -562,11 +568,11 @@ export function AdminTerritoriesView() {
 
   if (errorMsg) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] bg-red-50/50 rounded-xl border border-red-100 text-red-700 max-w-lg mx-auto p-6 text-center">
-        <AlertTriangle className="h-12 w-12 text-red-500 mb-4" />
+      <div className="flex flex-col items-center justify-center min-h-[60vh] bg-destructive/10 rounded-xl border border-destructive/20 text-destructive max-w-lg mx-auto p-6 text-center">
+        <AlertTriangle className="h-12 w-12 text-destructive mb-4" />
         <h2 className="text-xl font-bold mb-2">Ops! Ocorreu um erro.</h2>
         <p className="text-sm">{errorMsg}</p>
-        <Button onClick={() => loadData()} variant="outline" className="mt-6">
+        <Button onClick={() => loadData()} variant="outline" className="mt-6 border-destructive/20 hover:bg-destructive/10">
           Tentar Novamente
         </Button>
       </div>
@@ -577,19 +583,19 @@ export function AdminTerritoriesView() {
     <div className="space-y-8 animate-in fade-in duration-500 pb-10">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Territórios</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <h1 className="text-2xl font-black uppercase tracking-tight text-foreground">Territórios</h1>
+          <p className="text-xs text-muted-foreground font-medium mt-1">
             Gestão inteligente das quadras e designações.
           </p>
         </div>
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <div className="relative flex-1 sm:w-64">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Buscar por nome ou Nº..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 bg-white border-slate-200"
+              className="pl-9 bg-card border-border"
             />
           </div>
           <Button asChild className="shrink-0 shadow-sm">
@@ -644,9 +650,9 @@ export function AdminTerritoriesView() {
         {/* Territory Grid */}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 min-h-[200px]">
           {filteredList.length === 0 ? (
-            <div className="py-20 text-center col-span-full bg-white rounded-2xl border border-dashed border-slate-200">
-              <MapPin className="h-10 w-10 text-slate-200 mx-auto mb-3" />
-              <p className="text-slate-400 font-medium">Nenhum território encontrado neste filtro.</p>
+            <div className="py-20 text-center col-span-full bg-card rounded-2xl border border-dashed border-border">
+              <MapPin className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
+              <p className="text-muted-foreground font-medium">Nenhum território encontrado neste filtro.</p>
             </div>
           ) : (
             filteredList.map((p) => <TerritoryCard key={p.territory.id} p={p} />)
@@ -669,11 +675,11 @@ export function AdminTerritoriesView() {
                 value={searchUser}
                 onChange={(e) => setSearchUser(e.target.value)}
               />
-              <div className="border rounded-md max-h-32 overflow-y-auto mt-1">
+              <div className="border border-border rounded-md max-h-32 overflow-y-auto mt-1 bg-muted/20">
                 {filteredUsers.map(u => (
                   <button
                     key={u.id}
-                    className={cn("w-full text-left p-2 hover:bg-slate-50", selectedUserId === u.id && "bg-slate-100")}
+                    className={cn("w-full text-left p-2 hover:bg-muted/50 border-b last:border-0 border-border/10", selectedUserId === u.id && "bg-muted")}
                     onClick={() => { setSelectedUserId(u.id); setSearchUser(u.name) }}
                   >
                     {u.name}
@@ -717,8 +723,8 @@ export function AdminTerritoriesView() {
               <div className="space-y-1">
                 <Label>Cor Padrão</Label>
                 <div className="flex gap-2 items-center">
-                  <Input type="color" value={editColor} onChange={e => setEditColor(e.target.value)} className="w-12 p-1 h-9" />
-                  <span className="text-xs text-slate-400 font-mono uppercase">{editColor}</span>
+                  <Input type="color" value={editColor} onChange={e => setEditColor(e.target.value)} className="w-12 p-1 h-9 bg-card border-border" />
+                  <span className="text-xs text-muted-foreground font-mono uppercase">{editColor}</span>
                 </div>
               </div>
             </div>
@@ -729,9 +735,9 @@ export function AdminTerritoriesView() {
             </div>
 
             <div className="space-y-1">
-              <Label className="text-[#C65D3B] font-bold">Grupo Responsável (Dom.)</Label>
-              <div className="p-3 border rounded-lg bg-orange-50/50 border-orange-100 space-y-3">
-                <p className="text-[11px] text-orange-800 leading-tight">
+              <Label className="text-primary font-bold">Grupo Responsável (Dom.)</Label>
+              <div className="p-3 border rounded-lg bg-primary/5 border-primary/20 space-y-3">
+                <p className="text-[11px] text-primary leading-tight font-medium">
                   No domingo, o território será atribuído automaticamente a este grupo.
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -740,9 +746,9 @@ export function AdminTerritoriesView() {
                     onClick={() => setEditGroupId(null)}
                     className={cn(
                       "px-3 py-1.5 rounded-full text-xs font-bold transition-all border",
-                      !editGroupId 
-                        ? "bg-white border-slate-400 text-slate-900 shadow-sm" 
-                        : "bg-slate-50 border-transparent text-slate-400 hover:bg-slate-100"
+                      !editGroupId
+                        ? "bg-card border-border text-foreground shadow-sm"
+                        : "bg-muted/50 border-transparent text-muted-foreground hover:bg-muted"
                     )}
                   >
                     Nenhum
@@ -755,10 +761,10 @@ export function AdminTerritoriesView() {
                       className={cn(
                         "px-3 py-1.5 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5",
                         editGroupId === g.id
-                          ? "bg-white shadow-sm ring-1 ring-offset-1"
+                          ? "bg-background shadow-sm ring-1 ring-offset-1"
                           : "opacity-60 grayscale hover:grayscale-0 hover:opacity-100"
                       )}
-                      style={{ 
+                      style={{
                         borderColor: editGroupId === g.id ? g.color : "transparent",
                         color: editGroupId === g.id ? g.color : "inherit",
                         backgroundColor: editGroupId === g.id ? `${g.color}10` : ""
@@ -771,8 +777,8 @@ export function AdminTerritoriesView() {
                 </div>
               </div>
             </div>
-            
-            <div className="flex items-center justify-between p-3 border rounded-md bg-slate-50">
+
+            <div className="flex items-center justify-between p-3 border rounded-md bg-muted/30">
               <div className="space-y-0.5">
                 <Label className="text-sm font-medium">Território Ativo</Label>
                 <p className="text-xs text-muted-foreground">Desative para ocultar das listas de designação.</p>

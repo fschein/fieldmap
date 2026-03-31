@@ -33,12 +33,13 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, UserPlus, Pencil, Trash2, Mail, Phone, ShieldAlert, Lock, Copy, RefreshCw, CheckCircle2, UserCheck, UserMinus } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
+import { cn } from "@/lib/utils"
 
 interface UserProfile {
   id: string
   name: string
   email: string
-  role: "admin" | "dirigente" | "publicador"
+  role: "admin" | "dirigente" | "publicador" | "supervisor"
   phone: string | null
   group_id?: string | null
   groups?: { name: string } | null
@@ -90,7 +91,7 @@ export default function UsersPage() {
   const [formData, setFormData] = useState<{
     name: string
     email: string
-    role: "admin" | "dirigente" | "publicador"
+    role: "admin" | "dirigente" | "publicador" | "supervisor"
     phone: string
     gender: "M" | "F"
     groupId: string
@@ -255,7 +256,7 @@ export default function UsersPage() {
   if (!isReady) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary/30" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
   }
@@ -274,17 +275,17 @@ export default function UsersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Usuários</h1>
-          <p className="text-sm text-muted-foreground">Controle de acesso e contatos.</p>
+          <h1 className="text-2xl font-black uppercase tracking-tight text-foreground">Usuários</h1>
+          <p className="text-xs text-muted-foreground font-medium mt-1">Controle de acesso, níveis de permissão e contatos.</p>
         </div>
         <Button onClick={() => handleOpenDialog()}>
           <UserPlus className="mr-2 h-4 w-4" /> Criar Usuário
         </Button>
       </div>
 
-      <div className="border rounded-sm bg-white overflow-hidden shadow-sm">
+      <div className="border border-border rounded-sm bg-card overflow-hidden shadow-sm">
         <Table>
-          <TableHeader className="bg-slate-50">
+          <TableHeader className="bg-muted">
             <TableRow>
               <TableHead className="w-[200px]">Nome</TableHead>
               <TableHead>Contato</TableHead>
@@ -297,29 +298,32 @@ export default function UsersPage() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-10">
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-slate-200" />
+                <TableCell colSpan={6} className="text-center py-10">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted" />
                 </TableCell>
               </TableRow>
             ) : users.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-10 text-slate-400 italic">Nenhum usuário cadastrado.</TableCell>
+                <TableCell colSpan={6} className="text-center py-10 text-muted-foreground italic">Nenhum usuário cadastrado.</TableCell>
               </TableRow>
             ) : (
               users.map((u) => (
-                 <TableRow key={u.id} className="hover:bg-slate-50/50 cursor-pointer transition-colors" onClick={() => handleOpenDialog(u)}>
-                   <TableCell className="font-medium text-slate-700">
+                 <TableRow key={u.id} className="hover:bg-muted/50 cursor-pointer transition-colors" onClick={() => handleOpenDialog(u)}>
+                   <TableCell className="font-medium text-foreground">
                      <div className="flex items-center gap-2">
                        <span
-                         className={`w-2 h-2 rounded-full ${u.is_active === false ? "bg-slate-300" : (u.gender === "F" ? "bg-pink-400" : "bg-blue-400")}`}
+                         className={cn(
+                           "w-2 h-2 rounded-full",
+                           u.is_active === false ? "bg-muted-foreground/30" : (u.gender === "F" ? "bg-pink-500" : "bg-primary")
+                         )}
                          title={u.is_active === false ? "Inativo" : (u.gender === "F" ? "Irmã" : "Irmão")}
                        />
-                       <span className={u.is_active === false ? "text-slate-400" : ""}>{u.name}</span>
+                       <span className={u.is_active === false ? "text-muted-foreground" : ""}>{u.name}</span>
                        {u.is_active === false && <Badge variant="secondary" className="text-[9px] h-4 px-1">Inativo</Badge>}
                      </div>
                    </TableCell>
                    <TableCell className={u.is_active === false ? "opacity-50" : ""}>
-                     <div className="flex flex-col gap-1 text-[11px] text-slate-500">
+                     <div className="flex flex-col gap-1 text-[11px] text-muted-foreground">
                        <div className="flex items-center gap-1.5"><Mail className="h-3 w-3" /> {u.email}</div>
                        {u.phone && <div className="flex items-center gap-1.5"><Phone className="h-3 w-3" /> {u.phone}</div>}
                      </div>
@@ -330,7 +334,7 @@ export default function UsersPage() {
                          {u.groups.name}
                        </Badge>
                      ) : (
-                       <span className="text-[10px] text-slate-300 italic">Sem grupo</span>
+                       <span className="text-[10px] text-muted-foreground italic">Sem grupo</span>
                      )}
                    </TableCell>
                    <TableCell className={u.is_active === false ? "opacity-50" : ""}>
@@ -339,7 +343,7 @@ export default function UsersPage() {
                      </Badge>
                    </TableCell>
                    <TableCell className={u.is_active === false ? "opacity-50" : ""}>
-                     <span className="text-[11px] text-slate-500 italic">
+                     <span className="text-[11px] text-muted-foreground italic">
                        {u.last_seen_at ? new Date(u.last_seen_at).toLocaleString('pt-BR', {
                          day: '2-digit',
                          month: '2-digit',
@@ -401,6 +405,7 @@ export default function UsersPage() {
                     <SelectContent>
                       <SelectItem value="publicador">Publicador</SelectItem>
                       <SelectItem value="dirigente">Dirigente</SelectItem>
+                      <SelectItem value="supervisor">Supervisor</SelectItem>
                       <SelectItem value="admin">Administrador</SelectItem>
                     </SelectContent>
                   </Select>
@@ -420,7 +425,7 @@ export default function UsersPage() {
               </div>
 
               {editingUser && (
-                <div className="flex items-center justify-between p-3 border rounded-md bg-slate-50">
+                <div className="flex items-center justify-between p-3 border rounded-md bg-muted/30">
                   <div className="space-y-0.5">
                     <Label className="text-sm font-medium">Status do Usuário</Label>
                     <p className="text-xs text-muted-foreground">
@@ -428,7 +433,7 @@ export default function UsersPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{formData.isActive ? "Ativo" : "Inativo"}</span>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{formData.isActive ? "Ativo" : "Inativo"}</span>
                     <Switch 
                       checked={formData.isActive} 
                       onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })} 
@@ -438,18 +443,18 @@ export default function UsersPage() {
               )}
 
               {editingUser && (
-                <div className="bg-orange-50 p-3 rounded-md border border-orange-100 flex items-center justify-between">
+                <div className="bg-primary/5 p-3 rounded-md border border-primary/20 flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label className="text-xs text-orange-900 font-bold flex items-center gap-1.5">
+                    <Label className="text-xs text-primary font-bold flex items-center gap-1.5">
                       <Lock className="h-3 w-3" /> Segurança
                     </Label>
-                    <p className="text-[10px] text-orange-700">Redefinir acesso do usuário.</p>
+                    <p className="text-[10px] text-primary/70">Redefinir acesso do usuário.</p>
                   </div>
                   <Button 
                     type="button" 
                     variant="outline" 
                     size="sm" 
-                    className="h-8 text-[11px] border-orange-200 text-orange-600 hover:bg-orange-100"
+                    className="h-8 text-[11px] border-primary/30 text-primary hover:bg-primary/10"
                     onClick={() => handleOpenResetDialog(editingUser)}
                   >
                     Redefinir Senha
@@ -458,10 +463,10 @@ export default function UsersPage() {
               )}
 
               {!editingUser && (
-                <div className="space-y-1 bg-amber-50 p-3 rounded-md border border-amber-100">
-                  <Label className="text-xs text-amber-900 font-bold">Senha Temporária</Label>
+                <div className="space-y-1 bg-yellow-500/10 p-3 rounded-md border border-yellow-500/20">
+                  <Label className="text-xs text-foreground font-bold italic">Senha Temporária</Label>
                   <div className="flex items-center gap-2">
-                    <Input readOnly value={formData.password} className="bg-white font-mono text-sm" />
+                    <Input readOnly value={formData.password} className="bg-card font-mono text-sm border-border" />
                     <Button type="button" size="sm" variant="outline" onClick={() => setFormData({ ...formData, password: generateTempPassword() })}>
                       <RefreshCw className="h-3.5 w-3.5" />
                     </Button>
@@ -469,7 +474,7 @@ export default function UsersPage() {
                       <Copy className="h-3.5 w-3.5" />
                     </Button>
                   </div>
-                  <p className="text-[10px] text-amber-700 mt-1">Copie esta senha e envie ao usuário. Ele deverá trocá-la no primeiro acesso.</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">Copie esta senha e envie ao usuário. Ele deverá trocá-la no primeiro acesso.</p>
                 </div>
               )}
             </div>
@@ -488,7 +493,7 @@ export default function UsersPage() {
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Lock className="h-4 w-4 text-orange-500" />
+              <Lock className="h-4 w-4 text-primary" />
               Redefinir Senha
             </DialogTitle>
             <DialogDescription>
@@ -518,7 +523,7 @@ export default function UsersPage() {
             <Button
               type="button"
               variant={isCopied ? "default" : "outline"}
-              className={`w-full transition-colors ${isCopied ? "bg-green-600 text-white" : ""}`}
+              className={cn("w-full transition-colors", isCopied && "bg-emerald-600 text-white")}
               onClick={handleCopy}
             >
               {isCopied ? (
@@ -542,7 +547,7 @@ export default function UsersPage() {
             <Button
               onClick={handleConfirmReset}
               disabled={isResetting}
-              className="w-full sm:w-auto bg-orange-600 hover:bg-orange-700 text-white"
+              className="w-full sm:w-auto bg-primary text-primary-foreground"
             >
               {isResetting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmar e Aplicar"}
             </Button>

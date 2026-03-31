@@ -46,10 +46,11 @@ export default function TerritoryMapViewer({
     // Remover a bandeira da Ucrânia do prefixo padrão do Leaflet
     map.attributionControl.setPrefix('<a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a>')
 
-    // Adicionar camada de tiles
+    // Adicionar camada de tiles com filtro para dark mode
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: '© OpenStreetMap contributors',
       maxZoom: 19,
+      className: 'map-tiles-theme' // Filtro via CSS
     }).addTo(map)
 
     mapRef.current = map
@@ -259,14 +260,14 @@ export default function TerritoryMapViewer({
       {pinMode && (
         <>
           <div className="absolute top-[calc(50%-16px)] left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none drop-shadow-md">
-            <MapPinOff className="w-8 h-8 text-red-600 animate-bounce" />
-            <div className="w-2 h-2 bg-red-600 rounded-full mx-auto mt-1 opacity-70"></div>
+            <MapPinOff className="w-8 h-8 text-destructive animate-bounce" />
+            <div className="w-2 h-2 bg-destructive rounded-full mx-auto mt-1 opacity-70"></div>
           </div>
           
           <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] drop-shadow-lg flex flex-col gap-2 w-[85%] max-w-xs">
             <Button 
               size="lg"
-              className="bg-red-600 hover:bg-red-700 text-white font-bold h-12 w-full shadow-md"
+              className="bg-destructive hover:bg-destructive/90 text-white font-bold h-12 w-full shadow-md"
               onClick={() => {
                 if (mapRef.current && onPinConfirm) {
                   onPinConfirm(mapRef.current.getCenter())
@@ -278,31 +279,31 @@ export default function TerritoryMapViewer({
             <Button 
               size="lg"
               variant="secondary" 
-              className="h-12 w-full bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 font-semibold shadow-md"
+              className="h-12 w-full bg-card text-foreground border border-border hover:bg-accent font-semibold shadow-md"
               onClick={onPinCancel}
             >
               Cancelar
             </Button>
           </div>
           
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-white/95 px-4 py-2 rounded-full shadow-md border text-sm font-medium text-slate-800 flex items-center gap-2 whitespace-nowrap">
-            <MapPinOff className="w-4 h-4 text-red-600" />
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-card/95 px-4 py-2 rounded-full shadow-md border border-border text-sm font-medium text-foreground flex items-center gap-2 whitespace-nowrap">
+            <MapPinOff className="w-4 h-4 text-destructive" />
             Mova o mapa para apontar o local
           </div>
         </>
       )}
 
       {!pinMode && (
-        <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm rounded-lg shadow-lg p-3 z-[900] border border-slate-200 hidden sm:block">
-          <h3 className="text-xs font-bold mb-2 text-slate-800 uppercase tracking-wider">Legenda</h3>
+        <div className="absolute top-4 right-4 bg-card/90 backdrop-blur-sm rounded-lg shadow-lg p-3 z-[900] border border-border hidden sm:block">
+          <h3 className="text-xs font-bold mb-2 text-foreground uppercase tracking-wider">Legenda</h3>
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded border border-slate-300" style={{ backgroundColor: territory.color || "#3b82f6", opacity: 0.5 }} />
-              <span className="text-[10px] font-bold text-slate-600 uppercase">Pendente</span>
+              <div className="w-3 h-3 rounded border border-border" style={{ backgroundColor: territory.color || "hsl(var(--primary))", opacity: 0.5 }} />
+              <span className="text-[10px] font-bold text-muted-foreground uppercase">Pendente</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded border border-green-600 bg-green-500 opacity-60" />
-              <span className="text-[10px] font-bold text-slate-600 uppercase">Concluída</span>
+              <span className="text-[10px] font-bold text-foreground/70 uppercase">Concluída</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full border border-red-700 bg-red-600 opacity-80" />
@@ -317,7 +318,7 @@ export default function TerritoryMapViewer({
           <Button
             size="icon"
             variant="secondary"
-            className="h-11 w-11 bg-white shadow-xl border border-slate-200 rounded-full hover:bg-slate-50 text-slate-700"
+            className="h-11 w-11 bg-card shadow-xl border border-border rounded-full hover:bg-accent text-foreground"
             onClick={() => {
               if (mapRef.current && polygonsRef.current) {
                 mapRef.current.fitBounds(polygonsRef.current.getBounds(), { padding: [50, 50] })
@@ -329,7 +330,7 @@ export default function TerritoryMapViewer({
           <Button
             size="icon"
             variant="secondary"
-            className="h-11 w-11 bg-white shadow-xl border border-slate-200 rounded-full hover:bg-slate-50 text-slate-700"
+            className="h-11 w-11 bg-card shadow-xl border border-border rounded-full hover:bg-accent text-foreground"
             onClick={() => {
               if (mapRef.current && userMarkerRef.current) {
                 mapRef.current.setView(userMarkerRef.current.getLatLng(), 17)
@@ -349,33 +350,39 @@ export default function TerritoryMapViewer({
 
       <style jsx global>{`
         .leaflet-container {
-          background: #f8fafc;
+          background: transparent;
           z-index: 0 !important;
         }
 
+        .map-tiles-theme {
+          filter: var(--map-filter, none);
+        }
+
         .subdivision-tooltip-pill {
-          background: rgba(255, 255, 255, 0.95) !important;
+          background: var(--card) !important;
           backdrop-filter: blur(4px) !important;
-          border: 1px solid rgba(0, 0, 0, 0.1) !important;
+          border: 1px solid var(--border) !important;
           border-radius: 999px !important;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
-          color: #1e293b !important;
-          font-size: 11px !important;
-          font-weight: 800 !important;
-          padding: 3px 10px !important;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4) !important;
+          color: var(--foreground) !important;
+          font-size: 12px !important;
+          font-weight: 900 !important;
+          padding: 4px 12px !important;
           white-space: nowrap !important;
           pointer-events: auto !important;
           cursor: pointer !important;
           transition: all 0.2s ease !important;
+          text-shadow: 0 1px 1px rgba(0,0,0,0.1);
         }
 
         .dnv-tooltip {
-          background: white !important;
-          border: 1px solid #fee2e2 !important;
+          background: hsl(var(--card)) !important;
+          border: 1px solid hsl(var(--destructive) / 0.2) !important;
           border-radius: 8px !important;
-          box-shadow: 0 4px 12px rgba(220, 38, 38, 0.1) !important;
+          box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2) !important;
           padding: 8px 12px !important;
           z-index: 1000 !important;
+          color: hsl(var(--foreground)) !important;
         }
         
         .leaflet-tooltip-center::before {
@@ -385,10 +392,10 @@ export default function TerritoryMapViewer({
         .pulse-dot {
           width: 14px;
           height: 14px;
-          background-color: #2563eb;
+          background-color: hsl(var(--primary));
           border-radius: 50%;
-          border: 2px solid white;
-          box-shadow: 0 0 0 rgba(37, 99, 235, 0.4);
+          border: 2px solid hsl(var(--background));
+          box-shadow: 0 0 0 rgba(var(--primary), 0.4);
           animation: pulse 2s infinite;
         }
         @keyframes pulse {

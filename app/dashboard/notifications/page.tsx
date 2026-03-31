@@ -21,12 +21,12 @@ interface Notification {
 }
 
 const TYPE_CONFIG: Record<Notification["type"], { icon: React.ElementType; bg: string; color: string }> = {
-  request: { icon: MapPin, bg: "bg-[#FAECE7]", color: "text-[#712B13]" },
-  returned: { icon: RotateCcw, bg: "bg-slate-100", color: "text-slate-500" },
-  idle: { icon: Clock, bg: "bg-yellow-50", color: "text-yellow-700" },
-  assigned: { icon: CheckCircle2, bg: "bg-green-50", color: "text-green-600" },
-  completed: { icon: CheckCircle2, bg: "bg-green-50", color: "text-green-600" },
-  overdue: { icon: AlertTriangle, bg: "bg-red-50", color: "text-red-600" },
+  request: { icon: MapPin, bg: "bg-primary/10", color: "text-primary" },
+  returned: { icon: RotateCcw, bg: "bg-muted", color: "text-muted-foreground" },
+  idle: { icon: Clock, bg: "bg-yellow-500/10", color: "text-yellow-600" },
+  assigned: { icon: CheckCircle2, bg: "bg-emerald-500/10", color: "text-emerald-500" },
+  completed: { icon: CheckCircle2, bg: "bg-emerald-500/10", color: "text-emerald-500" },
+  overdue: { icon: AlertTriangle, bg: "bg-red-500/10", color: "text-red-500" },
 }
 
 export default function NotificationsPage() {
@@ -102,15 +102,15 @@ export default function NotificationsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-300" />
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/30" />
       </div>
     )
   }
 
   if (notifications.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-3 text-slate-400">
-        <BellOff className="h-9 w-9" />
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-3 text-muted-foreground">
+        <BellOff className="h-9 w-9 opacity-20" />
         <p className="text-sm">Nenhuma notificação por enquanto</p>
       </div>
     )
@@ -121,12 +121,12 @@ export default function NotificationsPage() {
 
   return (
     <div className="space-y-5 px-4 pt-4 pb-24 max-w-2xl mx-auto">
-      <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Notificações</h1>
+      <h1 className="text-xl font-extrabold text-foreground tracking-tight">Notificações</h1>
 
       {/* Não lidos */}
       {unread.length > 0 && (
         <section className="space-y-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Não lidos · {unread.length}
           </p>
           <NotificationList items={unread} />
@@ -136,7 +136,7 @@ export default function NotificationsPage() {
       {/* Anteriores */}
       {read.length > 0 && (
         <section className="space-y-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Anteriores
           </p>
           <NotificationList items={read} muted />
@@ -148,7 +148,7 @@ export default function NotificationsPage() {
 
 function NotificationList({ items, muted = false }: { items: Notification[]; muted?: boolean }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
+    <div className="bg-card rounded-xl border border-border divide-y divide-border/50">
       {items.map((notif) => {
         const config = TYPE_CONFIG[notif.type] ?? TYPE_CONFIG.request
         const Icon = config.icon
@@ -168,16 +168,16 @@ function NotificationList({ items, muted = false }: { items: Notification[]; mut
 
             {/* Texto */}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-slate-800 leading-snug">{notif.title}</p>
-              <p className="text-[12px] text-slate-500 mt-0.5 leading-snug">{notif.message}</p>
-              <p className="text-[11px] text-slate-400 mt-1">
+              <p className="text-sm font-medium text-foreground leading-snug">{notif.title}</p>
+              <p className="text-[12px] text-muted-foreground mt-0.5 leading-snug">{notif.message}</p>
+              <p className="text-[11px] text-muted-foreground/60 mt-1">
                 {formatDistanceToNow(new Date(notif.created_at), { addSuffix: true, locale: ptBR })}
               </p>
             </div>
 
             {/* Dot não lido */}
             {!notif.read && (
-              <div className="w-2 h-2 rounded-full bg-[#C65D3B] flex-shrink-0 mt-1.5" />
+              <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-1.5" />
             )}
           </div>
         )

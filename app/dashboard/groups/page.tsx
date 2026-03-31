@@ -194,9 +194,9 @@ export default function GroupsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Grupos</h1>
-          <p className="text-muted-foreground">
-            Organize territórios em grupos com cores
+          <h1 className="text-2xl font-black uppercase tracking-tight text-foreground">Grupos</h1>
+          <p className="text-xs text-muted-foreground font-medium mt-1">
+            Organize territórios em grupos com cores exclusivas.
           </p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

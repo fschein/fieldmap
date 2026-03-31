@@ -100,13 +100,13 @@ export function PushSubscriptionManager() {
   if (!isSupported || !user) return null
 
   return (
-    <div className="flex items-center gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg shadow-sm mb-4">
+    <div className="flex items-center gap-2 p-2 bg-muted/50 border border-border rounded-lg shadow-sm mb-4">
       <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
         {subscription ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-bold text-slate-800">Notificações no Celular</p>
-        <p className="text-[10px] text-slate-500 truncate">
+        <p className="text-xs font-bold text-foreground">Notificações no Celular</p>
+        <p className="text-[10px] text-muted-foreground truncate">
           {subscription ? "Você receberá notificações sobre seus territórios" : "Ative para receber notificações em tempo real"}
         </p>
       </div>

@@ -23,8 +23,8 @@ const TerritoryMapViewer = dynamic(
 
 function MapLoadingSkeleton() {
   return (
-    <div className="w-full h-[calc(100vh-12rem)] bg-slate-100 rounded-lg flex items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+    <div className="w-full h-[calc(100vh-12rem)] bg-muted rounded-lg flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/30" />
     </div>
   )
 }
@@ -280,16 +280,16 @@ export default function TerritoryMapPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     )
   }
 
   if (!territory) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-        <MapPin className="h-12 w-12 text-slate-400" />
-        <p className="text-slate-500">Território não encontrado</p>
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4 text-center">
+        <MapPin className="h-12 w-12 text-muted-foreground/20" />
+        <p className="text-muted-foreground">Território não encontrado</p>
         <Button onClick={() => router.push("/dashboard/my-assignments")}>
           Voltar
         </Button>
@@ -305,32 +305,32 @@ export default function TerritoryMapPage() {
   const isFullyCompleted = progress === 100
 
   return (
-    <div className="flex flex-col bg-slate-50 overflow-hidden relative" style={{ height: '100dvh' }}>
+    <div className="flex flex-col bg-background overflow-hidden relative" style={{ height: '100dvh' }}>
       {/* Header Fixo Sólido (Mobile) / Flutuante (Desktop) */}
-      <div className="absolute top-0 left-0 right-0 h-16 z-[40] bg-white/95 backdrop-blur-sm shadow-sm flex items-center justify-between px-2 md:relative md:h-auto md:bg-transparent md:shadow-none md:px-4 md:pt-4">
+      <div className="absolute top-0 left-0 right-0 h-16 z-[40] bg-card/95 backdrop-blur-sm shadow-sm flex items-center justify-between px-2 md:relative md:h-auto md:bg-transparent md:shadow-none md:px-4 md:pt-4">
         <div className="flex items-center gap-2 overflow-hidden">
           <Button
             variant="ghost"
             size="icon"
-            className="h-10 w-10 text-slate-600 hover:text-slate-900 rounded-full hover:bg-slate-100 transition-colors"
+            className="h-10 w-10 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors"
             onClick={() => router.push("/dashboard/my-assignments")}
             title="Voltar"
           >
             <ArrowLeft className="h-6 w-6" />
           </Button>
-          <div className="flex items-center gap-2 min-w-0 md:bg-white/95 md:backdrop-blur-sm md:px-3 md:py-1.5 md:rounded-full md:shadow-sm md:border md:border-slate-200">
+          <div className="flex items-center gap-2 min-w-0 md:bg-card/95 md:backdrop-blur-sm md:px-3 md:py-1.5 md:rounded-full md:shadow-sm md:border md:border-border">
             <div
-              className="w-3 h-3 rounded-full ring-2 ring-slate-100 flex-shrink-0"
+              className="w-3 h-3 rounded-full ring-2 ring-muted flex-shrink-0"
               style={{ backgroundColor: territory.color }}
             />
-            <h1 className="text-sm sm:text-base font-bold leading-tight truncate text-slate-800">
+            <h1 className="text-sm sm:text-base font-bold leading-tight truncate text-foreground">
               Território {territory.number}
             </h1>
           </div>
         </div>
 
         <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-          <div className="text-slate-700 font-bold md:bg-white/95 md:backdrop-blur-sm md:border md:border-slate-200 md:px-3 md:py-1.5 md:rounded-full text-sm md:shadow-sm">
+          <div className="text-foreground font-bold md:bg-card/95 md:backdrop-blur-sm md:border md:border-border md:px-3 md:py-1.5 md:rounded-full text-sm md:shadow-sm">
             {progress}%
           </div>
         </div>
@@ -338,7 +338,7 @@ export default function TerritoryMapPage() {
 
       <div className="flex flex-col flex-1 min-h-0 pt-16 md:pt-4 relative w-full">
         {/* Mapa */}
-        <div className={`flex-1 min-h-0 shrink-0 border-y-0 md:border md:rounded-xl overflow-hidden shadow-sm relative z-0 ${pinMode ? 'border-red-500 ring-inset ring-4 ring-red-500/30 cursor-crosshair' : 'border-slate-200'}`}>
+        <div className={`flex-1 min-h-0 shrink-0 border-y-0 md:border md:rounded-xl overflow-hidden shadow-sm relative z-0 ${pinMode ? 'border-destructive ring-inset ring-4 ring-destructive/30 cursor-crosshair' : 'border-border'}`}>
           <TerritoryMapViewer
             territory={territory}
             onSubdivisionClick={handleSubdivisionClick}
@@ -362,10 +362,10 @@ export default function TerritoryMapPage() {
         </div>
 
         {/* Botões Bottom/Native Bar */}
-        <div className="flex gap-2 p-4 pb-6 md:pb-4 bg-white shadow-[0_-10px_30px_rgba(0,0,0,0.05)] z-[40] relative shrink-0">
+        <div className="flex gap-2 p-4 pb-6 md:pb-4 bg-card shadow-[0_-10px_30px_rgba(0,0,0,0.1)] z-[40] relative shrink-0">
           <Button
             variant="outline"
-            className={`flex-1 min-h-[48px] border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 font-bold rounded-xl ${pinMode ? 'bg-red-50 animate-pulse' : 'bg-white'}`}
+            className={`flex-1 min-h-[48px] border-destructive/20 text-destructive hover:bg-destructive/10 font-bold rounded-xl ${pinMode ? 'bg-destructive/10 animate-pulse outline-none ring-2 ring-destructive' : ''}`}
             onClick={handleAddDnvClick}
             disabled={pinMode}
           >
@@ -374,8 +374,8 @@ export default function TerritoryMapPage() {
           </Button>
           <Button
             className={`flex-1 min-h-[48px] text-white font-bold shadow-sm rounded-xl ${isFullyCompleted
-                ? 'bg-green-600 hover:bg-green-700'
-                : 'bg-orange-600 hover:bg-orange-700 active:scale-[0.98]'
+                ? 'bg-emerald-600 hover:bg-emerald-700'
+                : 'bg-primary hover:bg-primary/90 active:scale-[0.98]'
               }`}
             onClick={() => setShowCompleteDialog(true)}
           >

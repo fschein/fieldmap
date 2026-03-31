@@ -54,11 +54,11 @@ const STATUS_LABELS: Record<string, string> = {
 }
 
 const STATUS_CLASS: Record<string, string> = {
-  available: "bg-amber-100 text-amber-700 border-amber-200",
-  completed: "bg-emerald-100 text-emerald-700 border-emerald-200 font-bold",
-  assigned: "bg-blue-100 text-blue-700 border-blue-200",
-  active: "bg-blue-100 text-blue-700 border-blue-200",
-  overdue: "bg-red-100 text-red-700 border-red-300 font-bold",
+  available: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-500 dark:border-amber-500/20",
+  completed: "bg-emerald-100 text-emerald-700 border-emerald-200 font-bold dark:bg-emerald-500/10 dark:text-emerald-500 dark:border-emerald-500/20",
+  assigned: "bg-primary/10 text-primary border-primary/20",
+  active: "bg-primary/10 text-primary border-primary/20",
+  overdue: "bg-red-50 text-red-700 border-red-200 font-bold dark:bg-red-500/10 dark:text-red-500 dark:border-red-500/20",
 }
 
 export default function AssignmentsPage() {
@@ -96,13 +96,16 @@ export default function AssignmentsPage() {
 
       if (terrErr) throw new Error(`Territories: ${terrErr.message}`)
 
-      // Fetch profiles manually to avoid fkey errors
       const { data: profilesData } = await supabase.from("profiles").select("id, name")
-      const profilesMap = new Map(profilesData?.map((p: any) => [p.id, p.name]) || [])
+      const { data: groupsData } = await supabase.from("groups").select("id, name")
+      
+      const namesMap = new Map()
+      profilesData?.forEach((p: any) => namesMap.set(p.id, p.name))
+      groupsData?.forEach((g: any) => namesMap.set(g.id, g.name))
 
       const { data: assignments, error: assErr } = await supabase
         .from("assignments")
-        .select(`id, status, assigned_at, completed_at, returned_at, territory_id, user_id`)
+        .select(`id, status, assigned_at, completed_at, returned_at, territory_id, user_id, group_id`)
         .order("assigned_at", { ascending: false })
 
       if (assErr) throw new Error(`Assignments: ${assErr.message}`)
@@ -118,7 +121,7 @@ export default function AssignmentsPage() {
 
       const assignmentsWithProfiles = (assignments || []).map((a: any) => ({
         ...a,
-        publisherName: profilesMap.get(a.user_id) || "Desconhecido"
+        publisherName: namesMap.get(a.user_id) || namesMap.get(a.group_id) || "Desconhecido"
       }))
 
       setRawTerritories(territories || [])
@@ -174,7 +177,10 @@ export default function AssignmentsPage() {
       let status: 'available' | 'active' | 'overdue' | 'inactive' | 'completed' = t.status || 'available'
 
       if (status !== 'inactive') {
-        if (activeAssig && activeAssig.user_id === t.assigned_to) {
+        const isAssignedToMe = activeAssig && activeAssig.user_id === t.assigned_to
+        const isAssignedToMyGroup = activeAssig && activeAssig.group_id && !t.assigned_to
+        
+        if (isAssignedToMe || isAssignedToMyGroup) {
           const start = new Date(activeAssig.assigned_at).getTime()
           daysInField = Math.ceil((now.getTime() - start) / (1000 * 60 * 60 * 24))
           status = daysInField > 90 ? 'overdue' : 'active'
@@ -307,8 +313,8 @@ export default function AssignmentsPage() {
       <div className="print:hidden space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Designações</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <h1 className="text-2xl font-black uppercase tracking-tight text-foreground">Designações</h1>
+            <p className="text-xs text-muted-foreground font-medium mt-1">
               {stats.active} em campo &bull; {stats.overdue} atrasados &bull; {stats.available} devolvidos &bull; {stats.completed} livres
             </p>
           </div>
@@ -319,7 +325,7 @@ export default function AssignmentsPage() {
                 <span className="hidden sm:inline">Designar</span>
               </Button>
             )}
-            <Button variant="outline" className="gap-2 bg-white" onClick={() => window.print()}>
+            <Button variant="outline" className="gap-2 bg-card" onClick={() => window.print()}>
               <Download className="w-4 h-4" />
               <span className="hidden sm:inline">Imprimir PDF</span>
             </Button>
@@ -338,24 +344,24 @@ export default function AssignmentsPage() {
                         <Calendar className="w-4 h-4 text-primary" />
                       </div>
                       <div>
-                        <p className="font-semibold text-slate-900 leading-tight">
+                        <p className="font-semibold text-foreground leading-tight">
                           Campanha: {campaigns.find(c => c.id === campaignFilter)?.name}
                         </p>
-                        <p className="text-xs text-slate-500">Acompanhamento de progresso geral</p>
+                        <p className="text-xs text-muted-foreground">Acompanhamento de progresso geral</p>
                       </div>
                     </div>
                     <div className="text-right">
                       <p className="font-bold text-primary">
                         {Math.round((data.filter(t => t.campaignId === campaignFilter && t.status === 'available').length / (data.length || 1)) * 100)}%
                       </p>
-                      <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Concluído</p>
+                      <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Concluído</p>
                     </div>
                   </div>
                   <Progress 
                     value={(data.filter(t => t.campaignId === campaignFilter && t.status === 'available').length / (data.length || 1)) * 100} 
-                    className="h-2 bg-slate-200"
+                    className="h-2 bg-muted"
                   />
-                  <div className="flex justify-between items-center text-[10px] text-slate-400 font-medium">
+                  <div className="flex justify-between items-center text-[10px] text-muted-foreground font-medium">
                     <span>{data.filter(t => t.campaignId === campaignFilter && t.status === 'available').length} concluídos</span>
                     <span>{data.length - data.filter(t => t.campaignId === campaignFilter && t.status === 'available').length} faltantes</span>
                   </div>
@@ -365,7 +371,7 @@ export default function AssignmentsPage() {
                     variant={showOnlyRemaining ? "default" : "outline"}
                     size="sm"
                     onClick={() => setShowOnlyRemaining(!showOnlyRemaining)}
-                    className={`gap-2 h-9 px-4 rounded-lg transition-all ${showOnlyRemaining ? 'shadow-md shadow-primary/20' : 'bg-white'}`}
+                    className={`gap-2 h-9 px-4 rounded-lg transition-all ${showOnlyRemaining ? 'shadow-md shadow-primary/20' : 'bg-card'}`}
                   >
                     {showOnlyRemaining ? <Filter className="w-3.5 h-3.5" /> : <CheckSquare className="w-3.5 h-3.5" />}
                     {showOnlyRemaining ? "Mostrando faltantes" : "Filtrar por faltantes"}
@@ -377,20 +383,20 @@ export default function AssignmentsPage() {
         )}
 
         {/* Filter Bar */}
-        <div className="bg-slate-50 border rounded-xl p-3 flex flex-col md:flex-row items-center gap-3">
+        <div className="bg-muted border rounded-xl p-3 flex flex-col md:flex-row items-center gap-3">
           <div className="relative w-full md:max-w-[300px] xl:max-w-sm flex-shrink-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Buscar território ou publicador..."
-              className="pl-9 bg-white border-slate-200 w-full"
+              className="pl-9 bg-card border-border w-full"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
           <div className="flex flex-wrap flex-1 w-full justify-start md:justify-end gap-2.5">
             <Select value={periodFilter} onValueChange={(v: PeriodFilter) => setPeriodFilter(v)}>
-              <SelectTrigger className="w-full sm:w-auto sm:min-w-[160px] flex-1 sm:flex-none justify-start px-3 bg-white border-slate-200">
-                <Clock className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-slate-400" />
+              <SelectTrigger className="w-full sm:w-auto sm:min-w-[160px] flex-1 sm:flex-none justify-start px-3 bg-card border-border">
+                <Clock className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-muted-foreground" />
                 <SelectValue placeholder="Período" />
               </SelectTrigger>
               <SelectContent>
@@ -400,8 +406,8 @@ export default function AssignmentsPage() {
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={(v: StatusFilter) => setStatusFilter(v)}>
-              <SelectTrigger className="w-full sm:w-auto sm:min-w-[150px] flex-1 sm:flex-none justify-start px-3 bg-white border-slate-200">
-                <SlidersHorizontal className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-slate-400" />
+              <SelectTrigger className="w-full sm:w-auto sm:min-w-[150px] flex-1 sm:flex-none justify-start px-3 bg-card border-border">
+                <SlidersHorizontal className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-muted-foreground" />
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -413,8 +419,8 @@ export default function AssignmentsPage() {
               </SelectContent>
             </Select>
             <Select value={campaignFilter} onValueChange={setCampaignFilter}>
-              <SelectTrigger className="w-full sm:w-auto sm:min-w-[150px] flex-1 sm:flex-none justify-start px-3 bg-white border-slate-200">
-                <Calendar className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-slate-400" />
+              <SelectTrigger className="w-full sm:w-auto sm:min-w-[150px] flex-1 sm:flex-none justify-start px-3 bg-card border-border">
+                <Calendar className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-muted-foreground" />
                 <SelectValue placeholder="Campanha" />
               </SelectTrigger>
               <SelectContent>
@@ -425,8 +431,8 @@ export default function AssignmentsPage() {
               </SelectContent>
             </Select>
             <Select value={sortBy} onValueChange={(v: SortOption) => setSortBy(v)}>
-              <SelectTrigger className="w-full sm:w-auto sm:min-w-[200px] flex-[2] sm:flex-none justify-start px-3 bg-white border-slate-200">
-                <ArrowUpDown className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-slate-400" />
+              <SelectTrigger className="w-full sm:w-auto sm:min-w-[200px] flex-[2] sm:flex-none justify-start px-3 bg-card border-border">
+                <ArrowUpDown className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-muted-foreground" />
                 <SelectValue placeholder="Ordenar por" />
               </SelectTrigger>
               <SelectContent>
@@ -443,8 +449,8 @@ export default function AssignmentsPage() {
       </div>
 
       {filtered.length === 0 ? (
-        <div className="text-center py-20 border-2 border-dashed rounded-xl bg-slate-50 print:hidden">
-          <p className="text-slate-400">Nenhum território confere com os filtros.</p>
+        <div className="text-center py-20 border-2 border-dashed rounded-xl bg-muted print:hidden">
+          <p className="text-muted-foreground">Nenhum território confere com os filtros.</p>
         </div>
       ) : (
         <>
@@ -452,21 +458,21 @@ export default function AssignmentsPage() {
           <div className="hidden md:block border rounded-xl overflow-hidden print:block print:rounded-none print:border-slate-400 print:w-full print:border-all">
             <Table className="print:w-full">
               <TableHeader>
-                <TableRow className="bg-slate-900 hover:bg-slate-900 print:bg-slate-800">
-                  <TableHead className="text-white font-bold text-xs w-14">Nº</TableHead>
-                  <TableHead className="text-white font-bold text-xs">Território</TableHead>
-                  <TableHead className="text-white font-bold text-xs">Resp. Atual</TableHead>
-                  <TableHead className="text-white font-bold text-xs text-center">Entrega</TableHead>
-                  <TableHead className="text-white font-bold text-xs text-center">Dias</TableHead>
-                  <TableHead className="text-white font-bold text-xs">Status</TableHead>
-                  <TableHead className="text-white font-bold text-xs text-center border-l border-slate-700 bg-slate-800/50 print:bg-slate-700">
-                    Trabalhado em<br/>({periodFilter === 'all' ? 'total' : periodFilter})
+                <TableRow className="bg-muted hover:bg-muted border-b border-border">
+                  <TableHead className="text-foreground font-black text-[10px] w-14 uppercase tracking-widest">Nº</TableHead>
+                  <TableHead className="text-foreground font-black text-[10px] uppercase tracking-widest">Território</TableHead>
+                  <TableHead className="text-foreground font-black text-[10px] uppercase tracking-widest">Dirigente</TableHead>
+                  <TableHead className="text-foreground font-black text-[10px] text-center uppercase tracking-widest">Entrega</TableHead>
+                  <TableHead className="text-foreground font-black text-[10px] text-center uppercase tracking-widest">Dias</TableHead>
+                  <TableHead className="text-foreground font-black text-[10px] uppercase tracking-widest">Status</TableHead>
+                  <TableHead className="text-foreground font-black text-[10px] text-center border-l border-border bg-muted/50 uppercase tracking-widest">
+                    Trabalhado<br/>({periodFilter === 'all' ? 'total' : periodFilter})
                   </TableHead>
-                  <TableHead className="text-white font-bold text-xs text-center bg-slate-800/50 print:bg-slate-700">
+                  <TableHead className="text-foreground font-black text-[10px] text-center bg-muted/50 uppercase tracking-widest">
                     Última Conclusão
                   </TableHead>
-                  <TableHead className="text-white font-bold text-xs text-center w-16 print:hidden">
-                    <History className="h-4 w-4 mx-auto text-slate-400" />
+                  <TableHead className="text-foreground font-black text-[10px] text-center w-16 print:hidden uppercase tracking-widest">
+                    <History className="h-4 w-4 mx-auto text-muted-foreground" />
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -476,24 +482,24 @@ export default function AssignmentsPage() {
                     key={t.id}
                     className={`
                       ${t.status === 'overdue'
-                        ? 'bg-red-50/60 hover:bg-red-50 border-l-4 border-l-red-500 print:bg-red-50 print:border-l-0'
+                        ? 'bg-red-50/60 dark:bg-red-500/10 hover:bg-red-50 dark:hover:bg-red-500/20 border-l-4 border-l-red-500 print:bg-red-50 print:border-l-0'
                         : idx % 2 === 0
-                        ? 'bg-white hover:bg-slate-50'
-                        : 'bg-slate-50/50 hover:bg-slate-100/50'
+                        ? 'bg-card hover:bg-muted/50'
+                        : 'bg-muted/30 hover:bg-muted/60'
                       }
                       print:border-b print:border-slate-300
                     `}
                   >
-                    <TableCell className="py-2.5 text-xs font-bold text-slate-700 whitespace-nowrap">
+                    <TableCell className="py-2.5 text-xs font-bold text-foreground whitespace-nowrap">
                       <span className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full print:hidden" style={{ backgroundColor: t.color }} />
                         {t.number}
                       </span>
                     </TableCell>
-                    <TableCell className="py-2.5 text-sm font-medium text-slate-800 whitespace-nowrap">
+                    <TableCell className="py-2.5 text-sm font-medium text-foreground whitespace-nowrap">
                       {t.name}
                     </TableCell>
-                    <TableCell className="py-2.5 text-xs text-slate-600 whitespace-nowrap">
+                    <TableCell className="py-2.5 text-xs text-muted-foreground whitespace-nowrap">
                       {t.activePublisher ? (
                         <span className="flex items-center gap-1">
                           <User className="w-3 h-3 text-slate-400 print:hidden" />
@@ -503,19 +509,19 @@ export default function AssignmentsPage() {
                         <span className="text-slate-400 italic">Disponível</span>
                       )}
                     </TableCell>
-                    <TableCell className="py-2.5 text-xs text-center font-mono text-slate-600 whitespace-nowrap">
+                    <TableCell className="py-2.5 text-xs text-center font-mono text-muted-foreground whitespace-nowrap">
                       {fmtDate(t.assignedAt)}
                     </TableCell>
                     <TableCell className="py-2.5 text-center whitespace-nowrap">
                       {t.daysInField !== null ? (
-                        <span className={`text-xs font-bold ${t.daysInField > 90 ? 'text-red-600' : 'text-slate-700'}`}>
+                        <span className={`text-xs font-bold ${t.daysInField > 90 ? 'text-red-500' : 'text-foreground'}`}>
                           {t.daysInField} d
                           {t.daysInField > 90 && (
                             <AlertTriangle className="inline-block w-3 h-3 ml-1 text-red-500 print:hidden" />
                           )}
                         </span>
                       ) : (
-                        <span className="text-slate-300 text-xs">—</span>
+                        <span className="text-muted-foreground/30 text-xs">—</span>
                       )}
                     </TableCell>
                     <TableCell className="py-2.5 whitespace-nowrap">
@@ -526,16 +532,16 @@ export default function AssignmentsPage() {
                         {STATUS_LABELS[t.status] || t.status}
                       </span>
                     </TableCell>
-                    <TableCell className="py-2.5 text-center font-bold text-slate-700 border-l border-slate-100 print:border-slate-300">
+                    <TableCell className="py-2.5 text-center font-bold text-foreground border-l border-border print:border-slate-300">
                       {t.completionsInPeriod} {t.completionsInPeriod === 1 ? 'vez' : 'vezes'}
                     </TableCell>
-                    <TableCell className="py-2.5 text-center font-mono text-xs text-slate-600">
+                    <TableCell className="py-2.5 text-center font-mono text-xs text-muted-foreground">
                       {t.lastCompletedAt ? (
-                        <span className="bg-slate-100 px-2 py-1 rounded print:bg-transparent print:p-0">
+                        <span className="bg-muted px-2 py-1 rounded print:bg-transparent print:p-0">
                           {fmtDate(t.lastCompletedAt)}
                         </span>
                       ) : (
-                        <span className="text-slate-300">—</span>
+                        <span className="text-muted-foreground/30">—</span>
                       )}
                     </TableCell>
                     <TableCell className="py-1 text-center print:hidden">
@@ -561,8 +567,8 @@ export default function AssignmentsPage() {
                 key={t.id}
                 className={`cursor-pointer transition-all border ${
                   t.status === 'overdue'
-                    ? 'border-red-200 bg-red-50/30'
-                    : 'border-slate-200 bg-white hover:border-primary/40 hover:shadow-sm'
+                    ? 'border-red-500/50 bg-red-500/5'
+                    : 'border-border bg-card hover:border-primary/40 hover:shadow-sm'
                 }`}
                 onClick={() => openSheet(t.id)}
               >
@@ -573,7 +579,7 @@ export default function AssignmentsPage() {
                       style={{ backgroundColor: t.color }}
                     />
                     <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
-                      <p className="font-semibold text-sm text-slate-900 truncate">{t.name}</p>
+                      <p className="font-semibold text-sm text-foreground truncate">{t.name}</p>
                       <Badge
                         variant="outline"
                         className={`text-[10px] px-1.5 py-0 h-4 uppercase flex-shrink-0 ${STATUS_CLASS[t.status]}`}
@@ -583,25 +589,25 @@ export default function AssignmentsPage() {
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-600 bg-slate-50 p-2 rounded-md">
+                  <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground bg-muted p-2 rounded-md">
                     <div>
-                      <span className="block text-[10px] text-slate-400 font-semibold uppercase mb-0.5">Resp. Atual</span>
-                      <span className="font-medium text-slate-900 truncate block">
-                        {t.activePublisher ? t.activePublisher : <span className="text-slate-400 italic">Disponível</span>}
+                      <span className="block text-[10px] text-muted-foreground/70 font-semibold uppercase mb-0.5">Dirigente</span>
+                      <span className="font-medium text-foreground truncate block">
+                        {t.activePublisher ? t.activePublisher : <span className="text-muted-foreground/50 italic">Disponível</span>}
                       </span>
                     </div>
                     <div>
-                      <span className="block text-[10px] text-slate-400 font-semibold uppercase mb-0.5">Dias em Campo</span>
-                      <span className={`font-medium ${t.daysInField && t.daysInField > 90 ? 'text-red-600' : 'text-slate-900'}`}>
+                      <span className="block text-[10px] text-muted-foreground/70 font-semibold uppercase mb-0.5">Dias em Campo</span>
+                      <span className={`font-medium ${t.daysInField && t.daysInField > 90 ? 'text-red-500' : 'text-foreground'}`}>
                         {t.daysInField !== null ? `${t.daysInField}d` : '—'}
                       </span>
                     </div>
-                    <div className="border-t border-slate-200 pt-1 mt-0.5">
-                      <span className="block text-[10px] text-slate-400 font-semibold uppercase mb-0.5">Trabalhado ({periodFilter})</span>
+                    <div className="border-t border-border pt-1 mt-0.5">
+                      <span className="block text-[10px] text-muted-foreground/70 font-semibold uppercase mb-0.5">Trabalhado ({periodFilter})</span>
                       <span className="font-semibold text-primary">{t.completionsInPeriod} vezes</span>
                     </div>
-                    <div className="border-t border-slate-200 pt-1 mt-0.5">
-                      <span className="block text-[10px] text-slate-400 font-semibold uppercase mb-0.5">Última Conclusão</span>
+                    <div className="border-t border-border pt-1 mt-0.5">
+                      <span className="block text-[10px] text-muted-foreground/70 font-semibold uppercase mb-0.5">Última Conclusão</span>
                       <span className="font-mono">{fmtDate(t.lastCompletedAt)}</span>
                     </div>
                   </div>
