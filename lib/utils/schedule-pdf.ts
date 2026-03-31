@@ -18,7 +18,7 @@ export async function exportScheduleToPDF(schedules: any[], currentMonth: Date) 
 
   // Group schedules by arrangement
   const groups: Record<string, any[]> = {}
-  schedules.forEach(item => {
+  schedules.forEach((item: any) => {
     const key = `${item.arrangement.id}`
     if (!groups[key]) groups[key] = []
     groups[key].push(item)
@@ -110,7 +110,7 @@ export async function exportScheduleToPDF(schedules: any[], currentMonth: Date) 
     }
 
     // 2. Draw each card in the row
-    row.forEach((items, colIdx) => {
+    row.forEach((items: any[], colIdx: number) => {
       const arrangement = items[0].arrangement
       const x = margin + (colIdx * (colWidth + gap))
       const dateParse = parseISO(items[0].date)
@@ -158,7 +158,7 @@ export async function exportScheduleToPDF(schedules: any[], currentMonth: Date) 
 
       // Dirichlet names and dates
       doc.setFontSize(9.5)
-      items.forEach((item, innerIdx) => {
+      items.forEach((item: any, innerIdx: number) => {
         const itemY = listY + 18 + (innerIdx * 6)
         const d = format(parseISO(item.date), "dd/MM")
         // Use normal casing (stored in DB) for names
