@@ -1,190 +1,143 @@
 import jsPDF from "jspdf"
-import { format, parseISO } from "date-fns"
+import autoTable from "jspdf-autotable"
+import { 
+  format, 
+  startOfMonth, 
+  endOfMonth, 
+  eachDayOfInterval, 
+  getDay, 
+  startOfWeek, 
+  endOfWeek,
+  isSameMonth,
+  parseISO
+} from "date-fns"
 import { ptBR } from "date-fns/locale"
 
 export async function exportScheduleToPDF(schedules: any[], currentMonth: Date) {
-  const doc = new jsPDF()
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: "a4"
+  })
+
   const pageWidth = doc.internal.pageSize.width
   const pageHeight = doc.internal.pageSize.height
-  const margin = 15
-  const gap = 8
-  const colWidth = (pageWidth - 2 * margin - gap) / 2
+  const margin = 10
 
-  // Colors
-  const tealColor = [7, 69, 82] as [number, number, number]
-  const cardBgColor = [217, 230, 235] as [number, number, number]
-  const listBgColor = [232, 241, 245] as [number, number, number]
-  const blackColor = [0, 0, 0] as [number, number, number]
+  // Colors based on branding
+  const primaryColor = [198, 93, 59] as [number, number, number] // Terracotta #C65D3B
+  const headerGray = [240, 240, 240] as [number, number, number]
+  const textGray = [80, 80, 80] as [number, number, number]
+  
+  // 1. Header & Branding (Premium Style)
+  doc.setFont("helvetica", "bold")
+  doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2])
+  doc.setFontSize(24)
+  doc.text("FieldMap", margin, 15)
+  
+  doc.setFontSize(10)
+  doc.setTextColor(120, 120, 120)
+  doc.text("CONGREGAÇÃO PARQUE DOS ANJOS", margin, 20)
 
-  // Group schedules by arrangement
-  const groups: Record<string, any[]> = {}
-  schedules.forEach((item: any) => {
-    const key = `${item.arrangement.id}`
-    if (!groups[key]) groups[key] = []
-    groups[key].push(item)
+  doc.setFontSize(14)
+  doc.setTextColor(textGray[0], textGray[1], textGray[2])
+  const monthYearLabel = format(currentMonth, "MMMM 'de' yyyy", { locale: ptBR }).toUpperCase()
+  doc.text(monthYearLabel, margin, 28)
+
+  // 2. Prepare Calendar Data
+  const monthStart = startOfMonth(currentMonth)
+  const monthEnd = endOfMonth(currentMonth)
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 }) // Sunday
+  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 })
+
+  const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd })
+  
+  // Group schedules by date string (YYYY-MM-DD)
+  const schedulesByDate: Record<string, any[]> = {}
+  schedules.forEach(s => {
+    const dateStr = s.date.split('T')[0]
+    if (!schedulesByDate[dateStr]) schedulesByDate[dateStr] = []
+    schedulesByDate[dateStr].push(s)
   })
 
-  // Weekday priority order (Terça, Quarta, Quinta, Sexta, Sábado, Domingo, Segunda)
-  const weekdaysOrder = ["terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo", "segunda-feira"]
+  // Create table rows (weeks)
+  const rows: any[][] = []
+  let currentRow: any[] = []
 
-  // Sort groups by typical weekday and then by time
-  const sortedRowsArr = Object.values(groups).sort((a, b) => {
-    const dateA = parseISO(a[0].date)
-    const dateB = parseISO(b[0].date)
-    const dayA = format(dateA, "EEEE", { locale: ptBR }).toLowerCase()
-    const dayB = format(dateB, "EEEE", { locale: ptBR }).toLowerCase()
+  days.forEach((day, index) => {
+    const dateStr = format(day, 'yyyy-MM-dd')
+    const isCurrentMonth = isSameMonth(day, currentMonth)
     
-    const scoreA = weekdaysOrder.indexOf(dayA)
-    const scoreB = weekdaysOrder.indexOf(dayB)
-    
-    if (scoreA !== scoreB) return scoreA - scoreB
-    
-    // If same day, sort by time
-    const timeA = a[0].arrangement.start_time || ""
-    const timeB = b[0].arrangement.start_time || ""
-    return timeA.localeCompare(timeB)
-  })
-
-  // Chunk into rows of 2 for the grid
-  const finalCardRows: any[][] = []
-  for (let i = 0; i < sortedRowsArr.length; i += 2) {
-    finalCardRows.push(sortedRowsArr.slice(i, i + 2))
-  }
-
-  let currentY = 40
-
-  function drawHeader() {
-    // Branding and Header Typography
-    doc.setFont("helvetica", "bold")
-    doc.setTextColor(tealColor[0], tealColor[1], tealColor[2])
-    
-    doc.setFontSize(24)
-    doc.text("PARQUE", margin, 20)
-    doc.setFontSize(20)
-    doc.setFont("helvetica", "normal")
-    doc.text("DOS ANJOS", margin, 28)
-    
-    // The Line (HR) - Sits exactly under the branding and connects to the box
-    const hrY = 30
-    doc.setDrawColor(tealColor[0], tealColor[1], tealColor[2])
-    doc.setLineWidth(0.5)
-    doc.line(margin, hrY, pageWidth - margin, hrY)
-
-    // Right Badge Box
-    const badgeWidth = 75
-    const badgeHeight = 11
-    const badgeX = pageWidth - margin - badgeWidth
-    const badgeY = hrY - badgeHeight // Box sits on the line
-    
-    doc.setFillColor(tealColor[0], tealColor[1], tealColor[2])
-    doc.rect(badgeX, badgeY, badgeWidth, badgeHeight, "F")
-    
-    doc.setTextColor(255, 255, 255)
-    doc.setFontSize(14)
-    doc.setFont("helvetica", "bold")
-    doc.text("SERVIÇO DE CAMPO", badgeX + badgeWidth / 2, badgeY + 7.5, { align: "center" })
-    
-    doc.setTextColor(blackColor[0], blackColor[1], blackColor[2])
-  }
-
-  drawHeader()
-
-  finalCardRows.forEach((row) => {
-    // 1. Calculate the maximum height for cards in this row to ensure perfect alignment
-    const calculateRowMaxHeight = (items: any[]) => {
-      const headerH = 10
-      const metaH = 20
-      const listHeaderH = 11
-      const itemH = items.length * 6
-      const footerH = 8
-      return headerH + metaH + listHeaderH + itemH + footerH
-    }
-
-    const rowMaxHeight = Math.max(...row.map(calculateRowMaxHeight))
-
-    // Handle Page Wrap
-    if (currentY + rowMaxHeight > pageHeight - 20) {
-      doc.addPage()
-      drawHeader()
-      currentY = 40
-    }
-
-    // 2. Draw each card in the row
-    row.forEach((items: any[], colIdx: number) => {
-      const arrangement = items[0].arrangement
-      const x = margin + (colIdx * (colWidth + gap))
-      const dateParse = parseISO(items[0].date)
-      const dayTitle = format(dateParse, "EEEE", { locale: ptBR }).toUpperCase()
-
-      // Card Main Background
-      doc.setFillColor(cardBgColor[0], cardBgColor[1], cardBgColor[2])
-      doc.rect(x, currentY, colWidth, rowMaxHeight, "F")
-
-      // Card Weekday Header
-      doc.setFillColor(tealColor[0], tealColor[1], tealColor[2])
-      doc.rect(x, currentY, colWidth, 7, "F")
-      doc.setTextColor(255, 255, 255)
-      doc.setFontSize(10)
-      doc.setFont("helvetica", "bold")
-      doc.text(dayTitle, x + colWidth / 2, currentY + 5, { align: "center" })
-
-      // Time and Local meta information
-      doc.setTextColor(0, 0, 0)
-      doc.setFontSize(18)
-      doc.setFont("helvetica", "bold")
-      doc.text(`${arrangement.start_time.substring(0, 5)}h`, x + 8, currentY + 18)
-      
-      doc.setFontSize(9)
-      doc.setFont("helvetica", "bold")
-      doc.text("Local:", x + 8, currentY + 25)
-      doc.setFont("helvetica", "normal")
-      const localStr = arrangement.location || "Salão do Reino"
-      doc.text(localStr, x + 19, currentY + 25)
-
-      // Dirichlet List Inner Container
-      const listX = x + 5
-      const listY = currentY + 30
-      const listW = colWidth - 10
-      const listH = rowMaxHeight - 35
-      
-      doc.setFillColor(listBgColor[0], listBgColor[1], listBgColor[2])
-      doc.rect(listX, listY, listW, listH, "F")
-
-      // List Heading
-      doc.setTextColor(0, 0, 0)
-      doc.setFontSize(10)
-      doc.setFont("helvetica", "bold")
-      doc.text("Dirigentes:", listX + 8, listY + 10)
-
-      // Dirichlet names and dates
-      doc.setFontSize(9.5)
-      items.forEach((item: any, innerIdx: number) => {
-        const itemY = listY + 18 + (innerIdx * 6)
-        const d = format(parseISO(item.date), "dd/MM")
-        // Use normal casing (stored in DB) for names
-        const leaderName = item.arrangement.is_group_mode 
-          ? "MODO GRUPO" 
-          : (item.leader?.name || "Pendente")
-
-        doc.setFont("helvetica", "bold")
-        doc.text(d, listX + 28, itemY, { align: "right" })
-        
-        doc.setFont("helvetica", "normal")
-        doc.text(leaderName, listX + 35, itemY)
+    let content = ""
+    if (isCurrentMonth) {
+      content = `${format(day, 'd')}\n`
+      const daySchedules = (schedulesByDate[dateStr] || []).sort((a,b) => {
+        return (a.arrangement?.start_time || "").localeCompare(b.arrangement?.start_time || "")
       })
+      
+      daySchedules.forEach(s => {
+        const time = s.arrangement?.start_time?.substring(0, 5) || ""
+        const label = s.arrangement?.label || ""
+        const leader = s.arrangement?.is_group_mode ? "Grupo" : (s.leader?.name?.split(' ')[0] || "---")
+        content += `\n${time} - ${label}\n(${leader})`
+      })
+    }
+
+    currentRow.push({
+      content,
+      styles: {
+        fillColor: isCurrentMonth ? [255, 255, 255] : [250, 250, 250],
+        textColor: isCurrentMonth ? [0, 0, 0] : [200, 200, 200],
+        fontSize: 7,
+        halign: 'left',
+        valign: 'top',
+        minCellHeight: 32, // More vertical space
+        lineWidth: 0.1,
+        lineColor: [220, 220, 220]
+      }
     })
 
-    currentY += rowMaxHeight + gap
+    if ((index + 1) % 7 === 0) {
+      rows.push(currentRow)
+      currentRow = []
+    }
   })
 
-  // Pagination Footer
+  // 3. Render Table
+  autoTable(doc, {
+    startY: 32,
+    head: [['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB']],
+    body: rows,
+    theme: 'grid',
+    headStyles: {
+      fillColor: primaryColor,
+      textColor: [255, 255, 255],
+      fontSize: 8,
+      fontStyle: 'bold',
+      halign: 'center'
+    },
+    styles: {
+      overflow: 'linebreak',
+      cellPadding: 1.5,
+      font: 'helvetica'
+    },
+    margin: { left: margin, right: margin },
+    tableWidth: pageWidth - (margin * 2),
+  })
+
+  // 4. Footer
   const pageTotal = (doc as any).internal.getNumberOfPages()
   for (let i = 1; i <= pageTotal; i++) {
     doc.setPage(i)
-    doc.setFontSize(8)
-    doc.setTextColor(150, 150, 150)
-    doc.text(`Página ${i} de ${pageTotal}`, pageWidth / 2, pageHeight - 10, { align: "center" })
+    doc.setFontSize(7)
+    doc.setTextColor(180, 180, 180)
+    doc.text(
+      `FieldMap • Gerado em ${format(new Date(), "dd/MM/yyyy HH:mm")}`, 
+      pageWidth / 2, 
+      pageHeight - 8, 
+      { align: "center" }
+    )
   }
 
-  doc.save(`escala-servico-campo-${format(currentMonth, "yyyy-MM")}.pdf`)
+  doc.save(`escala-${format(currentMonth, "yyyy-MM")}.pdf`)
 }

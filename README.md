@@ -8,17 +8,17 @@ Uma ferramenta robusta para gestão de territórios, designações e quadras, fo
 
 - **Gestão de Territórios**: Visualize e gerencie territórios de forma intuitiva.
 - **Mapa Interativo**: Integração com Leaflet para visualização de quadras e pontos.
-- **Designações Inteligentes**: Atribua territórios a publicadores e acompanhe o status em tempo real.
-- **Quadras (Subdivisions)**: Gerenciamento detalhado de cada setor do território.
+- **Designações inteligentes**: Atribua territórios a publicadores e acompanhe o status em tempo real.
+- **Quadras**: Gerenciamento detalhado de cada setor do território.
 - **Escalas por Grupo**: Suporte a arranjos coletivos para saídas de campo (ex: domingos), onde territórios são vinculados a grupos inteiros.
-- **Não Visitar (DNV)**: Marque residências que não devem ser visitadas com histórico e edição.
+- **Não Visitar**: Marque residências que não devem ser visitadas com histórico e edição.
 - **Histórico Completo**: Acompanhe todas as designações e conclusões passadas.
 - **Segurança**: Fluxo de alteração de senha obrigatório ou simplificado para novos cadastros.
 - **Notificações**: Alertas administrativos para pedidos de designação e conclusões.
 
-## 🚀 Como Publicar sua Instância
+## Como publicar sua instância
 
-### 1. Requisitos Prévios
+### 1. Requisitos prévios
 - Conta no [Supabase](https://supabase.com/).
 - Conta na [Vercel](https://vercel.com/).
 - Node.js instalado localmente (opcional para desenvolvimento).
@@ -34,9 +34,9 @@ Uma ferramenta robusta para gestão de territórios, designações e quadras, fo
 Clique no botão **Deploy to Vercel** no topo deste README. 
 
 > [!TIP]
-> **Dica Pro (Integração Nativa):** Ao criar o projeto na Vercel, você pode adicionar a Integração da Supabase. Isso vinculará automaticamente as chaves `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`, restando apenas configurar a `SUPABASE_SERVICE_ROLE_KEY` manualmente.
+> **Dica Pro (Integração nativa):** Ao criar o projeto na Vercel, você pode adicionar a Integração da Supabase. Isso vinculará automaticamente as chaves `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`, restando apenas configurar a `SUPABASE_SERVICE_ROLE_KEY` manualmente.
 
-#### Variáveis de Ambiente Necessárias:
+#### Variáveis de ambiente necessárias:
 | Variável | Descrição | Onde encontrar (Supabase) |
 |----------|-----------|---------------------------|
 | `NEXT_PUBLIC_SUPABASE_URL` | URL do Projeto | Settings > API |
@@ -44,13 +44,13 @@ Clique no botão **Deploy to Vercel** no topo deste README.
 | `SUPABASE_SERVICE_ROLE_KEY` | Chave Service Role | Settings > API (Mantenha Segura!) |
 | `NEXT_PUBLIC_APP_URL` | URL do seu App | URL da Vercel ou localhost:3000 |
 
-### 4. Primeiro Acesso (Admin)
+### 4. Primeiro acesso (Admin)
 1. No painel do Supabase, vá em **Authentication > Settings > Sign In / Up** e desative a opção **Confirm email** (para testar sem e-mails reais).
 2. Acesse o seu App e clique em **"Criar Conta de Administrador"** no alerta de primeira instalação (ou vá em `/signup`).
 3. Cadastre seu e-mail e senha.
 4. **Pronto!** Como você é o primeiro usuário, o sistema te tornará **Admin automaticamente**. O menu de Administração será liberado imediatamente.
 
-## 💻 Desenvolvimento Local
+## 💻 Desenvolvimento local
 
 Se quiser rodar o projeto na sua máquina para testar antes:
 

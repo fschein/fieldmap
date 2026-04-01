@@ -110,11 +110,20 @@ CREATE TABLE IF NOT EXISTS public.subdivisions (
 -- Corrigir nome da coluna se necessário (geometry -> coordinates)
 DO $$ 
 BEGIN 
-    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subdivisions' AND column_name='geometry') THEN
+    -- Se 'geometry' existe e 'coordinates' NÃO, renomeia
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subdivisions' AND column_name='geometry') 
+       AND NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subdivisions' AND column_name='coordinates') THEN
         ALTER TABLE public.subdivisions RENAME COLUMN geometry TO coordinates;
+    -- Se ambos existem por erro manual anterior, remove o 'geometry' redundante
+    ELSIF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subdivisions' AND column_name='geometry') 
+          AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subdivisions' AND column_name='coordinates') THEN
+        ALTER TABLE public.subdivisions DROP COLUMN geometry;
+    -- Se nenhum existir, cria o 'coordinates'
     ELSIF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subdivisions' AND column_name='coordinates') THEN
         ALTER TABLE public.subdivisions ADD COLUMN coordinates JSONB;
     END IF;
+
+    -- Adicionar 'notes' se não existir
     IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subdivisions' AND column_name='notes') THEN
         ALTER TABLE public.subdivisions ADD COLUMN notes TEXT;
     END IF;
@@ -274,7 +283,48 @@ BEGIN
   END IF;
 END $$;
 
--- 5. Segurança (RLS)
+-- 5. Sincronização Automática de Status e Datas
+CREATE OR REPLACE FUNCTION public.handle_assignment_completion()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  -- Se a designação foi marcada como COMPLETA, atualiza o território
+  IF (NEW.status = 'completed' AND (OLD.status IS NULL OR OLD.status != 'completed')) THEN
+    UPDATE public.territories
+    SET 
+      last_completed_at = NEW.completed_at,
+      status = 'available',
+      assigned_to = NULL
+    WHERE id = NEW.territory_id;
+  END IF;
+
+  -- Se a designação foi DEVOLVIDA (returned), libera o território mas não muda a última conclusão
+  IF (NEW.status = 'returned' AND (OLD.status IS NULL OR OLD.status != 'returned')) THEN
+    UPDATE public.territories
+    SET 
+      status = 'available',
+      assigned_to = NULL
+    WHERE id = NEW.territory_id;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DO $$ 
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trig_handle_assignment_completion') THEN
+        CREATE TRIGGER trig_handle_assignment_completion
+          AFTER UPDATE OF status ON public.assignments
+          FOR EACH ROW
+          WHEN (NEW.status IN ('completed', 'returned'))
+          EXECUTE FUNCTION public.handle_assignment_completion();
+    END IF;
+END $$;
+
+-- 6. Segurança (RLS)
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.groups ENABLE ROW LEVEL SECURITY;

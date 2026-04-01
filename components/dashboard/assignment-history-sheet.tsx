@@ -271,10 +271,31 @@ export function AssignmentHistorySheet({
         .order("assigned_at", { ascending: false })
         .limit(1)
 
+      // Find the most recent completion
+      const { data: lastCompletions } = await supabase
+        .from("assignments")
+        .select("completed_at")
+        .eq("territory_id", territoryId)
+        .eq("status", "completed")
+        .order("completed_at", { ascending: false })
+        .limit(1)
+
+      const lastCompletedAt = lastCompletions && lastCompletions.length > 0 
+        ? lastCompletions[0].completed_at 
+        : null
+
       if (activeAssignments && activeAssignments.length > 0) {
-        await supabase.from("territories").update({ assigned_to: activeAssignments[0].user_id, status: "assigned" }).eq("id", territoryId)
+        await supabase.from("territories").update({ 
+          assigned_to: activeAssignments[0].user_id, 
+          status: "assigned",
+          last_completed_at: lastCompletedAt
+        }).eq("id", territoryId)
       } else {
-        await supabase.from("territories").update({ assigned_to: null, status: "available" }).eq("id", territoryId)
+        await supabase.from("territories").update({ 
+          assigned_to: null, 
+          status: "available",
+          last_completed_at: lastCompletedAt
+        }).eq("id", territoryId)
       }
     } catch (e) {
       console.error("Erro ao sincronizar dono do território", e)

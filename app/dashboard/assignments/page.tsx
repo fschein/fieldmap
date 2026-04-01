@@ -192,8 +192,18 @@ export default function AssignmentsPage() {
           
           if (isFull || isEmpty) {
             status = 'completed' // LIVRE
+            // Mostrar há quantos dias está livre
+            if (lastCompletedAt) {
+              const start = new Date(lastCompletedAt).getTime()
+              daysInField = Math.max(0, Math.floor((now.getTime() - start) / (1000 * 60 * 60 * 24)))
+            }
           } else {
             status = 'available' // DEVOLVIDO
+            // Para devolvidos, também podemos mostrar os dias desde o retorno
+            if (lastCompletedAt) {
+              const start = new Date(lastCompletedAt).getTime()
+              daysInField = Math.max(0, Math.floor((now.getTime() - start) / (1000 * 60 * 60 * 24)))
+            }
           }
         }
       }
