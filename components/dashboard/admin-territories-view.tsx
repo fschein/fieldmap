@@ -1,17 +1,13 @@
 "use client"
 
 import { useEffect, useState, useCallback, useMemo } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { createTimeoutSignal } from "@/lib/utils/api-utils"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Dialog,
   DialogContent,
@@ -21,23 +17,18 @@ import {
   DialogTitle
 } from "@/components/ui/dialog"
 import { Switch } from "@/components/ui/switch"
+import { AssignmentCreateModal } from "@/components/dashboard/assignment-create-modal"
 import {
   Plus,
   Map,
   Loader2,
   MapPin,
-  User,
-  Calendar,
   AlertTriangle,
-  TrendingUp,
   Search,
-  X,
-  Clock,
-  CheckCircle2,
   Pencil,
   ArrowRight
 } from "lucide-react"
-import type { Profile, Campaign, Subdivision } from "@/lib/types"
+import type { Subdivision } from "@/lib/types"
 
 // ============================================================================
 // INTERFACES
@@ -86,6 +77,20 @@ interface PriorityScore {
 // ============================================================================
 
 function calculatePriorityScore(territory: TerritoryWithDetails & { assignments?: any[] }): PriorityScore {
+  // DEBUG temporary (remover após validar)
+  if (!territory.assigned_to) {
+    console.log(`[${territory.number}]`, {
+      last_completed_at: territory.last_completed_at,
+      assignments: territory.assignments?.map((a: any) => ({
+        status: a.status,
+        returned_at: a.returned_at,
+        completed_at: a.completed_at,
+        assigned_at: a.assigned_at,
+        updated_at: a.updated_at
+      }))
+    })
+  }
+
   const now = new Date()
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
@@ -95,26 +100,29 @@ function calculatePriorityScore(territory: TerritoryWithDetails & { assignments?
   let priority: 'critical' | 'high' | 'medium' | 'low' = 'low'
   let reason = ''
 
-  // 1. Dias Inativo (LIVRE): hoje - (last_completed_at || created_at)
+  // 1. Encontrar a última designação encerrada (returned ou completed)
+  const latestFinishedAssignment = [...(territory.assignments || [])]
+    .filter(a => a.status !== 'active')
+    .sort((a, b) => {
+      const dateA = new Date(a.completed_at || a.returned_at || a.updated_at || a.assigned_at).getTime()
+      const dateB = new Date(b.completed_at || b.returned_at || b.updated_at || b.assigned_at).getTime()
+      if (dateA !== dateB) return dateB - dateA
+      return b.id.localeCompare(a.id)
+    })[0]
+
+  const isReturned = !territory.assigned_to && latestFinishedAssignment?.status === 'returned'
+
+  // 2. Dias Inativo (LIVRE): hoje - (data real da liberação)
   // Isso define a URGÊNCIA do território ser trabalhado.
-  const lastActivityDate = territory.last_completed_at || territory.created_at
+  const lastActivityDate = (isReturned)
+    ? (latestFinishedAssignment?.returned_at || latestFinishedAssignment?.updated_at)
+    : (territory.last_completed_at || territory.created_at)
+
   const lastActivity = new Date(lastActivityDate)
   const activityDay = new Date(lastActivity.getFullYear(), lastActivity.getMonth(), lastActivity.getDate())
 
   const diffInactive = today.getTime() - activityDay.getTime()
   daysInactive = Math.max(0, Math.floor(diffInactive / (1000 * 60 * 60 * 24)))
-
-  // 2. Status Devolvido: última designação foi devolvida e não está designado agora
-  const latestFinishedAssignment = [...(territory.assignments || [])]
-    .filter(a => a.status !== 'active')
-    .sort((a, b) => {
-      const dateA = new Date(a.completed_at || a.returned_at || a.assigned_at).getTime()
-      const dateB = new Date(b.completed_at || b.returned_at || b.assigned_at).getTime()
-      if (dateA !== dateB) return dateB - dateA
-      return b.id.localeCompare(a.id) // Tie-breaker estável
-    })[0]
-
-  const isReturned = !territory.assigned_to && latestFinishedAssignment?.status === 'returned'
 
   // 3. Dias Designado: hoje - (assigned_at da designação ativa)
   if (territory.assigned_to) {
@@ -207,24 +215,10 @@ export function AdminTerritoriesView() {
   const [activeFilter, setActiveFilter] = useState("all")
   const [errorMsg, setErrorMsg] = useState("")
 
-  // Assignment modal
-  const [assignDialogOpen, setAssignDialogOpen] = useState(false)
-  const [selectedTerritory, setSelectedTerritory] = useState<TerritoryWithDetails | null>(null)
-  const [users, setUsers] = useState<Profile[]>([])
+  // Assignment modal — usa o AssignmentCreateModal completo
+  const [assignModalOpen, setAssignModalOpen] = useState(false)
+  const [assignPreselectedId, setAssignPreselectedId] = useState<string | null>(null)
   const [groups, setGroups] = useState<any[]>([])
-  const [campaigns, setCampaigns] = useState<Campaign[]>([])
-  const [searchUser, setSearchUser] = useState("")
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
-  const [selectedCampaignId, setSelectedCampaignId] = useState<string | null>(null)
-
-  // Novas datas do Modal Retroativo
-  const formatToday = () => {
-    const today = new Date()
-    return today.toISOString().split('T')[0]
-  }
-  const [startDate, setStartDate] = useState(formatToday())
-  const [endDate, setEndDate] = useState("")
-  const [assigning, setAssigning] = useState(false)
 
   // Memorização de filtros e contagens para performance
   const activeResults = useMemo(() => priorityTerritories.filter(p => p.territory.status !== 'inactive'), [priorityTerritories])
@@ -272,8 +266,7 @@ export function AdminTerritoriesView() {
     const { signal, clear } = createTimeoutSignal(15000)
 
     try {
-      const { data: { user: currentUser } } = await supabase.auth.getUser()
-      const [terrRes, usersRes, campRes, groupsRes] = await Promise.all([
+      const [terrRes, groupsRes] = await Promise.all([
         supabase
           .from("territories")
           .select(`
@@ -282,22 +275,10 @@ export function AdminTerritoriesView() {
             assigned_to_user:profiles!territories_assigned_to_fkey(id, name, email),
             campaign:campaigns(id, name),
             subdivisions(id, territory_id, completed, status, name),
-            assignments(id, assigned_at, status, completed_at, returned_at)
+            assignments(id, assigned_at, status, completed_at, returned_at, updated_at)
           `)
           .abortSignal(signal)
           .order("number"),
-        supabase
-          .from("profiles")
-          .select("*")
-          .in("role", ["admin", "dirigente", "publicador"])
-          .abortSignal(signal)
-          .order("name"),
-        supabase
-          .from("campaigns")
-          .select("*")
-          .eq("active", true)
-          .abortSignal(signal)
-          .order("name"),
         supabase
           .from("groups")
           .select("*")
@@ -305,18 +286,12 @@ export function AdminTerritoriesView() {
           .order("name")
       ])
 
-      if (usersRes.error) throw usersRes.error
-      if (campRes.error) throw campRes.error
       if (groupsRes.error) throw groupsRes.error
-
-      if (usersRes.data) setUsers(usersRes.data)
-      if (campRes.data) setCampaigns(campRes.data)
       if (groupsRes.data) setGroups(groupsRes.data)
 
       if (terrRes.data) {
         const territoriesData = terrRes.data as unknown as TerritoryWithDetails[]
-        const priorities = territoriesData
-          .map(t => calculatePriorityScore(t))
+        const priorities = territoriesData.map(t => calculatePriorityScore(t))
         setPriorityTerritories(priorities)
       }
     } catch (err: any) {
@@ -336,79 +311,10 @@ export function AdminTerritoriesView() {
     loadData()
   }, [loadData])
 
-  const handleOpenAssignDialog = (territory: TerritoryWithDetails) => {
-    setSelectedTerritory(territory)
-    setSelectedUserId(null)
-    setSelectedCampaignId(null)
-    setSearchUser("")
-    setStartDate(formatToday())
-    setEndDate("")
-    setAssignDialogOpen(true)
+  const handleOpenAssignModal = (territory: TerritoryWithDetails) => {
+    setAssignPreselectedId(territory.id)
+    setAssignModalOpen(true)
   }
-
-  const handleAssign = async () => {
-    if (!selectedTerritory || !selectedUserId || !startDate) return
-    setAssigning(true)
-
-    try {
-      const startDateTime = new Date(`${startDate}T12:00:00Z`).toISOString()
-      const endDateTime = endDate ? new Date(`${endDate}T12:00:00Z`).toISOString() : null
-
-      const isCompleted = !!endDateTime
-
-      const { error: assignError } = await supabase
-        .from("assignments")
-        .insert({
-          territory_id: selectedTerritory.id,
-          user_id: selectedUserId,
-          campaign_id: selectedCampaignId || null,
-          status: isCompleted ? "completed" : "active",
-          assigned_at: startDateTime,
-          completed_at: endDateTime,
-        })
-
-      if (assignError) throw assignError
-
-      // Inserir notificação para o publicador (Novo território designado)
-      if (!isCompleted) {
-        await supabase.from("notifications").insert({
-          type: "assigned",
-          title: "Novo território designado",
-          message: `O território ${selectedTerritory.number} foi designado para você.`,
-          user_id: selectedUserId,
-          territory_id: selectedTerritory.id,
-          created_by: (await supabase.auth.getUser()).data.user?.id
-        }).catch((err: unknown) => console.error("Erro ao inserir notificação:", err))
-      }
-
-      const territoryUpdates: any = {}
-      if (isCompleted) {
-        territoryUpdates.assigned_to = null
-        territoryUpdates.last_completed_at = endDateTime
-      } else {
-        territoryUpdates.assigned_to = selectedUserId
-      }
-
-      const { error: updateError } = await supabase
-        .from("territories")
-        .update(territoryUpdates)
-        .eq("id", selectedTerritory.id)
-
-      if (updateError) throw updateError
-
-      setAssignDialogOpen(false)
-      loadData()
-    } catch (error: any) {
-      alert("Erro ao designar território: " + error.message)
-    } finally {
-      setAssigning(false)
-    }
-  }
-
-  const filteredUsers = users.filter(u =>
-    u.name.toLowerCase().includes(searchUser.toLowerCase()) ||
-    u.email.toLowerCase().includes(searchUser.toLowerCase())
-  )
 
   const handleOpenEdit = (territory: TerritoryWithDetails) => {
     setEditingTerritory(territory)
@@ -535,11 +441,11 @@ export function AdminTerritoriesView() {
               </div>
             ) : (
               <div className="flex items-center gap-1.5 min-w-0">
-                <span className="font-extrabold text-primary truncate max-w-[90px]">
+                <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight border border-primary/20 truncate max-w-[90px]">
                   {territory.assigned_to_user?.name?.split(' ')[0]}
                 </span>
-                <span className="font-bold text-muted-foreground shrink-0">
-                  ⌛ {p.daysAssigned}d
+                <span className="font-bold text-muted-foreground shrink-0 text-xs">
+                  ⏳ {p.daysAssigned}d
                 </span>
               </div>
             )}
@@ -572,7 +478,7 @@ export function AdminTerritoriesView() {
               className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-primary transition-colors"
               onClick={(e) => {
                 e.stopPropagation();
-                handleOpenAssignDialog(territory);
+                handleOpenAssignModal(territory);
               }}
             >
               <ArrowRight className="h-4 w-4" />
@@ -606,27 +512,27 @@ export function AdminTerritoriesView() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-10">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-10 overflow-x-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-black uppercase tracking-tight text-foreground">Territórios</h1>
           <p className="text-xs text-muted-foreground font-medium mt-1">
-            Gestão inteligente das quadras e designações.
+            Status de todos os territórios.
           </p>
         </div>
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="relative flex-1 sm:w-64">
+        <div className="flex items-center gap-2 flex-1 sm:flex-none">
+          <div className="relative flex-1 sm:w-64 min-w-0">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Buscar por nome ou Nº..."
+              placeholder="Buscar..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 bg-card border-border"
+              className="pl-9 bg-card border-border w-full"
             />
           </div>
-          <Button onClick={handleOpenCreate} className="shrink-0 shadow-sm">
-            <Plus className="mr-2 h-4 w-4" />
-            Novo
+          <Button onClick={handleOpenCreate} size="sm" className="shrink-0 shadow-sm">
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline ml-2">Novo</span>
           </Button>
         </div>
       </div>
@@ -635,17 +541,17 @@ export function AdminTerritoriesView() {
         {/* Pills Filters */}
         <div className="flex gap-2 overflow-x-auto pb-4 -mx-4 px-4 scrollbar-hide">
           <FilterPill
-            active={activeFilter === "all"}
-            onClick={() => setActiveFilter("all")}
-            label="Todos"
-            count={counts.all}
-          />
-          <FilterPill
             emoji="🔥"
             active={activeFilter === "urgentes"}
             onClick={() => setActiveFilter("urgentes")}
             label="Urgentes"
             count={counts.urgentes}
+          />
+          <FilterPill
+            active={activeFilter === "all"}
+            onClick={() => setActiveFilter("all")}
+            label="Todos"
+            count={counts.all}
           />
           <FilterPill
             emoji="⏳"
@@ -684,49 +590,13 @@ export function AdminTerritoriesView() {
         </div>
       </div>
 
-      <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-        <DialogContent className="sm:max-w-[450px]">
-          {/* Assignment Modal Content */}
-          <DialogHeader>
-            <DialogTitle>Designar Território</DialogTitle>
-          </DialogHeader>
-          {/* Logic remains same as original */}
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Publicador Responsável</Label>
-              <Input
-                placeholder="Buscar..."
-                value={searchUser}
-                onChange={(e) => setSearchUser(e.target.value)}
-              />
-              <div className="border border-border rounded-md max-h-32 overflow-y-auto mt-1 bg-muted/20">
-                {filteredUsers.map(u => (
-                  <button
-                    key={u.id}
-                    className={cn("w-full text-left p-2 hover:bg-muted/50 border-b last:border-0 border-border/10", selectedUserId === u.id && "bg-muted")}
-                    onClick={() => { setSelectedUserId(u.id); setSearchUser(u.name) }}
-                  >
-                    {u.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label>Início</Label>
-                <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
-              </div>
-              <div>
-                <Label>Fim (Retroativo)</Label>
-                <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button onClick={handleAssign} disabled={assigning}>Designar</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Modal de designação completo (com território pré-selecionado) */}
+      <AssignmentCreateModal
+        open={assignModalOpen}
+        onOpenChange={setAssignModalOpen}
+        preselectedTerritoryId={assignPreselectedId}
+        onSuccess={loadData}
+      />
 
       {/* Modal de Edição de Território */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>

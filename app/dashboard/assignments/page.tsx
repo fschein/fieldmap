@@ -19,12 +19,13 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { TerritoryPrintReport } from "@/components/dashboard/territory-print-report"
+import { Progress } from "@/components/ui/progress"
 import {
   Loader2, Search, SlidersHorizontal, ArrowUpDown,
   Download, History, AlertTriangle, Plus, User, Calendar, Clock,
-  CheckSquare, Filter
+  CheckSquare, Filter, MapPin
 } from "lucide-react"
-import { Progress } from "@/components/ui/progress"
+import { cn } from "@/lib/utils"
 
 type SortOption = "number" | "days_desc" | "days_asc" | "assigned_desc" | "assigned_asc" | "last_completed_asc" | "last_completed_desc"
 type StatusFilter = "all" | "active" | "available" | "overdue" | "completed"
@@ -62,6 +63,38 @@ const STATUS_CLASS: Record<string, string> = {
   overdue: "bg-red-50 text-red-700 border-red-200 font-bold dark:bg-red-500/10 dark:text-red-500 dark:border-red-500/20",
 }
 
+// Pills de filtro rápido para mobile
+const QUICK_FILTERS = [
+  { id: "active" as StatusFilter, label: "Em Campo", emoji: "📌" },
+  { id: "overdue" as StatusFilter, label: "Atrasados", emoji: "🔥" },
+  { id: "available" as StatusFilter, label: "Devolvidos", emoji: "↩️" },
+  { id: "completed" as StatusFilter, label: "Livres", emoji: "✅" },
+  { id: "all" as StatusFilter, label: "Todos", emoji: undefined },
+]
+
+function FilterPill({ label, emoji, active, count, onClick }: any) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "whitespace-nowrap px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-tight transition-all flex items-center gap-1.5 border shadow-sm flex-shrink-0",
+        active
+          ? "bg-primary text-primary-foreground border-primary shadow-md"
+          : "bg-card text-muted-foreground border-border hover:border-muted-foreground/30"
+      )}
+    >
+      {emoji && <span>{emoji}</span>}
+      {label}
+      <span className={cn(
+        "text-[9px] px-1.5 py-0.5 rounded-full font-black min-w-[16px] text-center",
+        active ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"
+      )}>
+        {count}
+      </span>
+    </button>
+  )
+}
+
 export default function AssignmentsPage() {
   const { isReady, isAdmin, isDirigente } = useAuth()
   const supabase = getSupabaseBrowserClient()
@@ -69,17 +102,17 @@ export default function AssignmentsPage() {
 
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState<AggregatedTerritory[]>([])
-  
-  // Raw assignments mapped by territory ID for recalculating based on period
+
   const [rawTerritories, setRawTerritories] = useState<any[]>([])
   const [rawAssignments, setRawAssignments] = useState<any[]>([])
 
   const [search, setSearch] = useState("")
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
+  // Filtro padrão: Em Campo (active) — foco nas designações ativas
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("active")
   const [campaignFilter, setCampaignFilter] = useState<string>("all")
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all")
   const [sortBy, setSortBy] = useState<SortOption>("number")
-  const [campaigns, setCampaigns] = useState<{id: string, name: string}[]>([])
+  const [campaigns, setCampaigns] = useState<{ id: string, name: string }[]>([])
 
   const [selectedTerritoryId, setSelectedTerritoryId] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -99,7 +132,7 @@ export default function AssignmentsPage() {
 
       const { data: profilesData } = await supabase.from("profiles").select("id, name")
       const { data: groupsData } = await supabase.from("groups").select("id, name")
-      
+
       const namesMap = new Map()
       profilesData?.forEach((p: any) => namesMap.set(p.id, p.name))
       groupsData?.forEach((g: any) => namesMap.set(g.id, g.name))
@@ -111,13 +144,12 @@ export default function AssignmentsPage() {
 
       if (assErr) throw new Error(`Assignments: ${assErr.message}`)
 
-      // Fetch active campaigns for filter
       const { data: campaignsData } = await supabase
         .from("campaigns")
         .select("id, name")
         .eq("active", true)
         .order("name")
-      
+
       if (campaignsData) setCampaigns(campaignsData)
 
       const assignmentsWithProfiles = (assignments || []).map((a: any) => ({
@@ -139,13 +171,12 @@ export default function AssignmentsPage() {
     if (isReady) fetchData()
   }, [isReady])
 
-  // Process data whenever filters/raw data changes
   useEffect(() => {
     if (!rawTerritories.length) return
 
     const now = new Date()
-    let periodStart = new Date(0) // all time
-    
+    let periodStart = new Date(0)
+
     if (periodFilter === "6m") {
       periodStart = new Date()
       periodStart.setMonth(now.getMonth() - 6)
@@ -167,39 +198,36 @@ export default function AssignmentsPage() {
 
       const lastCompletedAt = completed.length > 0 ? completed[0].completed_at : null
 
-      const completionsInPeriod = completed.filter(a => 
+      const completionsInPeriod = completed.filter(a =>
         new Date(a.completed_at).getTime() >= periodStartTime
       ).length
 
       const totalSubdivisions = (t as any).subdivisions?.length || 0
       const completedSubdivisions = (t as any).subdivisions?.filter((s: any) => s.completed).length || 0
-      
+
       let daysInField: number | null = null
       let status: 'available' | 'active' | 'overdue' | 'inactive' | 'completed' = t.status || 'available'
 
       if (status !== 'inactive') {
         const isAssignedToMe = activeAssig && activeAssig.user_id === t.assigned_to
         const isAssignedToMyGroup = activeAssig && activeAssig.group_id && !t.assigned_to
-        
+
         if (isAssignedToMe || isAssignedToMyGroup) {
           const start = new Date(activeAssig.assigned_at).getTime()
           daysInField = Math.ceil((now.getTime() - start) / (1000 * 60 * 60 * 24))
           status = daysInField > 90 ? 'overdue' : 'active'
         } else {
-          // Lógica DINÂMICA baseada no progresso real das quadras
           const isFull = totalSubdivisions > 0 && completedSubdivisions === totalSubdivisions
           const isEmpty = completedSubdivisions === 0
-          
+
           if (isFull || isEmpty) {
-            status = 'completed' // LIVRE
-            // Mostrar há quantos dias está livre
+            status = 'completed'
             if (lastCompletedAt) {
               const start = new Date(lastCompletedAt).getTime()
               daysInField = Math.max(0, Math.floor((now.getTime() - start) / (1000 * 60 * 60 * 24)))
             }
           } else {
-            status = 'available' // DEVOLVIDO
-            // Para devolvidos, também podemos mostrar os dias desde o retorno
+            status = 'available'
             if (lastCompletedAt) {
               const start = new Date(lastCompletedAt).getTime()
               daysInField = Math.max(0, Math.floor((now.getTime() - start) / (1000 * 60 * 60 * 24)))
@@ -229,6 +257,13 @@ export default function AssignmentsPage() {
     setData(processed)
   }, [rawTerritories, rawAssignments, periodFilter])
 
+  const counts = useMemo(() => ({
+    active: data.filter(t => t.status === 'active').length,
+    overdue: data.filter(t => t.status === 'overdue').length,
+    available: data.filter(t => t.status === 'available').length,
+    completed: data.filter(t => t.status === 'completed').length,
+    all: data.length,
+  }), [data])
 
   const filtered = useMemo(() => {
     let result = [...data]
@@ -243,13 +278,16 @@ export default function AssignmentsPage() {
     }
 
     if (statusFilter !== "all") {
-      result = result.filter(t => t.status === statusFilter)
+      if (statusFilter === "active") {
+        // "Em Campo" inclui active E overdue
+        result = result.filter(t => t.status === 'active' || t.status === 'overdue')
+      } else {
+        result = result.filter(t => t.status === statusFilter)
+      }
     }
 
     if (campaignFilter !== "all") {
       if (showOnlyRemaining) {
-        // "Remaining" = not done for this campaign yet.
-        // That means either it's not in the campaign yet, OR it is but it's active/overdue (not finished)
         result = result.filter(t => t.campaignId !== campaignFilter || (t.campaignId === campaignFilter && t.status !== 'available'))
       } else {
         result = result.filter(t => t.campaignId === campaignFilter)
@@ -285,17 +323,11 @@ export default function AssignmentsPage() {
     })
 
     return result
-  }, [data, search, statusFilter, sortBy])
+  }, [data, search, statusFilter, sortBy, campaignFilter, showOnlyRemaining])
 
   const fmtDate = (d: string | null) => {
     if (!d) return "—"
     return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "2-digit" })
-  }
-
-  const getPeriodLabel = () => {
-    if (periodFilter === "6m") return "Últimos 6 meses"
-    if (periodFilter === "12m") return "Último ano"
-    return "Todo o período"
   }
 
   const openSheet = (id: string) => {
@@ -311,23 +343,18 @@ export default function AssignmentsPage() {
     )
   }
 
-  const stats = {
-    active: data.filter(t => t.status === 'active').length,
-    overdue: data.filter(t => t.status === 'overdue').length,
-    available: data.filter(t => t.status === 'available').length,
-    completed: data.filter(t => t.status === 'completed').length,
-  }
+  const inFieldTotal = counts.active + counts.overdue
 
   return (
     <div className="space-y-4 pb-10">
 
       {/* ===== Screen Header ===== */}
       <div className="print:hidden space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-black uppercase tracking-tight text-foreground">Designações</h1>
             <p className="text-xs text-muted-foreground font-medium mt-1">
-              {stats.active} em campo &bull; {stats.overdue} atrasados &bull; {stats.available} devolvidos &bull; {stats.completed} livres
+              {inFieldTotal} em campo · {counts.overdue > 0 && <span className="text-red-500 font-bold">{counts.overdue} atrasados · </span>}{counts.available} devolvidos · {counts.completed} livres
             </p>
           </div>
           <div className="flex gap-2">
@@ -341,6 +368,36 @@ export default function AssignmentsPage() {
               <Download className="w-4 h-4" />
               <span className="hidden sm:inline">Imprimir PDF</span>
             </Button>
+          </div>
+        </div>
+
+        {/* Barra de progresso geral */}
+        <div className="bg-card border rounded-xl p-3 space-y-2">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span className="font-semibold">Progresso Geral</span>
+            <span className="font-bold text-foreground">
+              {inFieldTotal} de {data.length} em campo
+              {counts.overdue > 0 && (
+                <span className="ml-2 text-red-500 font-bold">({counts.overdue} atrasados)</span>
+              )}
+            </span>
+          </div>
+          <div className="relative h-2 bg-muted rounded-full overflow-hidden">
+            {/* barra de atrasados */}
+            <div
+              className="absolute top-0 left-0 h-full bg-red-500 rounded-full transition-all duration-500"
+              style={{ width: `${((counts.overdue) / (data.length || 1)) * 100}%` }}
+            />
+            {/* barra de em campo (active) */}
+            <div
+              className="absolute top-0 left-0 h-full bg-primary rounded-full transition-all duration-500"
+              style={{ width: `${((counts.active) / (data.length || 1)) * 100}%` }}
+            />
+          </div>
+          <div className="flex gap-4 text-[10px] text-muted-foreground">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary inline-block" />Em Campo: {counts.active}</span>
+            {counts.overdue > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" />Atrasados: {counts.overdue}</span>}
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-muted-foreground/30 border inline-block" />Livres: {counts.completed + counts.available}</span>
           </div>
         </div>
 
@@ -359,7 +416,7 @@ export default function AssignmentsPage() {
                         <p className="font-semibold text-foreground leading-tight">
                           Campanha: {campaigns.find(c => c.id === campaignFilter)?.name}
                         </p>
-                        <p className="text-xs text-muted-foreground">Acompanhamento de progresso geral</p>
+                        <p className="text-xs text-muted-foreground">Acompanhamento de progresso</p>
                       </div>
                     </div>
                     <div className="text-right">
@@ -369,17 +426,13 @@ export default function AssignmentsPage() {
                       <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Concluído</p>
                     </div>
                   </div>
-                  <Progress 
-                    value={(data.filter(t => t.campaignId === campaignFilter && t.status === 'available').length / (data.length || 1)) * 100} 
+                  <Progress
+                    value={(data.filter(t => t.campaignId === campaignFilter && t.status === 'available').length / (data.length || 1)) * 100}
                     className="h-2 bg-muted"
                   />
-                  <div className="flex justify-between items-center text-[10px] text-muted-foreground font-medium">
-                    <span>{data.filter(t => t.campaignId === campaignFilter && t.status === 'available').length} concluídos</span>
-                    <span>{data.length - data.filter(t => t.campaignId === campaignFilter && t.status === 'available').length} faltantes</span>
-                  </div>
                 </div>
                 <div className="flex-shrink-0">
-                  <Button 
+                  <Button
                     variant={showOnlyRemaining ? "default" : "outline"}
                     size="sm"
                     onClick={() => setShowOnlyRemaining(!showOnlyRemaining)}
@@ -394,8 +447,22 @@ export default function AssignmentsPage() {
           </Card>
         )}
 
-        {/* Filter Bar */}
-        <div className="bg-muted border rounded-xl p-3 flex flex-col md:flex-row items-center gap-3">
+        {/* Pills rápidos de filtro (mobile-first) */}
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+          {QUICK_FILTERS.map(f => (
+            <FilterPill
+              key={f.id}
+              label={f.label}
+              emoji={f.emoji}
+              active={statusFilter === f.id}
+              count={f.id === "active" ? counts.active + counts.overdue : f.id === "all" ? counts.all : counts[f.id as keyof typeof counts] || 0}
+              onClick={() => setStatusFilter(f.id)}
+            />
+          ))}
+        </div>
+
+        {/* Filter Bar (desktop) */}
+        <div className="hidden md:flex bg-muted border rounded-xl p-3 flex-row items-center gap-3">
           <div className="relative w-full md:max-w-[300px] xl:max-w-sm flex-shrink-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
@@ -405,9 +472,9 @@ export default function AssignmentsPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <div className="flex flex-wrap flex-1 w-full justify-start md:justify-end gap-2.5">
+          <div className="flex flex-wrap flex-1 w-full justify-end gap-2.5">
             <Select value={periodFilter} onValueChange={(v: PeriodFilter) => setPeriodFilter(v)}>
-              <SelectTrigger className="w-full sm:w-auto sm:min-w-[160px] flex-1 sm:flex-none justify-start px-3 bg-card border-border">
+              <SelectTrigger className="w-auto min-w-[160px] px-3 bg-card border-border">
                 <Clock className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-muted-foreground" />
                 <SelectValue placeholder="Período" />
               </SelectTrigger>
@@ -417,21 +484,8 @@ export default function AssignmentsPage() {
                 <SelectItem value="6m">Últimos 6 meses</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={statusFilter} onValueChange={(v: StatusFilter) => setStatusFilter(v)}>
-              <SelectTrigger className="w-full sm:w-auto sm:min-w-[150px] flex-1 sm:flex-none justify-start px-3 bg-card border-border">
-                <SlidersHorizontal className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-muted-foreground" />
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Status</SelectItem>
-                <SelectItem value="active">EM CAMPO</SelectItem>
-                <SelectItem value="available">DEVOLVIDO</SelectItem>
-                <SelectItem value="completed">LIVRE</SelectItem>
-                <SelectItem value="overdue">ATRASADO</SelectItem>
-              </SelectContent>
-            </Select>
             <Select value={campaignFilter} onValueChange={setCampaignFilter}>
-              <SelectTrigger className="w-full sm:w-auto sm:min-w-[150px] flex-1 sm:flex-none justify-start px-3 bg-card border-border">
+              <SelectTrigger className="w-auto min-w-[150px] px-3 bg-card border-border">
                 <Calendar className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-muted-foreground" />
                 <SelectValue placeholder="Campanha" />
               </SelectTrigger>
@@ -443,7 +497,7 @@ export default function AssignmentsPage() {
               </SelectContent>
             </Select>
             <Select value={sortBy} onValueChange={(v: SortOption) => setSortBy(v)}>
-              <SelectTrigger className="w-full sm:w-auto sm:min-w-[200px] flex-[2] sm:flex-none justify-start px-3 bg-card border-border">
+              <SelectTrigger className="w-auto min-w-[200px] px-3 bg-card border-border">
                 <ArrowUpDown className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-muted-foreground" />
                 <SelectValue placeholder="Ordenar por" />
               </SelectTrigger>
@@ -458,11 +512,26 @@ export default function AssignmentsPage() {
             </Select>
           </div>
         </div>
+
+        {/* Mobile search */}
+        <div className="md:hidden relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar..."
+            className="pl-9 bg-card border-border w-full"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
       </div>
 
       {filtered.length === 0 ? (
         <div className="text-center py-20 border-2 border-dashed rounded-xl bg-muted print:hidden">
-          <p className="text-muted-foreground">Nenhum território confere com os filtros.</p>
+          <MapPin className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
+          <p className="text-muted-foreground font-medium">Nenhum território com este filtro.</p>
+          {statusFilter === "active" && (
+            <p className="text-xs text-muted-foreground/70 mt-1">Nenhum território em campo no momento.</p>
+          )}
         </div>
       ) : (
         <>
@@ -478,7 +547,7 @@ export default function AssignmentsPage() {
                   <TableHead className="text-foreground font-black text-[10px] text-center uppercase tracking-widest">Dias</TableHead>
                   <TableHead className="text-foreground font-black text-[10px] uppercase tracking-widest">Status</TableHead>
                   <TableHead className="text-foreground font-black text-[10px] text-center border-l border-border bg-muted/50 uppercase tracking-widest">
-                    Trabalhado<br/>({periodFilter === 'all' ? 'total' : periodFilter})
+                    Trabalhado<br />({periodFilter === 'all' ? 'total' : periodFilter})
                   </TableHead>
                   <TableHead className="text-foreground font-black text-[10px] text-center bg-muted/50 uppercase tracking-widest">
                     Última Conclusão
@@ -576,63 +645,58 @@ export default function AssignmentsPage() {
             </Table>
           </div>
 
-          {/* ===== MOBILE CARDS (hidden on desktop & print) ===== */}
+          {/* ===== MOBILE CARDS ===== */}
           <div className="md:hidden print:hidden space-y-2">
             {filtered.map((t) => (
-              <Card
+              <div
                 key={t.id}
-                className={`cursor-pointer transition-all border ${
-                  t.status === 'overdue'
-                    ? 'border-red-500/50 bg-red-500/5'
-                    : 'border-border bg-card hover:border-primary/40 hover:shadow-sm'
-                }`}
                 onClick={() => openSheet(t.id)}
+                className={cn(
+                  "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all active:scale-[0.98]",
+                  t.status === 'overdue'
+                    ? 'border-red-500/40 bg-red-500/5'
+                    : 'border-border bg-card hover:border-primary/30'
+                )}
               >
-                <CardContent className="p-3">
-                  <div className="flex items-center gap-3 mb-2">
-                    {t.groupColor ? (
-                      <div
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm"
-                        style={{ backgroundColor: t.groupColor }}
-                      />
+                {/* Indicador de grupo / cor */}
+                <div
+                  className="w-1 self-stretch rounded-full flex-shrink-0"
+                  style={{ backgroundColor: t.groupColor || (t.status === 'overdue' ? '#ef4444' : t.status === 'active' ? 'var(--primary)' : '#e5e7eb') }}
+                />
+
+                {/* Conteúdo principal */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2 mb-0.5">
+                    <p className="font-bold text-sm text-foreground truncate">{t.name}</p>
+                    <Badge
+                      variant="outline"
+                      className={cn("text-[9px] px-1.5 py-0 h-4 uppercase flex-shrink-0 font-black", STATUS_CLASS[t.status])}
+                    >
+                      {STATUS_LABELS[t.status]}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="font-mono opacity-60">#{t.number}</span>
+                    {t.activePublisher ? (
+                      <span className="flex items-center gap-1 min-w-0">
+                        <User className="w-3 h-3 flex-shrink-0" />
+                        <span className="truncate font-medium text-foreground">{t.activePublisher}</span>
+                      </span>
                     ) : (
-                      <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 border border-dashed border-border" />
+                      <span className="italic opacity-50">Disponível</span>
                     )}
-                    <div className="flex-1 min-w-0 flex items-center justify-between gap-2">
-                      <p className="font-semibold text-sm text-foreground truncate">{t.name}</p>
-                      <Badge
-                        variant="outline"
-                        className={`text-[10px] px-1.5 py-0 h-4 uppercase flex-shrink-0 ${STATUS_CLASS[t.status]}`}
-                      >
-                        {STATUS_LABELS[t.status]}
-                      </Badge>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground bg-muted p-2 rounded-md">
-                    <div>
-                      <span className="block text-[10px] text-muted-foreground/70 font-semibold uppercase mb-0.5">Dirigente</span>
-                      <span className="font-medium text-foreground truncate block">
-                        {t.activePublisher ? t.activePublisher : <span className="text-muted-foreground/50 italic">Disponível</span>}
+                    {t.daysInField !== null && (
+                      <span className={cn("flex items-center gap-0.5 flex-shrink-0 font-semibold", t.daysInField > 90 && "text-red-500")}>
+                        <Clock className="w-3 h-3" />
+                        {t.daysInField}d
+                        {t.daysInField > 90 && <AlertTriangle className="w-3 h-3" />}
                       </span>
-                    </div>
-                    <div>
-                      <span className="block text-[10px] text-muted-foreground/70 font-semibold uppercase mb-0.5">Dias em Campo</span>
-                      <span className={`font-medium ${t.daysInField && t.daysInField > 90 ? 'text-red-500' : 'text-foreground'}`}>
-                        {t.daysInField !== null ? `${t.daysInField}d` : '—'}
-                      </span>
-                    </div>
-                    <div className="border-t border-border pt-1 mt-0.5">
-                      <span className="block text-[10px] text-muted-foreground/70 font-semibold uppercase mb-0.5">Trabalhado ({periodFilter})</span>
-                      <span className="font-semibold text-primary">{t.completionsInPeriod} vezes</span>
-                    </div>
-                    <div className="border-t border-border pt-1 mt-0.5">
-                      <span className="block text-[10px] text-muted-foreground/70 font-semibold uppercase mb-0.5">Última Conclusão</span>
-                      <span className="font-mono">{fmtDate(t.lastCompletedAt)}</span>
-                    </div>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+
+                <History className="w-4 h-4 text-muted-foreground/40 flex-shrink-0" />
+              </div>
             ))}
           </div>
         </>
@@ -651,8 +715,8 @@ export default function AssignmentsPage() {
         onSuccess={fetchData}
       />
 
-      {/* COMPONENTE DE IMPRESSÃO (Otimizado para PDF) */}
-      <TerritoryPrintReport 
+      {/* COMPONENTE DE IMPRESSÃO */}
+      <TerritoryPrintReport
         data={[...filtered]
           .sort((a, b) => a.number.localeCompare(b.number, undefined, { numeric: true }))
           .map(t => ({

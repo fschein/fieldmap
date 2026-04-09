@@ -417,41 +417,43 @@ export default function TerritoryMapPage({
 
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col gap-0 bg-background">
-      {/* Header Compacto Premium */}
-      <div className="border-b bg-card px-6 py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground">
+      {/* Header Compacto */}
+      <div className="border-b bg-card px-3 sm:px-6 py-2 sm:py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm gap-2">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+          <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground flex-shrink-0 h-8 px-2 sm:px-3">
             <Link href="/dashboard/territories">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Territórios</span>
+              <ArrowLeft className="h-4 w-4" />
+              <span className="hidden sm:inline ml-1">Territórios</span>
             </Link>
           </Button>
 
-          <div className="h-6 w-px bg-border" />
+          <div className="h-5 w-px bg-border hidden sm:block" />
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 min-w-0">
             <div
-              className="h-8 w-8 rounded-lg flex-shrink-0 flex items-center justify-center text-white font-bold shadow-sm"
+              className="h-7 w-7 rounded-lg flex-shrink-0 flex items-center justify-center text-white font-bold text-xs shadow-sm"
               style={{ backgroundColor: territory.color }}
             >
               {territory.number.slice(0, 2)}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="font-mono text-xs bg-muted border-border text-muted-foreground">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <Badge variant="outline" className="font-mono text-xs bg-muted border-border text-muted-foreground hidden sm:flex">
                   T-{territory.number}
                 </Badge>
-                <h1 className="text-lg font-bold text-foreground tracking-tight">{territory.name}</h1>
-                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-primary" onClick={() => setEditTerritoryDialogOpen(true)}>
-                  <Pencil className="h-3.5 w-3.5" />
+                <h1 className="text-sm sm:text-lg font-bold text-foreground tracking-tight truncate max-w-[140px] sm:max-w-none">
+                  {territory.name}
+                </h1>
+                <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-primary flex-shrink-0" onClick={() => setEditTerritoryDialogOpen(true)}>
+                  <Pencil className="h-3 w-3" />
                 </Button>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          {/* Progress Section */}
+        <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+          {/* Progress Section - desktop only */}
           <div className="hidden sm:flex items-center gap-3 px-4 py-1.5 rounded-full bg-muted border border-border shadow-inner">
             <div className="flex flex-col">
               <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider leading-none mb-1">Status de Campo</span>
@@ -469,10 +471,21 @@ export default function TerritoryMapPage({
             </div>
           </div>
 
+          {/* Progress mobile compacto */}
+          <div className="sm:hidden flex items-center gap-1.5 text-xs">
+            <span className="font-bold text-foreground">{stats.completed}/{stats.total}</span>
+            <div className="h-1.5 w-16 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-green-500 transition-all duration-500 rounded-full"
+                style={{ width: `${stats.percentage}%` }}
+              />
+            </div>
+          </div>
+
           {saving && (
-            <div className="flex items-center gap-2 text-sm text-primary font-medium animate-pulse">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span className="text-xs">Salvando...</span>
+            <div className="flex items-center gap-1 text-xs text-primary font-medium animate-pulse">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span className="hidden sm:inline">Salvando...</span>
             </div>
           )}
         </div>

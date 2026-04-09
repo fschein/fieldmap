@@ -13,8 +13,9 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2, Search, AlertTriangle, Clock } from "lucide-react"
+import { Loader2, Search, AlertTriangle, Clock, User, Users } from "lucide-react"
 import { toast } from "sonner"
+import { cn } from "@/lib/utils"
 
 interface Territory {
   id: string
@@ -33,12 +34,20 @@ interface Publisher {
   name: string
 }
 
+interface Group {
+  id: string
+  name: string
+  color?: string
+}
+
 interface AssignmentCreateModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   preselectedTerritoryId?: string | null
   onSuccess: () => void
 }
+
+type AssigneeType = "publisher" | "group"
 
 export function AssignmentCreateModal({
   open,
@@ -53,10 +62,14 @@ export function AssignmentCreateModal({
 
   const [territories, setTerritories] = useState<Territory[]>([])
   const [publishers, setPublishers] = useState<Publisher[]>([])
+  const [groups, setGroups] = useState<Group[]>([])
   const [campaigns, setCampaigns] = useState<{ id: string; name: string; start_date?: string | null; end_date?: string | null }[]>([])
 
+  // assignee type: publicador ou grupo
+  const [assigneeType, setAssigneeType] = useState<AssigneeType>("publisher")
   const [selectedTerritoryId, setSelectedTerritoryId] = useState<string>("")
   const [selectedPublisherId, setSelectedPublisherId] = useState<string>("")
+  const [selectedGroupId, setSelectedGroupId] = useState<string>("")
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>("")
   const [startDate, setStartDate] = useState(getLocalTodayStr())
   const [endDate, setEndDate] = useState("")
@@ -67,7 +80,9 @@ export function AssignmentCreateModal({
     if (open) {
       setSelectedTerritoryId(preselectedTerritoryId || "")
       setSelectedPublisherId("")
+      setSelectedGroupId("")
       setSelectedCampaignId("")
+      setAssigneeType("publisher")
       setStartDate(getLocalTodayStr())
       setEndDate("")
       setSearchTerritory("")
@@ -79,7 +94,7 @@ export function AssignmentCreateModal({
   const loadData = async () => {
     setLoading(true)
     try {
-      const [terrRes, pubRes, campRes, activeAssignmentsRes] = await Promise.all([
+      const [terrRes, pubRes, campRes, activeAssignmentsRes, groupsRes] = await Promise.all([
         supabase
           .from("territories")
           .select("id, name, number, color, assigned_to, last_completed_at")
@@ -97,7 +112,11 @@ export function AssignmentCreateModal({
         supabase
           .from("assignments")
           .select("territory_id, assigned_at")
-          .eq("status", "active")
+          .eq("status", "active"),
+        supabase
+          .from("groups")
+          .select("id, name, color")
+          .order("name"),
       ])
 
       if (terrRes.data && activeAssignmentsRes.data) {
@@ -110,7 +129,7 @@ export function AssignmentCreateModal({
               (now - new Date(t.last_completed_at).getTime()) / (1000 * 60 * 60 * 24)
             )
           } else {
-            urgencyDays = 9999 // Nunca concluído = máxima urgência
+            urgencyDays = 9999
           }
 
           let assignedName = null
@@ -131,7 +150,6 @@ export function AssignmentCreateModal({
           return { ...t, urgencyDays, assignedName, daysInField }
         })
 
-        // Ordenar: disponíveis primeiro, depois por urgência decrescente
         mapped.sort((a, b) => {
           if (!a.assigned_to && b.assigned_to) return -1
           if (a.assigned_to && !b.assigned_to) return 1
@@ -142,11 +160,11 @@ export function AssignmentCreateModal({
       }
 
       if (pubRes.data) setPublishers(pubRes.data)
+      if (groupsRes.data) setGroups(groupsRes.data)
       if (campRes.data) {
         const campsData = campRes.data as any[]
         setCampaigns(campsData)
 
-        // Auto-selecionar campanha atual baseada na data de HOJE
         const today = new Date()
         const currentCampaign = campsData.find(c => {
           if (!c.start_date) return false
@@ -178,14 +196,19 @@ export function AssignmentCreateModal({
 
   const selectedTerr = territories.find((t) => t.id === selectedTerritoryId)
   const selectedPub = publishers.find((p) => p.id === selectedPublisherId)
+  const selectedGroup = groups.find((g) => g.id === selectedGroupId)
 
   const handleSave = async () => {
     if (!selectedTerritoryId) {
       toast.error("Selecione um território")
       return
     }
-    if (!selectedPublisherId) {
+    if (assigneeType === "publisher" && !selectedPublisherId) {
       toast.error("Selecione um publicador")
+      return
+    }
+    if (assigneeType === "group" && !selectedGroupId) {
+      toast.error("Selecione um grupo")
       return
     }
     if (!startDate) {
@@ -199,6 +222,7 @@ export function AssignmentCreateModal({
       const endISO = toLocalISOString(endDate)
       const isCompleted = !!endISO
 
+      // Retornar designação ativa anterior
       if (!isCompleted) {
         await supabase
           .from("assignments")
@@ -207,9 +231,12 @@ export function AssignmentCreateModal({
           .eq("status", "active")
       }
 
+      const isGroupAssign = assigneeType === "group"
+
       const { error: assignErr } = await supabase.from("assignments").insert({
         territory_id: selectedTerritoryId,
-        user_id: selectedPublisherId,
+        user_id: isGroupAssign ? null : selectedPublisherId,
+        group_id: isGroupAssign ? selectedGroupId : null,
         campaign_id: selectedCampaignId || null,
         status: isCompleted ? "completed" : "active",
         assigned_at: startISO,
@@ -223,9 +250,14 @@ export function AssignmentCreateModal({
       if (isCompleted) {
         terrUpdate.assigned_to = null
         terrUpdate.last_completed_at = endISO
-      } else {
+      } else if (!isGroupAssign) {
         terrUpdate.assigned_to = selectedPublisherId
+      } else {
+        // designação de grupo — não altera assigned_to (fica null para ser acessível pelo grupo)
+        // mas registra o group_id se relevante para o contexto de domingo
+        terrUpdate.assigned_to = null
       }
+
       if (selectedCampaignId) {
         terrUpdate.campaign_id = selectedCampaignId
       } else {
@@ -237,8 +269,8 @@ export function AssignmentCreateModal({
         .update(terrUpdate)
         .eq("id", selectedTerritoryId)
 
-      // Enviar notificação push se não for histórico
-      if (!isCompleted) {
+      // Enviar notificação push apenas para designações individuais ativas
+      if (!isCompleted && !isGroupAssign) {
         fetch("/api/push/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -254,6 +286,8 @@ export function AssignmentCreateModal({
       toast.success(
         isCompleted
           ? "Designação histórica salva com sucesso!"
+          : isGroupAssign
+          ? `${selectedTerr?.name} designado para o grupo ${selectedGroup?.name}`
           : `${selectedTerr?.name} designado para ${selectedPub?.name}`
       )
       onOpenChange(false)
@@ -279,7 +313,7 @@ export function AssignmentCreateModal({
         ) : (
           <div className="space-y-5 py-2">
             {/* Resumo da Seleção */}
-            {(selectedTerr || selectedPub) && (
+            {(selectedTerr || selectedPub || selectedGroup) && (
               <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-sm space-y-1">
                 {selectedTerr && (
                   <p>
@@ -293,10 +327,16 @@ export function AssignmentCreateModal({
                     )}
                   </p>
                 )}
-                {selectedPub && (
+                {selectedPub && assigneeType === "publisher" && (
                   <p>
                     <span className="text-muted-foreground">Publicador:</span>{" "}
                     <strong className="text-foreground">{selectedPub.name}</strong>
+                  </p>
+                )}
+                {selectedGroup && assigneeType === "group" && (
+                  <p>
+                    <span className="text-muted-foreground">Grupo:</span>{" "}
+                    <strong className="text-foreground">{selectedGroup.name}</strong>
                   </p>
                 )}
               </div>
@@ -363,31 +403,92 @@ export function AssignmentCreateModal({
               </div>
             </div>
 
-            {/* Publicador */}
+            {/* Toggle Publicador / Grupo */}
             <div className="space-y-2">
-              <Label className="text-sm font-semibold">Publicador</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar publicador..."
-                  className="pl-8 h-8 text-sm"
-                  value={searchPublisher}
-                  onChange={(e) => setSearchPublisher(e.target.value)}
-                />
-              </div>
-              <div className="border rounded-lg max-h-[120px] overflow-y-auto divide-y bg-card">
-                {filteredPublishers.map((p) => (
-                  <button
-                    key={p.id}
-                    className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent transition-colors ${selectedPublisherId === p.id ? "bg-primary/5 border-l-2 border-l-primary font-medium" : ""
-                      }`}
-                    onClick={() => setSelectedPublisherId(p.id)}
-                  >
-                    <span className="text-foreground">{p.name}</span>
-                  </button>
-                ))}
+              <Label className="text-sm font-semibold">Designar para</Label>
+              <div className="flex rounded-lg border border-border overflow-hidden">
+                <button
+                  className={cn(
+                    "flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold transition-colors",
+                    assigneeType === "publisher"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  )}
+                  onClick={() => { setAssigneeType("publisher"); setSelectedGroupId("") }}
+                >
+                  <User className="w-3.5 h-3.5" />
+                  Publicador
+                </button>
+                <button
+                  className={cn(
+                    "flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold transition-colors border-l border-border",
+                    assigneeType === "group"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground hover:bg-muted/80"
+                  )}
+                  onClick={() => { setAssigneeType("group"); setSelectedPublisherId("") }}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  Grupo
+                </button>
               </div>
             </div>
+
+            {/* Publicador */}
+            {assigneeType === "publisher" && (
+              <div className="space-y-2">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar publicador..."
+                    className="pl-8 h-8 text-sm"
+                    value={searchPublisher}
+                    onChange={(e) => setSearchPublisher(e.target.value)}
+                  />
+                </div>
+                <div className="border rounded-lg max-h-[120px] overflow-y-auto divide-y bg-card">
+                  {filteredPublishers.map((p) => (
+                    <button
+                      key={p.id}
+                      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent transition-colors ${selectedPublisherId === p.id ? "bg-primary/5 border-l-2 border-l-primary font-medium" : ""
+                        }`}
+                      onClick={() => setSelectedPublisherId(p.id)}
+                    >
+                      <span className="text-foreground">{p.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Grupo */}
+            {assigneeType === "group" && (
+              <div className="space-y-2">
+                <div className="border rounded-lg max-h-[120px] overflow-y-auto divide-y bg-card">
+                  {groups.length === 0 && (
+                    <p className="text-center text-sm text-muted-foreground py-4">Nenhum grupo cadastrado</p>
+                  )}
+                  {groups.map((g) => (
+                    <button
+                      key={g.id}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-accent transition-colors",
+                        selectedGroupId === g.id ? "bg-primary/5 border-l-2 border-l-primary" : ""
+                      )}
+                      onClick={() => setSelectedGroupId(g.id)}
+                    >
+                      {g.color && (
+                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: g.color }} />
+                      )}
+                      <span className="text-sm font-medium text-foreground">{g.name}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-muted-foreground bg-amber-500/10 border border-amber-500/20 rounded-md p-2">
+                  ☀️ Designação de grupo — o território ficará disponível para o grupo trabalhar (ex: modo domingo). Não será sobrescrito automaticamente.
+                </p>
+              </div>
+            )}
 
             {/* Campanha */}
             <div className="space-y-2">
@@ -410,7 +511,7 @@ export function AssignmentCreateModal({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-sm font-semibold">
-                  Data de Entrega <span className="text-red-500">*</span>
+                  Entrega <span className="text-red-500">*</span>
                 </Label>
                 <Input
                   type="date"
@@ -421,7 +522,7 @@ export function AssignmentCreateModal({
               </div>
               <div className="space-y-1.5">
                 <Label className="text-sm font-semibold text-muted-foreground">
-                  Data de Conclusão{" "}
+                  Conclusão{" "}
                   <span className="font-normal opacity-70">(opcional)</span>
                 </Label>
                 <Input

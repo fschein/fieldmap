@@ -19,6 +19,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
+import { AssignmentCreateModal } from "@/components/dashboard/assignment-create-modal"
 import type { AssignmentStatus } from "@/lib/types"
 
 interface Profile { id: string; name: string }
@@ -66,10 +67,10 @@ export function AssignmentHistorySheet({
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [publishers, setPublishers] = useState<Profile[]>([])
 
-  // Quick-add state
-  const [isAddingMode, setIsAddingMode] = useState(false)
-  const [selectedPublisher, setSelectedPublisher] = useState("")
-  const [customStartDate, setCustomStartDate] = useState("")
+  const canEdit = isAdmin || isDirigente
+
+  // Modal de designacao completo
+  const [assignModalOpen, setAssignModalOpen] = useState(false)
 
   // Inline edit state
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -77,16 +78,10 @@ export function AssignmentHistorySheet({
   const [editEnd, setEditEnd] = useState("")
   const [savingEdit, setSavingEdit] = useState(false)
 
-  const canEdit = isAdmin || isDirigente
-
   useEffect(() => {
     if (open && territoryId && isReady) {
       loadHistory()
-      if (canEdit && publishers.length === 0) loadPublishers()
     } else if (!open) {
-      setIsAddingMode(false)
-      setSelectedPublisher("")
-      setCustomStartDate("")
       setEditingId(null)
     }
   }, [open, territoryId, isReady])
@@ -146,54 +141,6 @@ export function AssignmentHistorySheet({
       onUpdate()
     } catch {
       toast.error("Erro ao atualizar status.")
-      setLoading(false)
-    }
-  }
-
-  const handleCreateAssignment = async () => {
-    if (!selectedPublisher) { toast.error("Selecione um publicador"); return }
-    try {
-      setLoading(true)
-      const activeCurrent = assignments.find(a => a.status === 'active')
-      if (activeCurrent) {
-        toast.error("Este território já está em campo.")
-        setLoading(false)
-        return
-      }
-
-      let dateToUse = new Date().toISOString()
-      if (customStartDate) {
-        dateToUse = new Date(`${customStartDate}T12:00:00Z`).toISOString()
-      }
-
-      const { error } = await supabase.from("assignments").insert({
-        territory_id: territoryId,
-        user_id: selectedPublisher,
-        status: 'active',
-        assigned_at: dateToUse,
-      })
-      if (error) throw error
-
-      // Inserir notificação (Novo território designado)
-      if (territory) {
-        await supabase.from("notifications").insert({
-          type: "assigned",
-          title: "Novo território designado",
-          message: `O território ${territory.number} foi designado para você.`,
-          user_id: selectedPublisher,
-          territory_id: territoryId,
-          created_by: (await supabase.auth.getUser()).data.user?.id
-        }).catch((err: unknown) => console.error("Erro ao inserir notificação:", err))
-      }
-
-      toast.success("Nova designação criada!")
-      setIsAddingMode(false)
-      setSelectedPublisher("")
-      setCustomStartDate("")
-      await loadHistory()
-      onUpdate()
-    } catch {
-      toast.error("Erro ao criar designação.")
       setLoading(false)
     }
   }
@@ -315,6 +262,7 @@ export function AssignmentHistorySheet({
   }
 
   return (
+    <>
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-md overflow-y-auto pb-20">
         <SheetHeader className="mb-6">
@@ -336,49 +284,22 @@ export function AssignmentHistorySheet({
         ) : !territory ? null : (
           <div className="space-y-6">
 
-            {/* Nova Designação Rápida */}
+            {/* Nova Designação - usa o modal completo */}
             {canEdit && (
-              <div className="bg-muted/50 border border-border rounded-lg p-3 space-y-3">
+              <div className="bg-muted/50 border border-border rounded-lg p-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold flex items-center gap-1.5 text-foreground">
                     <PlayCircle className="w-4 h-4 text-primary" /> Nova Designação
                   </h3>
-                  {!isAddingMode && (
-                    <Button variant="outline" size="sm" onClick={() => setIsAddingMode(true)} className="h-7 text-xs">
-                      <PlusCircle className="mr-1 h-3 w-3" /> Adicionar
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setAssignModalOpen(true)}
+                    className="h-7 text-xs"
+                  >
+                    <PlusCircle className="mr-1 h-3 w-3" /> Adicionar
+                  </Button>
                 </div>
-
-                {isAddingMode && (
-                  <div className="space-y-3 pt-2 border-t">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Publicador</Label>
-                      <select
-                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        value={selectedPublisher}
-                        onChange={(e) => setSelectedPublisher(e.target.value)}
-                      >
-                        <option value="">Selecione...</option>
-                        {publishers.map(p => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Data de Início (opcional — padrão: hoje)</Label>
-                      <Input type="date" value={customStartDate} onChange={(e) => setCustomStartDate(e.target.value)} className="h-9" />
-                    </div>
-                    <div className="flex gap-2 pt-1">
-                      <Button size="sm" onClick={handleCreateAssignment} disabled={loading} className="flex-1">
-                        Confirmar
-                      </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setIsAddingMode(false)} disabled={loading}>
-                        Cancelar
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
@@ -546,5 +467,17 @@ export function AssignmentHistorySheet({
         )}
       </SheetContent>
     </Sheet>
+
+    {/* Modal completo de designação com território pré-selecionado */}
+    <AssignmentCreateModal
+      open={assignModalOpen}
+      onOpenChange={setAssignModalOpen}
+      preselectedTerritoryId={territoryId}
+      onSuccess={async () => {
+        await loadHistory()
+        onUpdate()
+      }}
+    />
+  </>
   )
 }
