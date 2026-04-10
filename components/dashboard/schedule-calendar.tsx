@@ -38,8 +38,8 @@ export function ScheduleCalendar({
         territory:territories(id, number, name)
       `)
       .eq('status', 'published')
-      .gte('date', start.toISOString())
-      .lte('date', end.toISOString())
+      .gte('date', format(start, 'yyyy-MM-dd'))
+      .lte('date', format(end, 'yyyy-MM-dd'))
       .order('date', { ascending: true })
 
     if (scheduleError) {
