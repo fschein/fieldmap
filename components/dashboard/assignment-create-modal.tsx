@@ -44,6 +44,7 @@ interface AssignmentCreateModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   preselectedTerritoryId?: string | null
+  preselectedPublisherId?: string | null
   onSuccess: () => void
 }
 
@@ -53,6 +54,7 @@ export function AssignmentCreateModal({
   open,
   onOpenChange,
   preselectedTerritoryId = null,
+  preselectedPublisherId = null,
   onSuccess,
 }: AssignmentCreateModalProps) {
   const supabase = getSupabaseBrowserClient()
@@ -78,7 +80,7 @@ export function AssignmentCreateModal({
   useEffect(() => {
     if (open) {
       setSelectedTerritoryId(preselectedTerritoryId || "")
-      setSelectedPublisherId("")
+      setSelectedPublisherId(preselectedPublisherId || "")
       setSelectedGroupId("")
       setSelectedCampaignId("")
       setAssigneeType("publisher")
@@ -88,7 +90,7 @@ export function AssignmentCreateModal({
       setSearchPublisher("")
       loadData()
     }
-  }, [open, preselectedTerritoryId])
+  }, [open, preselectedTerritoryId, preselectedPublisherId])
 
   const loadData = async () => {
     setLoading(true)

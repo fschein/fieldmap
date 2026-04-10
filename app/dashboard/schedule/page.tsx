@@ -11,6 +11,7 @@ import { ScheduleGenerator } from "@/components/dashboard/schedule-generator"
 import { ScheduleCalendar } from "@/components/dashboard/schedule-calendar"
 import { exportScheduleToPDF } from "@/lib/utils/schedule-pdf"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
+import { cn } from "@/lib/utils"
 import { format, startOfMonth, endOfMonth } from "date-fns"
 import { toast } from "sonner"
 
@@ -54,42 +55,69 @@ export default function SchedulePage() {
 
   return (
     <div className="container mx-auto p-4 space-y-6 pb-24 md:pb-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-black uppercase tracking-tight text-foreground">Escala de Dirigentes</h1>
-          <p className="text-xs text-muted-foreground font-medium mt-1">
-            Gestão e organização das saídas de campo e designações.
+          <h1 className="text-2xl font-black uppercase tracking-tight text-foreground leading-none">Gestão de Escala</h1>
+          <p className="text-[11px] text-muted-foreground font-medium mt-1 uppercase tracking-wider">
+            Organização de saídas e designações
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-2 font-bold border-2" onClick={handleExport}>
+          <Button variant="outline" size="sm" className="h-10 px-4 gap-2 font-bold border-2 rounded-xl bg-card hover:bg-muted transition-all shadow-sm" onClick={handleExport}>
             <FileDown className="h-4 w-4" />
-            Exportar PDF
+            <span className="hidden sm:inline">Exportar PDF</span>
+            <span className="sm:hidden text-xs">PDF</span>
           </Button>
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className={isAdmin ? "grid w-full grid-cols-3 mb-8" : "grid w-full grid-cols-1 mb-8"}>
-          <TabsTrigger value="calendar" className="gap-2">
-            <Calendar className="h-4 w-4" />
-            Calendário
-          </TabsTrigger>
-          {isAdmin && (
-            <>
-              <TabsTrigger value="config" className="gap-2">
-                <Settings className="h-4 w-4" />
-                Configurar
-              </TabsTrigger>
-              <TabsTrigger value="generator" className="gap-2">
-                <Wand2 className="h-4 w-4" />
-                Gerar Escala
-              </TabsTrigger>
-            </>
+      {/* Navegação por abas (Estilo Pills Premium) */}
+      <div className="flex overflow-x-auto pb-4 gap-2 hide-scrollbar no-scrollbar scroll-smooth">
+        <button
+          onClick={() => setActiveTab("calendar")}
+          className={cn(
+            "shrink-0 h-10 px-6 rounded-full text-[10px] sm:text-[11px] font-black uppercase tracking-widest border transition-all shadow-sm flex items-center gap-2",
+            activeTab === "calendar"
+              ? "bg-foreground text-background border-foreground shadow-md active:scale-95"
+              : "bg-card text-muted-foreground border-border hover:bg-muted/50"
           )}
-        </TabsList>
+        >
+          <Calendar className="h-3.5 w-3.5" />
+          <span>Calendário</span>
+        </button>
 
-        <TabsContent value="calendar">
+        {isAdmin && (
+          <>
+            <button
+              onClick={() => setActiveTab("config")}
+              className={cn(
+                "shrink-0 h-10 px-6 rounded-full text-[10px] sm:text-[11px] font-black uppercase tracking-widest border transition-all shadow-sm flex items-center gap-2",
+                activeTab === "config"
+                  ? "bg-foreground text-background border-foreground shadow-md active:scale-95"
+                  : "bg-card text-muted-foreground border-border hover:bg-muted/50"
+              )}
+            >
+              <Settings className="h-3.5 w-3.5" />
+              <span>Configurar</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("generator")}
+              className={cn(
+                "shrink-0 h-10 px-6 rounded-full text-[10px] sm:text-[11px] font-black uppercase tracking-widest border transition-all shadow-sm flex items-center gap-2",
+                activeTab === "generator"
+                  ? "bg-foreground text-background border-foreground shadow-md active:scale-95"
+                  : "bg-card text-muted-foreground border-border hover:bg-muted/50"
+              )}
+            >
+              <Wand2 className="h-3.5 w-3.5" />
+              <span>Gerar Escala</span>
+            </button>
+          </>
+        )}
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsContent value="calendar" className="mt-0">
           <ScheduleCalendar currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} />
         </TabsContent>
 
