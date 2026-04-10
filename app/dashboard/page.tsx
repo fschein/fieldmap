@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import {
   Map as MapIcon, MapPin, Users, CheckCircle, Clock, Loader2, 
-  TrendingUp, AlertCircle, Activity
+  TrendingUp, AlertCircle, Activity, AlertTriangle
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 
@@ -259,106 +259,66 @@ export default function DashboardPage() {
         <p className="text-xs text-muted-foreground font-medium">Bem-vindo, {profile?.name || "Usuário"}!</p>
       </div>
 
-      {/* Stats Consolidado (Mobile-First 2x2 Grid) */}
+      {/* Stats Consolidado (Option A: Primary Focus Hero) */}
       {stats && (
-        <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-          <Card className={cn("bg-card border-border", stats.overdueAssignments > 0 && "border-orange-500/20 bg-orange-500/5")}>
-            <CardHeader className="p-3 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium flex items-center justify-between">
-                <span className="flex items-center gap-1.5 text-muted-foreground uppercase font-black tracking-widest text-[9px]">
-                  <Activity className="h-3.5 w-3.5 text-primary" />
-                  <span className="hidden sm:inline">Em Campo</span>
-                  <span className="sm:hidden">Ativos</span>
-                </span>
-                {stats.overdueAssignments > 0 && (
-                  <AlertCircle className="h-4 w-4 text-orange-500" />
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-3 pt-0">
-              <div className="text-xl sm:text-2xl font-black text-foreground">{stats.activeAssignments}</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                {stats.overdueAssignments > 0 ? (
-                  <span className="text-orange-500 font-bold uppercase tracking-tight">{stats.overdueAssignments} atrasados</span>
-                ) : (
-                  <span>trabalhando agora</span>
-                )}
-              </p>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-2 gap-3 mb-4">
+          {/* Ativos */}
+          <div className="bg-card rounded-2xl border border-border p-3.5 flex flex-col gap-1.5 shadow-sm transition-transform active:scale-[0.98]">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5" /> Em campo
+            </span>
+            <span className="text-4xl font-black leading-none tracking-tighter text-foreground">{stats.activeAssignments}</span>
+            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide">territórios ativos</span>
+          </div>
 
-          <Card className="border-emerald-500/20 bg-emerald-500/5">
-            <CardHeader className="p-3 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium flex items-center gap-1.5 text-muted-foreground">
-                <MapIcon className="h-4 w-4 text-emerald-600" />
-                Prontos
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-3 pt-0">
-              <div className="text-xl sm:text-2xl font-bold text-emerald-700">{stats.freeTerritories}</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                esperando designação
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className={stats.overdueAssignments > 0 ? "border-red-500/20 bg-red-500/5" : ""}>
-            <CardHeader className="p-3 pb-2">
-              <h2 className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
-                <Clock className="h-4 w-4" /> Atrasados
-              </h2>
-            </CardHeader>
-            <CardContent className="p-3 pt-0">
-              <div className="text-xl sm:text-2xl font-bold text-red-700">{stats.overdueAssignments}</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                há mais de 90 dias
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="p-3 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium flex items-center gap-1.5 text-muted-foreground">
-                <TrendingUp className="h-4 w-4 text-primary" />
-                Eficiência
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-3 pt-0">
-              <div className="text-xl sm:text-2xl font-bold">{stats.completionRate}%</div>
-              <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                territórios concluídos
-              </p>
-            </CardContent>
-          </Card>
+          {/* Atrasados */}
+          <div className="bg-card rounded-2xl border border-border p-3.5 flex flex-col gap-1.5 shadow-sm transition-transform active:scale-[0.98]">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <AlertTriangle className={cn("w-3.5 h-3.5", stats.overdueAssignments > 0 ? "text-red-500" : "text-muted-foreground")} /> Atrasados
+            </span>
+            <span className={cn(
+              "text-4xl font-black leading-none tracking-tighter",
+              stats.overdueAssignments > 0 ? "text-red-500" : "text-foreground"
+            )}>
+              {stats.overdueAssignments}
+            </span>
+            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide">há mais de 90 dias</span>
+          </div>
         </div>
       )}
 
       {/* Main Sections Grid (3 Columns on Desktop) */}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Column 1: Em Campo (Who has it, Days, Progress) */}
-        <Card className="flex flex-col h-full bg-card border-border shadow-sm">
-          <CardHeader className="pb-3 border-b mb-3 border-border">
-            <CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-foreground">
-              <MapPin className="h-4 w-4 text-primary" />
-              Em Campo
-            </CardTitle>
-            <CardDescription className="text-xs text-muted-foreground">
-              Quem está trabalhando e o progresso
-            </CardDescription>
+        <Card className="flex flex-col h-full bg-card border-border shadow-sm overflow-hidden">
+          <CardHeader className="p-4 pb-3 border-b border-border bg-muted/5">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-base font-black uppercase tracking-[0.1em] text-foreground">
+                  <MapPin className="h-4 w-4 text-primary" />
+                  Em Campo
+                </CardTitle>
+                <CardDescription className="text-[10px] text-muted-foreground font-black uppercase mt-0.5 tracking-wider">
+                  Progresso das designações
+                </CardDescription>
+              </div>
+              <Badge variant="outline" className="h-5 px-1.5 text-[10px] font-black border-primary/20 text-primary uppercase">
+                {territories.filter(t => t.isActive).length}
+              </Badge>
+            </div>
           </CardHeader>
-          <CardContent className="flex-1">
+          <CardContent className="p-0">
             {territories.filter(t => t.isActive).length === 0 ? (
-              <p className="text-center text-muted-foreground py-8 text-sm">
-                Nenhum território em campo
-              </p>
+              <div className="p-12 text-center text-muted-foreground flex flex-col items-center gap-2">
+                <MapPin className="h-8 w-8 opacity-20" />
+                <p className="text-xs font-medium italic">Nenhum território em campo</p>
+              </div>
             ) : (
-              <div className="space-y-4">
+              <div className="divide-y divide-border/50">
                 {territories
                   .filter(t => t.isActive)
                   .map((territory) => {
                     const isOverdue = territory.daysInField && territory.daysInField > 90
-                    
-                    // Calcula progresso das subdivisions
                     const subs = (territory as any).subdivisions || []
                     const completedSubs = subs.filter((s: any) => s.completed || s.status === 'completed').length
                     const totalSubs = subs.length
@@ -368,56 +328,59 @@ export default function DashboardPage() {
                       <div
                         key={territory.id}
                         className={cn(
-                          "p-4 rounded-2xl border transition-all hover:border-primary/30 bg-card shadow-sm",
-                          isOverdue ? "border-red-500/30 bg-red-500/5 shadow-red-500/5" : "border-border"
+                          "p-4 transition-all hover:bg-muted/50 group",
+                          isOverdue && "bg-red-500/5 hover:bg-red-500/10"
                         )}
                       >
-                        <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-start justify-between gap-3 mb-2">
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-foreground truncate">
+                            <h4 className="text-sm font-bold text-foreground truncate group-hover:text-primary transition-colors">
                               {territory.name}
-                            </p>
-                            <p className="text-[10px] font-black text-primary truncate uppercase tracking-widest flex items-center gap-1.5">
+                            </h4>
+                            <div className="flex items-center gap-1.5 mt-1">
                               {(() => {
                                 const assignment = territory.lastAssignment as any
                                 const name = namesLookup.get(assignment?.user_id) || namesLookup.get(assignment?.group_id) || "Disponível"
                                 const isGroup = !!assignment?.group_id
-                                const isSunday = assignment?.assigned_at ? new Date(assignment.assigned_at).getDay() === 0 : false
                                 
                                 return (
                                   <>
-                                    {isGroup && <Badge variant="outline" className="h-3.5 px-0.5 text-[7.5px] border-primary text-primary font-black leading-none">GRUPO</Badge>}
-                                    {name}
-                                    {isSunday && <span className="text-[9px] opacity-70" title="Designado no Domingo">☀️</span>}
+                                    {isGroup && (
+                                      <Badge variant="outline" className="h-3.5 px-1 text-[8px] border-primary text-primary font-black leading-none uppercase">
+                                        Grupo
+                                      </Badge>
+                                    )}
+                                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest truncate">
+                                      {name}
+                                    </span>
                                   </>
                                 )
                               })()}
-                            </p>
+                            </div>
                           </div>
-                          {isOverdue && (
-                            <Badge variant="destructive" className="text-[8px] h-4 px-1 leading-none font-black uppercase">
-                              Atrasado
-                            </Badge>
-                          )}
+                          <div className="flex flex-col items-end gap-1">
+                            <span className={cn(
+                              "text-[10px] font-black whitespace-nowrap uppercase",
+                              isOverdue ? "text-red-500 animate-pulse" : "text-muted-foreground"
+                            )}>
+                              {territory.daysInField} dias
+                            </span>
+                          </div>
                         </div>
                         
-                        <div className="flex items-center justify-between mb-1.5 px-0.5">
-                          <span className={cn("text-[10px] font-bold", isOverdue ? "text-red-700" : "text-muted-foreground")}>
-                            ⌛ {territory.daysInField} dias
-                          </span>
-                          <span className="text-[10px] font-black text-foreground">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                            <div 
+                              className={cn(
+                                "h-full transition-all duration-700 rounded-full",
+                                progress === 100 ? "bg-emerald-500" : "bg-primary"
+                              )}
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                          <span className="text-[10px] font-black text-foreground tabular-nums w-8 text-right">
                              {progress}%
                           </span>
-                        </div>
-                        
-                        <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
-                          <div 
-                            className={cn(
-                              "h-full transition-all duration-700 rounded-full",
-                              progress === 100 ? "bg-emerald-500" : "bg-[#C65D3B]"
-                            )}
-                            style={{ width: `${progress}%` }}
-                          />
                         </div>
                       </div>
                     )
@@ -428,48 +391,49 @@ export default function DashboardPage() {
         </Card>
 
         {/* Column 2: Mais Trabalhados */}
-        <Card className="flex flex-col h-full bg-card border-border shadow-sm">
-          <CardHeader className="pb-3 border-b mb-3 border-border">
-            <CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-foreground">
+        <Card className="flex flex-col h-full bg-card border-border shadow-sm overflow-hidden">
+          <CardHeader className="p-4 pb-3 border-b border-border bg-muted/5">
+            <CardTitle className="flex items-center gap-2 text-base font-black uppercase tracking-[0.1em] text-foreground">
               <TrendingUp className="h-4 w-4 text-emerald-500" />
-              Mais Trabalhados
+              Ranking
             </CardTitle>
-            <CardDescription className="text-xs text-muted-foreground">
-              Territórios com maior rotatividade
+            <CardDescription className="text-[10px] text-muted-foreground font-black uppercase mt-0.5 tracking-wider">
+              Territórios mais rotativos
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex-1">
+          <CardContent className="p-0">
             {territories.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8 text-sm">
-                Nenhum território cadastrado
-              </p>
+              <div className="p-12 text-center text-muted-foreground">
+                <p className="text-xs font-medium italic">Nenhum território cadastrado</p>
+              </div>
             ) : (
-              <div className="space-y-3">
+              <div className="divide-y divide-border/50">
                 {territories
                   .sort((a, b) => b.assignmentCount - a.assignmentCount)
                   .slice(0, 6)
                   .map((territory) => (
                     <div 
                       key={territory.id}
-                      className="flex items-center justify-between p-3 rounded-2xl border border-border bg-muted/20"
+                      className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
                     >
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="flex items-center gap-4 flex-1 min-w-0">
                         <div 
-                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                          className="w-1.5 h-8 rounded-full flex-shrink-0"
                           style={{ backgroundColor: territory.color }}
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-bold truncate text-foreground">
                             {territory.name}
                           </p>
-                          <p className="text-[10px] text-muted-foreground font-mono">
+                          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mt-0.5">
                             Nº {territory.number}
                           </p>
                         </div>
                       </div>
-                      <Badge variant="secondary" className="text-[10px] font-black h-5 px-1.5 ml-2">
-                        {territory.assignmentCount}x
-                      </Badge>
+                      <div className="flex flex-col items-end ml-2">
+                        <span className="text-lg font-black text-foreground leading-none">{territory.assignmentCount}</span>
+                        <span className="text-[8px] font-black text-muted-foreground uppercase tracking-tighter mt-1">vezes</span>
+                      </div>
                     </div>
                   ))}
               </div>
@@ -478,58 +442,64 @@ export default function DashboardPage() {
         </Card>
 
         {/* Column 3: Atividades Recentes */}
-        <Card className="flex flex-col h-full bg-card border-border shadow-sm">
-          <CardHeader className="pb-3 border-b mb-3 border-border">
-            <CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-foreground">
+        <Card className="flex flex-col h-full bg-card border-border shadow-sm overflow-hidden">
+          <CardHeader className="p-4 pb-3 border-b border-border bg-muted/5">
+            <CardTitle className="flex items-center gap-2 text-base font-black uppercase tracking-[0.1em] text-foreground">
               <Activity className="h-4 w-4 text-primary" />
-              Atividades Recentes
+              Atividades
             </CardTitle>
-            <CardDescription className="text-xs text-muted-foreground">
-              Últimas movimentações em campo
+            <CardDescription className="text-[10px] text-muted-foreground font-black uppercase mt-0.5 tracking-wider">
+              Últimas movimentações
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex-1">
+          <CardContent className="p-0">
             {recentActivity.length === 0 ? (
-              <p className="text-center text-muted-foreground py-8 text-sm">
-                Nenhuma atividade recente
-              </p>
+              <div className="p-12 text-center text-muted-foreground">
+                 <p className="text-xs font-medium italic">Nenhuma atividade recente</p>
+              </div>
             ) : (
-              <div className="space-y-4">
+              <div className="divide-y divide-border/50">
                 {recentActivity.map((activity) => (
                   <div 
                     key={activity.id} 
-                    className="flex items-start gap-3"
+                    className="flex items-start gap-4 p-4 hover:bg-muted/50 transition-colors"
                   >
-                    <div className={`mt-1 h-2 w-2 rounded-full flex-shrink-0 ${
-                      activity.type === 'completed' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 
+                    <div className={cn(
+                      "mt-1.5 h-2 w-2 rounded-full flex-shrink-0",
+                      activity.type === 'completed' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 
                       activity.type === 'returned' ? 'bg-orange-500' : 
-                      'bg-[#C65D3B]'
-                    }`} />
+                      'bg-primary'
+                    )} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] font-black text-muted-foreground leading-none mb-1.5 uppercase tracking-widest">
-                        {activity.type === 'completed' ? 'Concluiu' : 
-                         activity.type === 'returned' ? 'Devolveu' : 
-                         'Recebeu'}
-                      </p>
-                      <p className="text-sm font-bold truncate text-foreground">
-                        {activity.territory}
-                      </p>
-                      <div className="flex items-center justify-between mt-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <div className="text-[10px] text-muted-foreground font-bold flex items-center gap-1.5">
-                            {activity.group_id && (
-                              <Badge variant="outline" className="h-3.5 px-1 text-[8px] font-black border-primary text-primary leading-none">GRUPO</Badge>
-                            )}
-                            {activity.publisher}
-                          </div>
-                          {activity.isSunday && <span className="text-[10px]" title="Domingo">☀️</span>}
-                        </div>
-                        <span className="text-[10px] text-muted-foreground font-mono">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className={cn(
+                          "text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md",
+                          activity.type === 'completed' ? 'bg-emerald-500/10 text-emerald-600' : 
+                          activity.type === 'returned' ? 'bg-orange-500/10 text-orange-600' : 
+                          'bg-primary/10 text-primary'
+                        )}>
+                          {activity.type === 'completed' ? 'CONCLUÍDO' : 
+                           activity.type === 'returned' ? 'DEVOLVIDO' : 
+                           'DESIGNADO'}
+                        </span>
+                        <span className="text-[10px] font-medium text-muted-foreground tabular-nums">
                           {new Date(activity.date).toLocaleDateString('pt-BR', { 
                             day: '2-digit', 
                             month: 'short' 
                           })}
                         </span>
+                      </div>
+                      <h4 className="text-sm font-bold truncate text-foreground mb-1">
+                        {activity.territory}
+                      </h4>
+                      <div className="flex items-center gap-1.5">
+                        {activity.group_id && (
+                          <Badge variant="outline" className="h-3.5 px-1 text-[8px] font-black border-primary text-primary leading-none uppercase">Grupo</Badge>
+                        )}
+                        <span className="text-[10px] font-black text-muted-foreground/80 uppercase tracking-wide truncate">
+                          {activity.publisher}
+                        </span>
+                        {activity.isSunday && <span className="text-[10px]" title="Domingo">☀️</span>}
                       </div>
                     </div>
                   </div>
