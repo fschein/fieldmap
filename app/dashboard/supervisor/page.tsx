@@ -92,7 +92,7 @@ export default function SupervisorDashboard() {
     <div className="space-y-6 pb-24 px-1">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Gestão</h1>
+          <h1 className="text-[1.375rem] font-semibold tracking-tight text-foreground">Gestão</h1>
           <p className="text-xs text-muted-foreground font-medium">Controle de territórios em campo</p>
         </div>
         <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
@@ -102,11 +102,11 @@ export default function SupervisorDashboard() {
 
       <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="bg-card rounded-2xl border border-border p-4 shadow-sm">
-          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Em Campo</p>
+          <p className="text-[0.625rem] font-black uppercase tracking-widest text-muted-foreground mb-1">Em Campo</p>
           <div className="text-2xl font-black text-foreground">{activeTerritories.length}</div>
         </div>
         <div className="bg-card rounded-2xl border border-border p-4 shadow-sm">
-          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Livres</p>
+          <p className="text-[0.625rem] font-black uppercase tracking-widest text-muted-foreground mb-1">Livres</p>
           <div className="text-2xl font-black text-foreground">{freeTerritories.length}</div>
         </div>
       </div>
@@ -124,7 +124,7 @@ export default function SupervisorDashboard() {
 
       {/* In Use List */}
       <div className="space-y-4">
-        <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground px-1 flex items-center gap-2">
+        <h3 className="text-[0.6875rem] font-black uppercase tracking-[0.2em] text-muted-foreground px-1 flex items-center gap-2">
           <Clock className="h-3 w-3" /> Quem está com o quê ({filteredInUse.length})
         </h3>
         <div className="space-y-2">
@@ -145,7 +145,7 @@ export default function SupervisorDashboard() {
                   <p className="font-black text-foreground text-lg leading-none mb-1">
                     {t.number}
                   </p>
-                  <p className="text-[10px] font-black text-primary truncate uppercase tracking-widest">
+                  <p className="text-[0.625rem] font-black text-primary truncate uppercase tracking-widest">
                     {t.profiles?.name || "Desconhecido"}
                   </p>
                 </div>
@@ -157,7 +157,7 @@ export default function SupervisorDashboard() {
 
       {/* Free List */}
       <div className="space-y-4">
-        <h3 className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground px-1 flex items-center gap-2">
+        <h3 className="text-[0.6875rem] font-black uppercase tracking-[0.2em] text-muted-foreground px-1 flex items-center gap-2">
           <MapPin className="h-3 w-3" /> Territórios Livres ({filteredFree.length})
         </h3>
         <div className="grid grid-cols-1 gap-2">
@@ -179,7 +179,7 @@ export default function SupervisorDashboard() {
                     {t.name}
                   </p>
                 </div>
-                <Badge variant="outline" className="text-[9px] font-black uppercase tracking-wider border-primary/20 text-primary bg-primary/5">
+                <Badge variant="outline" className="text-[0.5625rem] font-black uppercase tracking-wider border-primary/20 text-primary bg-primary/5">
                   Livre
                 </Badge>
               </div>

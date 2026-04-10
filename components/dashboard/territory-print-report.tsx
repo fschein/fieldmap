@@ -29,7 +29,7 @@ export function TerritoryPrintReport({ data, campaignName }: TerritoryPrintRepor
           <div>
             <h1 className="text-xl font-black uppercase tracking-tighter leading-none text-slate-900">Relatório de Territórios</h1>
             {campaignName && (
-              <p className="text-[10px] font-bold text-slate-500 mt-1 uppercase tracking-widest">
+              <p className="text-[0.625rem] font-bold text-slate-500 mt-1 uppercase tracking-widest">
                 Campanha: {campaignName}
               </p>
             )}
@@ -42,7 +42,7 @@ export function TerritoryPrintReport({ data, campaignName }: TerritoryPrintRepor
 
       {/* Single Column Layout */}
       <div className="w-full">
-        <table className="w-full border-collapse text-[11px]">
+        <table className="w-full border-collapse text-[0.6875rem]">
           <thead>
             <tr className="border-b-2 border-slate-800">
               <th className="py-2 text-left font-black uppercase tracking-tighter text-slate-400 w-24">Nº / Nome</th>

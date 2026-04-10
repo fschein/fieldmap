@@ -57,8 +57,8 @@ export default function SchedulePage() {
     <div className="container mx-auto p-4 space-y-6 pb-24 md:pb-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-[22px] font-semibold tracking-tight text-foreground leading-none">Gestão de escala</h1>
-          <p className="text-[11px] text-muted-foreground font-medium mt-1 uppercase tracking-wider">
+          <h1 className="text-[1.375rem] font-semibold tracking-tight text-foreground leading-none">Gestão de escala</h1>
+          <p className="text-[0.6875rem] text-muted-foreground font-medium mt-1 uppercase tracking-wider">
             Organização de saídas e designações
           </p>
         </div>
@@ -76,7 +76,7 @@ export default function SchedulePage() {
         <button
           onClick={() => setActiveTab("calendar")}
           className={cn(
-            "shrink-0 h-10 px-6 rounded-full text-[10px] sm:text-[11px] font-black uppercase tracking-widest border transition-all shadow-sm flex items-center gap-2",
+            "shrink-0 h-10 px-6 rounded-full text-[0.625rem] sm:text-[0.6875rem] font-black uppercase tracking-widest border transition-all shadow-sm flex items-center gap-2",
             activeTab === "calendar"
               ? "bg-foreground text-background border-foreground shadow-md active:scale-95"
               : "bg-card text-muted-foreground border-border hover:bg-muted/50"
@@ -91,7 +91,7 @@ export default function SchedulePage() {
             <button
               onClick={() => setActiveTab("config")}
               className={cn(
-                "shrink-0 h-10 px-6 rounded-full text-[10px] sm:text-[11px] font-black uppercase tracking-widest border transition-all shadow-sm flex items-center gap-2",
+                "shrink-0 h-10 px-6 rounded-full text-[0.625rem] sm:text-[0.6875rem] font-black uppercase tracking-widest border transition-all shadow-sm flex items-center gap-2",
                 activeTab === "config"
                   ? "bg-foreground text-background border-foreground shadow-md active:scale-95"
                   : "bg-card text-muted-foreground border-border hover:bg-muted/50"
@@ -103,7 +103,7 @@ export default function SchedulePage() {
             <button
               onClick={() => setActiveTab("generator")}
               className={cn(
-                "shrink-0 h-10 px-6 rounded-full text-[10px] sm:text-[11px] font-black uppercase tracking-widest border transition-all shadow-sm flex items-center gap-2",
+                "shrink-0 h-10 px-6 rounded-full text-[0.625rem] sm:text-[0.6875rem] font-black uppercase tracking-widest border transition-all shadow-sm flex items-center gap-2",
                 activeTab === "generator"
                   ? "bg-foreground text-background border-foreground shadow-md active:scale-95"
                   : "bg-card text-muted-foreground border-border hover:bg-muted/50"

@@ -128,7 +128,7 @@ export default function ProfilePage() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <h1 className="text-2xl font-bold tracking-tight">{profile?.name || "Meu Perfil"}</h1>
-              <Badge variant={getRoleBadgeVariant(profile?.role || "publicador") as any} className="h-5 px-1.5 text-[10px] uppercase font-black tracking-wider">
+              <Badge variant={getRoleBadgeVariant(profile?.role || "publicador") as any} className="h-5 px-1.5 text-[0.625rem] uppercase font-black tracking-wider">
                 {getRoleName(profile?.role || "publicador")}
               </Badge>
             </div>

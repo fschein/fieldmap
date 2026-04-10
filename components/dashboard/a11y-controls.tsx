@@ -30,7 +30,7 @@ export function A11yControls() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         
-        <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground pt-2">Tamanho do Texto</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-[0.625rem] uppercase tracking-wider text-muted-foreground pt-2">Tamanho do Texto</DropdownMenuLabel>
         <DropdownMenuItem onClick={() => setFontScale(1)} className="flex items-center justify-between">
           <span>Padrão</span>
           {fontScale === 1 && <Check className="h-4 w-4" />}
@@ -45,7 +45,7 @@ export function A11yControls() {
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
-        <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground pt-1">Aparência</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-[0.625rem] uppercase tracking-wider text-muted-foreground pt-1">Aparência</DropdownMenuLabel>
         <DropdownMenuItem onClick={() => setTheme("light")} className="flex items-center justify-between">
           <span className="flex items-center gap-2"><Sun className="h-4 w-4" /> Claro</span>
           {theme === "light" && <Check className="h-4 w-4" />}

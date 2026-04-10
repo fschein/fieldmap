@@ -293,7 +293,7 @@ export function TerritoryMap({
       {editable && (
         <div className="absolute bottom-4 left-4 z-10 rounded-lg bg-card/90 backdrop-blur-sm p-3 shadow-lg border border-border pointer-events-none sm:pointer-events-auto">
           <p className="text-sm font-bold text-foreground">Instruções:</p>
-          <ul className="mt-1 text-[11px] text-muted-foreground space-y-1 font-medium">
+          <ul className="mt-1 text-[0.6875rem] text-muted-foreground space-y-1 font-medium">
             <li>• Use o polígono (topo dir.) para novas quadras</li>
             <li>• Clique em uma quadra para selecioná-la</li>
             <li>• Clique na aba "Não Visitar" para restrições</li>

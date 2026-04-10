@@ -340,7 +340,7 @@ export default function MyAssignmentsPage() {
     <div className="min-h-screen bg-background">
 
       <div className="px-2.5 mb-6">
-        <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Meus territórios</h1>
+        <h1 className="text-[1.375rem] font-semibold tracking-tight text-foreground">Meus territórios</h1>
         <p className="text-xs text-muted-foreground font-medium">Olá, {firstName}!</p>
       </div>
 
@@ -355,7 +355,7 @@ export default function MyAssignmentsPage() {
 
       <div className="px-2.5 mb-2">
         {cooldown > 0 && (
-          <div className="bg-warning/10 border border-warning/20 p-2 rounded-lg text-[11px] text-warning font-medium text-center">
+          <div className="bg-warning/10 border border-warning/20 p-2 rounded-lg text-[0.6875rem] text-warning font-medium text-center">
             Aguarde {Math.floor(cooldown / 60)}:{String(cooldown % 60).padStart(2, "0")} para um novo pedido.
           </div>
         )}
@@ -370,7 +370,7 @@ export default function MyAssignmentsPage() {
             <CalendarDays className="h-5 w-5" />
           </div>
           <div className="flex-1 text-left">
-            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground leading-none mb-1">
+            <p className="text-[0.625rem] font-black uppercase tracking-widest text-muted-foreground leading-none mb-1">
               {nextSchedule ? (
                 isToday(parseISO(nextSchedule.date)) ? "Você dirige hoje!" :
                   isTomorrow(parseISO(nextSchedule.date)) ? "Próxima escala: amanhã" :
@@ -382,7 +382,7 @@ export default function MyAssignmentsPage() {
             ) : nextSchedule ? (
               <p className="text-sm font-bold text-foreground">
                 {format(parseISO(nextSchedule.date), "eeee, dd/MM", { locale: ptBR })} — {nextSchedule.arrangement?.start_time.substring(0, 5)}h
-                <span className="block text-[11px] font-medium text-muted-foreground uppercase">{nextSchedule.arrangement?.label}</span>
+                <span className="block text-[0.6875rem] font-medium text-muted-foreground uppercase">{nextSchedule.arrangement?.label}</span>
               </p>
             ) : (
               <p className="text-sm font-bold text-muted-foreground">Nenhuma designação próxima</p>
@@ -395,11 +395,11 @@ export default function MyAssignmentsPage() {
       <div className="space-y-3 px-2.5 pb-24">
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-card rounded-xl border border-border p-3 shadow-sm">
-            <p className="text-[12px] font-medium text-muted-foreground mb-1.5">Progresso médio</p>
+            <p className="text-[0.75rem] font-medium text-muted-foreground mb-1.5">Progresso médio</p>
             <p className="text-xl font-semibold text-foreground">{avgProgress}%</p>
           </div>
           <div className="bg-card rounded-xl border border-border p-3 shadow-sm">
-            <p className="text-[12px] font-medium text-muted-foreground mb-1.5">Quadras concluídas</p>
+            <p className="text-[0.75rem] font-medium text-muted-foreground mb-1.5">Quadras concluídas</p>
             <p className="text-xl font-semibold text-foreground">
               {totalDone} <span className="text-sm font-normal text-muted-foreground">/ {totalAll}</span>
             </p>
@@ -407,7 +407,7 @@ export default function MyAssignmentsPage() {
         </div>
 
         <div className="flex items-center justify-between">
-          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+          <p className="text-[0.625rem] font-black uppercase tracking-widest text-muted-foreground">
             {territories.length} {territories.length === 1 ? "território ativo" : "territórios ativos"}
           </p>
           <div className="h-px flex-1 bg-border/50 ml-4" />
@@ -465,14 +465,14 @@ export default function MyAssignmentsPage() {
                       Território {t.number}
                       {t.name && <span className="font-normal text-muted-foreground"> · {t.name}</span>}
                     </span>
-                    <span className={cn("text-[11px] font-medium px-2 py-0.5 rounded-full", badgeClass)}>
+                    <span className={cn("text-[0.6875rem] font-medium px-2 py-0.5 rounded-full", badgeClass)}>
                       {progress}%
                     </span>
                     <ChevronRight className="h-4 w-4 text-muted-foreground/30 flex-shrink-0" />
                   </div>
 
                   {isGroupWork && (
-                    <div className="flex items-center gap-1.5 bg-warning/10 text-warning text-[10px] font-bold px-2 py-0.5 rounded-md w-fit border border-warning/20">
+                    <div className="flex items-center gap-1.5 bg-warning/10 text-warning text-[0.625rem] font-bold px-2 py-0.5 rounded-md w-fit border border-warning/20">
                       <Users className="h-3 w-3" /> TRABALHO DE GRUPO
                     </div>
                   )}
@@ -481,7 +481,7 @@ export default function MyAssignmentsPage() {
                     <div className={cn("h-full rounded-full transition-all", progressColor)} style={{ width: `${progress}%` }} />
                   </div>
 
-                  <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <div className="flex items-center gap-2 text-[0.6875rem] text-muted-foreground">
                     <span>{days} dias</span>
                     <span className="w-1 h-1 rounded-full bg-border inline-block" />
                     <span>{done} de {total} quadras</span>
@@ -489,7 +489,7 @@ export default function MyAssignmentsPage() {
                       <span className="text-red-500 font-medium bg-red-500/10 px-1.5 py-0.5 rounded-full">Em atraso</span>
                     )}
                     {campaignName && (
-                      <span className="ml-auto bg-muted border border-border px-1.5 py-0.5 rounded text-[10px]">
+                      <span className="ml-auto bg-muted border border-border px-1.5 py-0.5 rounded text-[0.625rem]">
                         {campaignName}
                       </span>
                     )}

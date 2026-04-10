@@ -156,7 +156,7 @@ if (!isReady) return <Loader2 className="animate-spin" />
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-sm">
                 <div className="flex flex-col gap-4">
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 bg-[#C65D3B] text-white rounded text-[9px] font-black uppercase tracking-tighter shadow-sm">Onboarding</span>
+                    <span className="px-2 py-0.5 bg-[#C65D3B] text-white rounded text-[0.5625rem] font-black uppercase tracking-tighter shadow-sm">Onboarding</span>
                     <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">Primeira Instalação?</h3>
                   </div>
                   

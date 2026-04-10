@@ -126,7 +126,7 @@ export default function NotificationsPage() {
       {/* Não lidos */}
       {unread.length > 0 && (
         <section className="space-y-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <p className="text-[0.625rem] font-semibold uppercase tracking-wider text-muted-foreground">
             Não lidos · {unread.length}
           </p>
           <NotificationList items={unread} />
@@ -136,7 +136,7 @@ export default function NotificationsPage() {
       {/* Anteriores */}
       {read.length > 0 && (
         <section className="space-y-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          <p className="text-[0.625rem] font-semibold uppercase tracking-wider text-muted-foreground">
             Anteriores
           </p>
           <NotificationList items={read} muted />
@@ -169,8 +169,8 @@ function NotificationList({ items, muted = false }: { items: Notification[]; mut
             {/* Texto */}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-foreground leading-snug">{notif.title}</p>
-              <p className="text-[12px] text-muted-foreground mt-0.5 leading-snug">{notif.message}</p>
-              <p className="text-[11px] text-muted-foreground/60 mt-1">
+              <p className="text-[0.75rem] text-muted-foreground mt-0.5 leading-snug">{notif.message}</p>
+              <p className="text-[0.6875rem] text-muted-foreground/60 mt-1">
                 {formatDistanceToNow(new Date(notif.created_at), { addSuffix: true, locale: ptBR })}
               </p>
             </div>

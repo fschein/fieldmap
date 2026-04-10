@@ -73,17 +73,17 @@ export function SubdivisionDrawer({
             </div>
             <div>
                {isCompleted ? (
-                  <span className="text-[9px] font-black px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-500 uppercase tracking-widest">
+                  <span className="text-[0.5625rem] font-black px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-500 uppercase tracking-widest">
                     Concluída
                   </span>
                 ) : (
-                  <span className="text-[9px] font-black px-2 py-1 rounded-full bg-primary/10 text-primary uppercase tracking-widest">
+                  <span className="text-[0.5625rem] font-black px-2 py-1 rounded-full bg-primary/10 text-primary uppercase tracking-widest">
                     Pendente
                   </span>
                 )}
             </div>
           </div>
-          <p className="text-[11px] text-muted-foreground font-bold uppercase tracking-wider">
+          <p className="text-[0.6875rem] text-muted-foreground font-bold uppercase tracking-wider">
             Detalhamento de Trabalho
           </p>
         </div>
@@ -94,7 +94,7 @@ export function SubdivisionDrawer({
             <div className="bg-muted/50 border border-border p-4 rounded-xl">
               <div className="flex items-center gap-2 mb-2 opacity-50">
                 <Info className="h-3.5 w-3.5" />
-                <h4 className="text-[9px] font-black uppercase tracking-widest text-foreground">Observações de Campo</h4>
+                <h4 className="text-[0.5625rem] font-black uppercase tracking-widest text-foreground">Observações de Campo</h4>
               </div>
               <p className="text-sm text-foreground font-medium leading-relaxed italic">
                 "{subdivision.notes}"
@@ -110,7 +110,7 @@ export function SubdivisionDrawer({
                 <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-5 text-center shadow-inner">
                   <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto mb-3" />
                   <p className="text-xs font-black text-emerald-500 mb-1 tracking-wider">TRABALHO FINALIZADO</p>
-                  <p className="text-[10px] text-emerald-500/60 font-medium uppercase tracking-tight">
+                  <p className="text-[0.625rem] text-emerald-500/60 font-medium uppercase tracking-tight">
                     Registrado em {formatDate(subdivision.updated_at)}
                   </p>
                 </div>
@@ -118,7 +118,7 @@ export function SubdivisionDrawer({
                   onClick={handleToggle}
                   disabled={loading}
                   variant="ghost"
-                  className="w-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 text-[9px] font-black uppercase tracking-[0.25em] h-10 rounded-lg transition-all"
+                  className="w-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 text-[0.5625rem] font-black uppercase tracking-[0.25em] h-10 rounded-lg transition-all"
                 >
                   {loading ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : "Reabrir Quadra (Desfazer)"}
                 </Button>
@@ -127,7 +127,7 @@ export function SubdivisionDrawer({
               // VISÃO PENDENTE (DIRETA E PROPORCIONAL)
               <div className="group/field bg-muted p-5 rounded-2xl space-y-4 shadow-inner border border-border">
                  <div className="space-y-2">
-                  <Label htmlFor="date" className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2 px-1">
+                  <Label htmlFor="date" className="text-[0.5625rem] font-black text-muted-foreground uppercase tracking-[0.2em] flex items-center gap-2 px-1">
                     <Calendar className="h-3 w-3" />
                     Data da Conclusão
                   </Label>
@@ -138,7 +138,7 @@ export function SubdivisionDrawer({
                     onChange={(e) => setCompletionDate(e.target.value)}
                     className="h-11 bg-background border-border rounded-xl font-bold font-mono text-sm shadow-sm focus:ring-primary/20"
                   />
-                  <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest px-1">
+                  <p className="text-[0.5625rem] text-muted-foreground font-bold uppercase tracking-widest px-1">
                     Corrija se necessário
                   </p>
                 </div>
@@ -162,7 +162,7 @@ export function SubdivisionDrawer({
                     )}
                   </Button>
                   
-                  <p className="text-[9px] text-center text-muted-foreground font-black uppercase tracking-[0.25em] opacity-60">
+                  <p className="text-[0.5625rem] text-center text-muted-foreground font-black uppercase tracking-[0.25em] opacity-60">
                     Toque para registrar a visita
                   </p>
                 </div>

@@ -275,7 +275,7 @@ export default function UsersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Usuários</h1>
+          <h1 className="text-[1.375rem] font-semibold tracking-tight text-foreground">Usuários</h1>
           <p className="text-xs text-muted-foreground font-medium mt-1">Controle de acesso, níveis de permissão e contatos.</p>
         </div>
         <Button onClick={() => handleOpenDialog()}>
@@ -319,31 +319,31 @@ export default function UsersPage() {
                          title={u.is_active === false ? "Inativo" : (u.gender === "F" ? "Irmã" : "Irmão")}
                        />
                        <span className={u.is_active === false ? "text-muted-foreground" : ""}>{u.name}</span>
-                       {u.is_active === false && <Badge variant="secondary" className="text-[9px] h-4 px-1">Inativo</Badge>}
+                       {u.is_active === false && <Badge variant="secondary" className="text-[0.5625rem] h-4 px-1">Inativo</Badge>}
                      </div>
                    </TableCell>
                    <TableCell className={u.is_active === false ? "opacity-50" : ""}>
-                     <div className="flex flex-col gap-1 text-[11px] text-muted-foreground">
+                     <div className="flex flex-col gap-1 text-[0.6875rem] text-muted-foreground">
                        <div className="flex items-center gap-1.5"><Mail className="h-3 w-3" /> {u.email}</div>
                        {u.phone && <div className="flex items-center gap-1.5"><Phone className="h-3 w-3" /> {u.phone}</div>}
                      </div>
                    </TableCell>
                    <TableCell className={u.is_active === false ? "opacity-50" : ""}>
                      {u.groups?.name ? (
-                       <Badge variant="secondary" className="text-[10px]">
+                       <Badge variant="secondary" className="text-[0.625rem]">
                          {u.groups.name}
                        </Badge>
                      ) : (
-                       <span className="text-[10px] text-muted-foreground italic">Sem grupo</span>
+                       <span className="text-[0.625rem] text-muted-foreground italic">Sem grupo</span>
                      )}
                    </TableCell>
                    <TableCell className={u.is_active === false ? "opacity-50" : ""}>
-                     <Badge variant={u.role === "admin" ? "default" : "outline"} className="capitalize text-[9px]">
+                     <Badge variant={u.role === "admin" ? "default" : "outline"} className="capitalize text-[0.5625rem]">
                        {u.role}
                      </Badge>
                    </TableCell>
                    <TableCell className={u.is_active === false ? "opacity-50" : ""}>
-                     <span className="text-[11px] text-muted-foreground italic">
+                     <span className="text-[0.6875rem] text-muted-foreground italic">
                        {u.last_seen_at ? new Date(u.last_seen_at).toLocaleString('pt-BR', {
                          day: '2-digit',
                          month: '2-digit',
@@ -433,7 +433,7 @@ export default function UsersPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{formData.isActive ? "Ativo" : "Inativo"}</span>
+                    <span className="text-[0.625rem] font-bold text-muted-foreground uppercase tracking-wider">{formData.isActive ? "Ativo" : "Inativo"}</span>
                     <Switch 
                       checked={formData.isActive} 
                       onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })} 
@@ -448,13 +448,13 @@ export default function UsersPage() {
                     <Label className="text-xs text-primary font-bold flex items-center gap-1.5">
                       <Lock className="h-3 w-3" /> Segurança
                     </Label>
-                    <p className="text-[10px] text-primary/70">Redefinir acesso do usuário.</p>
+                    <p className="text-[0.625rem] text-primary/70">Redefinir acesso do usuário.</p>
                   </div>
                   <Button 
                     type="button" 
                     variant="outline" 
                     size="sm" 
-                    className="h-8 text-[11px] border-primary/30 text-primary hover:bg-primary/10"
+                    className="h-8 text-[0.6875rem] border-primary/30 text-primary hover:bg-primary/10"
                     onClick={() => handleOpenResetDialog(editingUser)}
                   >
                     Redefinir Senha
@@ -474,7 +474,7 @@ export default function UsersPage() {
                       <Copy className="h-3.5 w-3.5" />
                     </Button>
                   </div>
-                  <p className="text-[10px] text-muted-foreground mt-1">Copie esta senha e envie ao usuário. Ele deverá trocá-la no primeiro acesso.</p>
+                  <p className="text-[0.625rem] text-muted-foreground mt-1">Copie esta senha e envie ao usuário. Ele deverá trocá-la no primeiro acesso.</p>
                 </div>
               )}
             </div>

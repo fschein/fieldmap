@@ -194,7 +194,7 @@ export default function GroupsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Grupos</h1>
+          <h1 className="text-[1.375rem] font-semibold tracking-tight text-foreground">Grupos</h1>
           <p className="text-xs text-muted-foreground font-medium mt-1">
             Organize territórios em grupos com cores exclusivas.
           </p>

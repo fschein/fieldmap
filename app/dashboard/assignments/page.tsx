@@ -95,7 +95,7 @@ function FilterPill({ label, active, count, onClick, id }: any) {
     >
       {label}
       <span className={cn(
-        "text-[10px] px-1.5 py-0.5 rounded-full font-black min-w-[18px]",
+        "text-[0.625rem] px-1.5 py-0.5 rounded-full font-black min-w-[18px]",
         active ? "bg-black/10 text-inherit" : "bg-muted text-muted-foreground"
       )}>
         {count}
@@ -368,7 +368,7 @@ export default function AssignmentsPage() {
       <div className="print:hidden space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Designações</h1>
+            <h1 className="text-[1.375rem] font-semibold tracking-tight text-foreground">Designações</h1>
             <p className="text-xs text-muted-foreground font-medium mt-1">
               {inFieldTotal} em campo · {counts.overdue > 0 && <span className="text-red-500 font-bold">{counts.overdue} atrasados · </span>}{counts.available} devolvidos · {counts.completed} livres
             </p>
@@ -450,7 +450,7 @@ export default function AssignmentsPage() {
                       <p className="font-bold text-primary">
                         {Math.round((data.filter(t => t.campaignId === campaignFilter && t.status === 'available').length / (data.length || 1)) * 100)}%
                       </p>
-                      <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">Concluído</p>
+                      <p className="text-[0.625rem] text-muted-foreground font-medium uppercase tracking-wider">Concluído</p>
                     </div>
                   </div>
                   <Progress
@@ -537,19 +537,19 @@ export default function AssignmentsPage() {
             <Table className="print:w-full">
               <TableHeader>
                 <TableRow className="bg-muted hover:bg-muted border-b border-border">
-                  <TableHead className="text-foreground font-black text-[10px] w-14 uppercase tracking-widest">Nº</TableHead>
-                  <TableHead className="text-foreground font-black text-[10px] uppercase tracking-widest">Território</TableHead>
-                  <TableHead className="text-foreground font-black text-[10px] uppercase tracking-widest">Dirigente</TableHead>
-                  <TableHead className="text-foreground font-black text-[10px] text-center uppercase tracking-widest">Entrega</TableHead>
-                  <TableHead className="text-foreground font-black text-[10px] text-center uppercase tracking-widest">Dias</TableHead>
-                  <TableHead className="text-foreground font-black text-[10px] uppercase tracking-widest">Status</TableHead>
-                  <TableHead className="text-foreground font-black text-[10px] text-center border-l border-border bg-muted/50 uppercase tracking-widest">
+                  <TableHead className="text-foreground font-black text-[0.625rem] w-14 uppercase tracking-widest">Nº</TableHead>
+                  <TableHead className="text-foreground font-black text-[0.625rem] uppercase tracking-widest">Território</TableHead>
+                  <TableHead className="text-foreground font-black text-[0.625rem] uppercase tracking-widest">Dirigente</TableHead>
+                  <TableHead className="text-foreground font-black text-[0.625rem] text-center uppercase tracking-widest">Entrega</TableHead>
+                  <TableHead className="text-foreground font-black text-[0.625rem] text-center uppercase tracking-widest">Dias</TableHead>
+                  <TableHead className="text-foreground font-black text-[0.625rem] uppercase tracking-widest">Status</TableHead>
+                  <TableHead className="text-foreground font-black text-[0.625rem] text-center border-l border-border bg-muted/50 uppercase tracking-widest">
                     Trabalhado<br />({periodFilter === 'all' ? 'total' : periodFilter})
                   </TableHead>
-                  <TableHead className="text-foreground font-black text-[10px] text-center bg-muted/50 uppercase tracking-widest">
+                  <TableHead className="text-foreground font-black text-[0.625rem] text-center bg-muted/50 uppercase tracking-widest">
                     Última Conclusão
                   </TableHead>
-                  <TableHead className="text-foreground font-black text-[10px] text-center w-16 print:hidden uppercase tracking-widest">
+                  <TableHead className="text-foreground font-black text-[0.625rem] text-center w-16 print:hidden uppercase tracking-widest">
                     <History className="h-4 w-4 mx-auto text-muted-foreground" />
                   </TableHead>
                 </TableRow>
@@ -608,7 +608,7 @@ export default function AssignmentsPage() {
                     </TableCell>
                     <TableCell className="py-2.5 whitespace-nowrap">
                       <span className={`
-                        text-[10px] px-2 py-0.5 rounded-full uppercase font-medium border
+                        text-[0.625rem] px-2 py-0.5 rounded-full uppercase font-medium border
                         ${STATUS_CLASS[t.status] || 'bg-slate-100 text-slate-500'}
                       `}>
                         {STATUS_LABELS[t.status] || t.status}
@@ -667,7 +667,7 @@ export default function AssignmentsPage() {
                     <p className="font-bold text-sm text-foreground truncate">{t.name}</p>
                     <Badge
                       variant="outline"
-                      className={cn("text-[9px] px-1.5 py-0 h-4 uppercase flex-shrink-0 font-black", STATUS_CLASS[t.status])}
+                      className={cn("text-[0.5625rem] px-1.5 py-0 h-4 uppercase flex-shrink-0 font-black", STATUS_CLASS[t.status])}
                     >
                       {STATUS_LABELS[t.status]}
                     </Badge>

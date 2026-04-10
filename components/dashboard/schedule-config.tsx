@@ -122,8 +122,8 @@ export function ScheduleConfig() {
       {/* Toolbar */}
       <div className="flex items-center gap-2">
         <div className="flex-1">
-          <h1 className="text-[15px] font-semibold text-foreground leading-tight">Arranjos</h1>
-          <p className="text-[12px] text-muted-foreground">Horários fixos de saída de campo</p>
+          <h1 className="text-[0.9375rem] font-semibold text-foreground leading-tight">Arranjos</h1>
+          <p className="text-[0.75rem] text-muted-foreground">Horários fixos de saída de campo</p>
         </div>
         <Button
           onClick={() => setIsAdding(true)}
@@ -159,14 +159,14 @@ export function ScheduleConfig() {
         <DialogContent className="sm:max-w-[400px]">
           <DialogHeader>
             <DialogTitle className="text-base font-semibold">Novo arranjo</DialogTitle>
-            <DialogDescription className="text-[13px]">
+            <DialogDescription className="text-[0.8125rem]">
               Defina o dia e horário para as saídas de campo.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3 py-2">
             <div className="space-y-1.5">
-              <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <Label className="text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
                 Dia da semana
               </Label>
               <Select
@@ -185,7 +185,7 @@ export function ScheduleConfig() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <Label className="text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
                 Horário
               </Label>
               <Input
@@ -197,7 +197,7 @@ export function ScheduleConfig() {
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <Label className="text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
                 Descrição
               </Label>
               <Input
@@ -227,7 +227,7 @@ export function ScheduleConfig() {
           <div className="px-5 pt-5 pb-4 border-b border-border">
             <DialogTitle className="text-base font-semibold">Dirigentes do arranjo</DialogTitle>
             {selectedArr && (
-              <p className="text-[12px] text-muted-foreground mt-0.5">
+              <p className="text-[0.75rem] text-muted-foreground mt-0.5">
                 {WEEKDAYS[selectedArr.weekday]} · {selectedArr.start_time.substring(0, 5)}h · {selectedArr.label}
               </p>
             )}
@@ -236,7 +236,7 @@ export function ScheduleConfig() {
           <div className="overflow-y-auto max-h-[70vh]">
             {/* Add form */}
             <div className="px-5 py-4 space-y-3 border-b border-border bg-muted/30">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              <p className="text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
                 Adicionar dirigente
               </p>
 
@@ -256,8 +256,8 @@ export function ScheduleConfig() {
 
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[12px] font-medium text-foreground">Limitar frequência</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Máximo de vezes por mês</p>
+                  <p className="text-[0.75rem] font-medium text-foreground">Limitar frequência</p>
+                  <p className="text-[0.625rem] text-muted-foreground mt-0.5">Máximo de vezes por mês</p>
                 </div>
                 <Switch
                   checked={newLeader.limitFrequency}
@@ -296,7 +296,7 @@ export function ScheduleConfig() {
             {/* Assigned list */}
             <div className="divide-y divide-border">
               {assignedLeaders.length === 0 ? (
-                <p className="py-8 text-center text-[13px] text-muted-foreground">
+                <p className="py-8 text-center text-[0.8125rem] text-muted-foreground">
                   Nenhum dirigente atribuído ainda.
                 </p>
               ) : (
@@ -306,12 +306,12 @@ export function ScheduleConfig() {
                     className="flex items-center gap-3 px-5 py-3"
                   >
                     {/* Avatar */}
-                    <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center text-[10px] font-medium text-muted-foreground shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center text-[0.625rem] font-medium text-muted-foreground shrink-0">
                       {al.profile.name.split(" ").slice(0, 2).map((w: string) => w[0]).join("").toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[13px] font-medium text-foreground truncate">{al.profile.name}</p>
-                      <p className="text-[10px] text-muted-foreground">
+                      <p className="text-[0.8125rem] font-medium text-foreground truncate">{al.profile.name}</p>
+                      <p className="text-[0.625rem] text-muted-foreground">
                         {al.frequency ? `${al.frequency}× por mês` : "Frequência ilimitada"}
                       </p>
                     </div>
@@ -359,7 +359,7 @@ function ArrangementCard({
       {/* Header */}
       <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-muted/40">
         <span className={cn(
-          "text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md border",
+          "text-[0.625rem] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md border",
           arr.weekday === 0
             ? "bg-primary/10 text-primary border-primary/20"
             : "bg-muted text-muted-foreground border-border"
@@ -367,7 +367,7 @@ function ArrangementCard({
           {WEEKDAYS[arr.weekday]}
         </span>
         {isGroup && (
-          <span className="text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 ml-auto">
+          <span className="text-[0.5625rem] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 ml-auto">
             Grupo
           </span>
         )}
@@ -384,10 +384,10 @@ function ArrangementCard({
 
       {/* Body */}
       <div className="px-4 py-3">
-        <p className="text-[13px] font-medium text-foreground">{arr.label}</p>
+        <p className="text-[0.8125rem] font-medium text-foreground">{arr.label}</p>
         <div className="flex items-center gap-1 mt-1">
           <Clock className="w-3 h-3 text-muted-foreground" />
-          <span className="text-[12px] text-muted-foreground font-mono">{time}</span>
+          <span className="text-[0.75rem] text-muted-foreground font-mono">{time}</span>
         </div>
       </div>
 
@@ -396,7 +396,7 @@ function ArrangementCard({
         <div className="px-4 pb-3">
           <button
             onClick={onManageLeaders}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-muted/60 hover:bg-muted border border-border text-[12px] font-medium text-foreground transition-colors"
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-muted/60 hover:bg-muted border border-border text-[0.75rem] font-medium text-foreground transition-colors"
           >
             <span className="flex items-center gap-1.5">
               <Users className="w-3.5 h-3.5 text-muted-foreground" />

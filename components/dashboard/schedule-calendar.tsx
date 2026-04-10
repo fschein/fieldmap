@@ -93,7 +93,7 @@ export function ScheduleCalendar({
             {format(currentMonth, "MMMM yyyy", { locale: ptBR })}
           </h2>
           <div className="md:hidden">
-            <span className="text-[9px] font-black uppercase text-muted-foreground/60 tracking-widest">
+            <span className="text-[0.5625rem] font-black uppercase text-muted-foreground/60 tracking-widest">
               Escala Publicada
             </span>
           </div>
@@ -145,16 +145,16 @@ export function ScheduleCalendar({
                     : "bg-muted/30 text-foreground border border-border/50 rounded-2xl"
                 )}>
                   <span className="text-xl sm:text-2xl font-black tracking-tighter leading-none">{format(itemDate, "dd")}</span>
-                  <span className="text-[9px] uppercase font-black opacity-80">{format(itemDate, "EEE", { locale: ptBR })}</span>
+                  <span className="text-[0.5625rem] uppercase font-black opacity-80">{format(itemDate, "EEE", { locale: ptBR })}</span>
                 </div>
 
                 {/* Content Area */}
                 <div className="flex-1 min-w-0 flex flex-col gap-1 w-full">
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground truncate opacity-80">
+                    <h3 className="text-[0.625rem] font-black uppercase tracking-widest text-muted-foreground truncate opacity-80">
                       {item.arrangement.label}
                     </h3>
-                    <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground shrink-0 uppercase">
+                    <div className="flex items-center gap-1 text-[0.625rem] font-bold text-muted-foreground shrink-0 uppercase">
                       <Clock className="h-3 w-3" />
                       {item.arrangement.start_time.substring(0, 5)}h
                     </div>
@@ -172,14 +172,14 @@ export function ScheduleCalendar({
                   {/* Smart Actions / Info */}
                   <div className="mt-1 flex flex-wrap items-center gap-2">
                     {item.arrangement.is_group_mode ? (
-                      <div className="flex items-center gap-2 px-2 py-1 bg-primary/10 rounded-lg border border-primary/20 text-[10px] font-black text-primary uppercase">
+                      <div className="flex items-center gap-2 px-2 py-1 bg-primary/10 rounded-lg border border-primary/20 text-[0.625rem] font-black text-primary uppercase">
                         <MapPin className="h-3 w-3" />
                         {item.territory ? `Focar: T${item.territory.number}` : "Modo Domingo"}
                       </div>
                     ) : (
                       <>
                         {hasAssignment ? (
-                          <div className="text-[10px] font-bold text-muted-foreground italic flex items-center gap-1">
+                          <div className="text-[0.625rem] font-bold text-muted-foreground italic flex items-center gap-1">
                             <CheckCircle2 className="h-3 w-3 text-primary" />
                             Com território
                           </div>
@@ -187,7 +187,7 @@ export function ScheduleCalendar({
                           <Button 
                             variant="ghost" 
                             size="sm" 
-                            className="h-7 px-2 text-[10px] font-black uppercase tracking-wider text-primary hover:text-primary hover:bg-primary/10 gap-1.5 rounded-lg border border-primary/20 transition-all active:scale-95"
+                            className="h-7 px-2 text-[0.625rem] font-black uppercase tracking-wider text-primary hover:text-primary hover:bg-primary/10 gap-1.5 rounded-lg border border-primary/20 transition-all active:scale-95"
                             onClick={() => {
                               setSelectedLeaderId(item.leader.id)
                               setDesignationModalOpen(true)
@@ -197,7 +197,7 @@ export function ScheduleCalendar({
                             Designar Agora
                           </Button>
                         ) : (
-                          <span className="text-[10px] text-muted-foreground/40 italic">Sem dirigente definido</span>
+                          <span className="text-[0.625rem] text-muted-foreground/40 italic">Sem dirigente definido</span>
                         )}
                       </>
                     )}

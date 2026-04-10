@@ -70,7 +70,7 @@ export function BottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
               </div>
               <span
                 className={cn(
-                  "text-[10px] font-bold leading-none transition-colors",
+                  "text-[0.625rem] font-bold leading-none transition-colors",
                   active ? "text-primary" : "text-muted-foreground"
                 )}
               >

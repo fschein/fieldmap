@@ -170,7 +170,7 @@ export default function TerritoryMapViewer({
 
         const tooltipContent = `
           <div class="text-xs font-bold text-red-700 mb-0.5 whitespace-nowrap">🛑 Não Visitar</div>
-          ${dnv.address ? `<div class="text-[10px] opacity-90 font-medium"><strong>Endereço:</strong> ${dnv.address}</div>` : ''}
+          ${dnv.address ? `<div class="text-[0.625rem] opacity-90 font-medium"><strong>Endereço:</strong> ${dnv.address}</div>` : ''}
         `
         marker.bindTooltip(tooltipContent, { 
           className: "dnv-tooltip",
@@ -299,15 +299,15 @@ export default function TerritoryMapViewer({
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded border border-border" style={{ backgroundColor: territory.color || "hsl(var(--primary))", opacity: 0.5 }} />
-              <span className="text-[10px] font-bold text-muted-foreground uppercase">Pendente</span>
+              <span className="text-[0.625rem] font-bold text-muted-foreground uppercase">Pendente</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded border border-green-600 bg-green-500 opacity-60" />
-              <span className="text-[10px] font-bold text-foreground/70 uppercase">Concluída</span>
+              <span className="text-[0.625rem] font-bold text-foreground/70 uppercase">Concluída</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full border border-red-700 bg-red-600 opacity-80" />
-              <span className="text-[10px] font-bold text-red-700 uppercase">Não Visitar</span>
+              <span className="text-[0.625rem] font-bold text-red-700 uppercase">Não Visitar</span>
             </div>
           </div>
         </div>

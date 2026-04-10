@@ -420,11 +420,11 @@ export function AdminTerritoriesView() {
             {isLivre ? (
               <div className="flex items-center gap-2">
                 {p.isReturned ? (
-                  <span className="bg-warning/10 text-warning text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight border border-warning/20">
+                  <span className="bg-warning/10 text-warning text-[0.625rem] font-black px-2 py-0.5 rounded-full uppercase tracking-tight border border-warning/20">
                     DEVOLVIDO
                   </span>
                 ) : (
-                  <span className="bg-success/10 text-success text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight border border-success/20">
+                  <span className="bg-success/10 text-success text-[0.625rem] font-black px-2 py-0.5 rounded-full uppercase tracking-tight border border-success/20">
                     LIVRE
                   </span>
                 )}
@@ -434,7 +434,7 @@ export function AdminTerritoriesView() {
               </div>
             ) : (
               <div className="flex items-center gap-1.5 min-w-0">
-                <span className="bg-primary/10 text-primary text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tight border border-primary/20 truncate max-w-[90px]">
+                <span className="bg-primary/10 text-primary text-[0.625rem] font-black px-2 py-0.5 rounded-full uppercase tracking-tight border border-primary/20 truncate max-w-[90px]">
                   {territory.assigned_to_user?.name?.split(' ')[0]}
                 </span>
                 <span className="font-bold text-muted-foreground text-xs flex items-center gap-1">
@@ -502,7 +502,7 @@ export function AdminTerritoriesView() {
     <div className="space-y-6 animate-in fade-in duration-500 pb-10 w-full max-w-full overflow-hidden">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Territórios</h1>
+          <h1 className="text-[1.375rem] font-semibold tracking-tight text-foreground">Territórios</h1>
           <p className="text-xs text-muted-foreground font-medium mt-1">
             Status de todos os territórios.
           </p>
@@ -611,7 +611,7 @@ export function AdminTerritoriesView() {
             <div className="space-y-1">
               <Label className="text-primary font-bold">Grupo Responsável (Dom.)</Label>
               <div className="p-3 border rounded-lg bg-primary/5 border-primary/20 space-y-3">
-                <p className="text-[11px] text-primary leading-tight font-medium">
+                <p className="text-[0.6875rem] text-primary leading-tight font-medium">
                   No domingo, o território será atribuído automaticamente a este grupo.
                 </p>
                 <div className="flex flex-wrap gap-2">

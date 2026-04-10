@@ -336,14 +336,14 @@ export function AssignmentHistorySheet({
                               <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                               <span className="truncate">{assignment.profiles?.name || assignment.groups?.name || "Desconhecido"}</span>
                               {assignment.group_id && (
-                                <Badge variant="secondary" className="h-4 px-1 text-[8px] font-black bg-muted text-muted-foreground shrink-0">GRUPO</Badge>
+                                <Badge variant="secondary" className="h-4 px-1 text-[0.5rem] font-black bg-muted text-muted-foreground shrink-0">GRUPO</Badge>
                               )}
                               {assignment.assigned_at && new Date(assignment.assigned_at).getDay() === 0 && (
                                 <span className="text-xs shrink-0" title="Domingo">☀️</span>
                               )}
                             </span>
                             <div className="flex items-center gap-1.5">
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${isActive ? 'bg-primary/20 text-primary' :
+                              <span className={`text-[0.625rem] px-1.5 py-0.5 rounded-full font-medium ${isActive ? 'bg-primary/20 text-primary' :
                                   isCompleted ? 'bg-emerald-500/10 text-emerald-500' : 'bg-muted text-muted-foreground'
                                 }`}>
                                 {isActive ? 'Em Campo' : isCompleted ? 'Concluído' : 'Devolvido'}
@@ -373,13 +373,13 @@ export function AssignmentHistorySheet({
                             <div className="space-y-2">
                               <div className="grid grid-cols-2 gap-2 text-xs">
                                 <div className="space-y-0.5 bg-card p-1.5 rounded border border-border">
-                                  <span className="text-[10px] text-muted-foreground uppercase font-semibold">Início</span>
+                                  <span className="text-[0.625rem] text-muted-foreground uppercase font-semibold">Início</span>
                                   <div className="flex items-center gap-1 text-foreground font-mono">
                                     <Calendar className="w-3 h-3 text-muted-foreground" /> {formatDate(assignment.assigned_at)}
                                   </div>
                                 </div>
                                 <div className="space-y-0.5 bg-card p-1.5 rounded border border-border">
-                                  <span className="text-[10px] text-muted-foreground uppercase font-semibold">Fim</span>
+                                  <span className="text-[0.625rem] text-muted-foreground uppercase font-semibold">Fim</span>
                                   <div className="flex items-center gap-1 text-foreground font-mono">
                                     {isActive ? (
                                       <span className="text-primary italic">— ativo —</span>
@@ -394,8 +394,8 @@ export function AssignmentHistorySheet({
                               </div>
 
                               {(assignment.notes || assignment.return_reason) && (
-                                <div className="bg-amber-500/10 border border-amber-500/20 p-2 rounded text-[11px] text-amber-500 italic">
-                                  <span className="font-semibold not-italic text-[10px] text-amber-500/60 block mb-0.5 uppercase">Motivo:</span>
+                                <div className="bg-amber-500/10 border border-amber-500/20 p-2 rounded text-[0.6875rem] text-amber-500 italic">
+                                  <span className="font-semibold not-italic text-[0.625rem] text-amber-500/60 block mb-0.5 uppercase">Motivo:</span>
                                   "{assignment.notes || assignment.return_reason}"
                                 </div>
                               )}
@@ -405,7 +405,7 @@ export function AssignmentHistorySheet({
                             <div className="space-y-2 pt-2 border-t border-border">
                               <div className="grid grid-cols-2 gap-2">
                                 <div className="space-y-1">
-                                  <Label className="text-[10px] text-muted-foreground uppercase font-semibold">Início</Label>
+                                  <Label className="text-[0.625rem] text-muted-foreground uppercase font-semibold">Início</Label>
                                   <Input
                                     type="date"
                                     value={editStart}
@@ -415,7 +415,7 @@ export function AssignmentHistorySheet({
                                   />
                                 </div>
                                 <div className="space-y-1">
-                                  <Label className="text-[10px] text-slate-500 uppercase font-semibold">
+                                  <Label className="text-[0.625rem] text-slate-500 uppercase font-semibold">
                                     Fim {isActive && <span className="text-slate-400">(opcional)</span>}
                                   </Label>
                                   <Input
@@ -446,7 +446,7 @@ export function AssignmentHistorySheet({
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-7 text-[10px] flex-1 border-green-200 text-green-700 hover:bg-green-50"
+                                className="h-7 text-[0.625rem] flex-1 border-green-200 text-green-700 hover:bg-green-50"
                                 onClick={() => handleUpdateStatus(assignment.id, 'completed')}
                                 disabled={loading}
                               >
@@ -455,7 +455,7 @@ export function AssignmentHistorySheet({
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-7 text-[10px] flex-1 border-orange-200 text-orange-700 hover:bg-orange-50"
+                                className="h-7 text-[0.625rem] flex-1 border-orange-200 text-orange-700 hover:bg-orange-50"
                                 onClick={() => handleUpdateStatus(assignment.id, 'returned')}
                                 disabled={loading}
                               >

@@ -208,8 +208,8 @@ export function ScheduleGenerator({
       <div className="flex flex-wrap items-center gap-2">
         {/* Title */}
         <div className="flex-1 min-w-[160px]">
-          <h1 className="text-[15px] font-semibold text-foreground leading-tight">Motor de escala</h1>
-          <p className="text-[12px] text-muted-foreground">Rascunho mensal e designações</p>
+          <h1 className="text-[0.9375rem] font-semibold text-foreground leading-tight">Motor de escala</h1>
+          <p className="text-[0.75rem] text-muted-foreground">Rascunho mensal e designações</p>
         </div>
 
         {/* Month selector */}
@@ -272,7 +272,7 @@ export function ScheduleGenerator({
 
       {/* ── Section header ── */}
       <div className="flex items-center justify-between pt-1">
-        <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <span className="flex items-center gap-1.5 text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
           <CalendarDays className="h-3.5 w-3.5" />
           Rascunho por arranjo
         </span>
@@ -332,8 +332,8 @@ function OptionChip({
   return (
     <div className="flex items-center gap-3 flex-1 px-3 py-2.5 rounded-xl border border-border bg-card">
       <div className="flex-1 min-w-0">
-        <p className="text-[12px] font-medium text-foreground leading-tight">{title}</p>
-        <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{sub}</p>
+        <p className="text-[0.75rem] font-medium text-foreground leading-tight">{title}</p>
+        <p className="text-[0.625rem] text-muted-foreground mt-0.5 leading-tight">{sub}</p>
       </div>
       <Switch checked={checked} onCheckedChange={onChange} className="shrink-0" />
     </div>
@@ -360,8 +360,8 @@ function ArrangementCard({
         <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
           <Clock className="h-3.5 w-3.5 text-primary" />
         </div>
-        <span className="text-[13px] font-medium text-foreground flex-1 truncate">{arr.label}</span>
-        <span className="text-[11px] font-medium text-muted-foreground shrink-0">{timeLabel}</span>
+        <span className="text-[0.8125rem] font-medium text-foreground flex-1 truncate">{arr.label}</span>
+        <span className="text-[0.6875rem] font-medium text-muted-foreground shrink-0">{timeLabel}</span>
       </div>
 
       {/* Slot rows */}
@@ -411,16 +411,16 @@ function SlotRow({
     >
       {/* Date */}
       <div className="text-center">
-        <p className="text-[18px] font-medium text-foreground leading-none">{dayNum}</p>
-        <p className="text-[9px] font-medium uppercase tracking-wider text-muted-foreground mt-0.5">{weekday}</p>
+        <p className="text-[1.125rem] font-medium text-foreground leading-none">{dayNum}</p>
+        <p className="text-[0.5625rem] font-medium uppercase tracking-wider text-muted-foreground mt-0.5">{weekday}</p>
       </div>
 
       {/* Assignee */}
       {isGroupMode ? (
         <div className="min-w-0">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-primary">Modo Grupo</span>
+          <span className="text-[0.625rem] font-semibold uppercase tracking-wide text-primary">Modo Grupo</span>
           {item.territory && (
-            <p className="text-[12px] font-medium text-foreground truncate mt-0.5">
+            <p className="text-[0.75rem] font-medium text-foreground truncate mt-0.5">
               T{item.territory.number} · {item.territory.name}
             </p>
           )}
@@ -436,15 +436,15 @@ function SlotRow({
             if (!error) onUpdate()
           }}
         >
-          <SelectTrigger className="h-8 w-full text-[12px] font-medium border-border">
+          <SelectTrigger className="h-8 w-full text-[0.75rem] font-medium border-border">
             <SelectValue placeholder="Pendente" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="none" className="text-[12px]">Pendente</SelectItem>
+            <SelectItem value="none" className="text-[0.75rem]">Pendente</SelectItem>
             {leaders
               .filter((l) => leaderArrs.some((la) => la.profile_id === l.id && la.arrangement_id === item.arrangement_id))
               .map((l) => (
-                <SelectItem key={l.id} value={l.id} className="text-[12px]">{l.name}</SelectItem>
+                <SelectItem key={l.id} value={l.id} className="text-[0.75rem]">{l.name}</SelectItem>
               ))}
           </SelectContent>
         </Select>
@@ -452,7 +452,7 @@ function SlotRow({
 
       {/* Status badge */}
       <span className={cn(
-        "text-[9px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md border whitespace-nowrap",
+        "text-[0.5625rem] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded-md border whitespace-nowrap",
         statusClass,
       )}>
         {statusLabel}

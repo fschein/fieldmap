@@ -456,10 +456,10 @@ export default function TerritoryMapPage({
           {/* Progress Section - desktop only */}
           <div className="hidden sm:flex items-center gap-3 px-4 py-1.5 rounded-full bg-muted border border-border shadow-inner">
             <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider leading-none mb-1">Status de Campo</span>
+              <span className="text-[0.625rem] font-bold text-muted-foreground uppercase tracking-wider leading-none mb-1">Status de Campo</span>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-black text-foreground leading-none">
-                  {stats.completed}/{stats.total} <span className="text-[10px] text-muted-foreground/50 font-normal">áreas</span>
+                  {stats.completed}/{stats.total} <span className="text-[0.625rem] text-muted-foreground/50 font-normal">áreas</span>
                 </span>
                 <div className="h-2 w-24 bg-border rounded-full overflow-hidden">
                   <div
@@ -554,10 +554,10 @@ export default function TerritoryMapPage({
             <div className="p-4 border-b bg-muted/30">
               <TabsList className="w-full grid grid-cols-2 bg-muted p-1 h-10 border">
                 <TabsTrigger value="quadras" className="text-xs font-bold data-[state=active]:bg-card data-[state=active]:shadow-sm">
-                  Quadras <Badge variant="secondary" className="ml-2 bg-muted-foreground/10 text-[10px] px-1.5 py-0">{territory.subdivisions?.length || 0}</Badge>
+                  Quadras <Badge variant="secondary" className="ml-2 bg-muted-foreground/10 text-[0.625rem] px-1.5 py-0">{territory.subdivisions?.length || 0}</Badge>
                 </TabsTrigger>
                 <TabsTrigger value="dnv" className="text-xs font-bold data-[state=active]:bg-red-500/10 data-[state=active]:text-red-500 data-[state=active]:shadow-sm">
-                  Não Visitar <Badge variant="secondary" className="ml-2 bg-card text-red-500 border-red-500/20 text-[10px] px-1.5 py-0">{((territory as any).do_not_visits?.length) || 0}</Badge>
+                  Não Visitar <Badge variant="secondary" className="ml-2 bg-card text-red-500 border-red-500/20 text-[0.625rem] px-1.5 py-0">{((territory as any).do_not_visits?.length) || 0}</Badge>
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -567,17 +567,17 @@ export default function TerritoryMapPage({
                 <div className="flex flex-col p-2.5 rounded-xl bg-card border border-border shadow-sm">
                   <Clock className="h-4 w-4 text-muted-foreground/40 mb-1" />
                   <span className="font-black text-foreground text-sm">{stats.total - stats.completed}</span>
-                  <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Pendentes</span>
+                  <span className="text-[0.625rem] text-muted-foreground font-bold uppercase tracking-tighter">Pendentes</span>
                 </div>
                 <div className="flex flex-col p-2.5 rounded-xl bg-card border border-border shadow-sm">
                   <Check className="h-4 w-4 text-emerald-500 mb-1" />
                   <span className="font-black text-foreground text-sm">{stats.completed}</span>
-                  <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Concluídas</span>
+                  <span className="text-[0.625rem] text-muted-foreground font-bold uppercase tracking-tighter">Concluídas</span>
                 </div>
                 <div className="flex flex-col p-2.5 rounded-xl bg-card border border-border shadow-sm">
                   <TrendingUp className="h-4 w-4 text-primary mb-1" />
                   <span className="font-black text-foreground text-sm">{stats.percentage}%</span>
-                  <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">Meta</span>
+                  <span className="text-[0.625rem] text-muted-foreground font-bold uppercase tracking-tighter">Meta</span>
                 </div>
               </div>
 
@@ -637,7 +637,7 @@ export default function TerritoryMapPage({
 
                         {subdivision.notes && (
                           <div className="bg-muted p-2 rounded-lg border border-border mb-3">
-                            <p className="text-[11px] text-muted-foreground font-medium line-clamp-2">
+                            <p className="text-[0.6875rem] text-muted-foreground font-medium line-clamp-2">
                               {subdivision.notes}
                             </p>
                           </div>
@@ -717,9 +717,9 @@ export default function TerritoryMapPage({
                               {dnv.address || "Endereço não informado"}
                             </h4>
                             {isExpired ? (
-                              <Badge className="bg-destructive text-destructive-foreground text-[9px] uppercase tracking-wider h-4">Expirado</Badge>
+                              <Badge className="bg-destructive text-destructive-foreground text-[0.5625rem] uppercase tracking-wider h-4">Expirado</Badge>
                             ) : (
-                              <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-tight">Desde {date.toLocaleDateString("pt-BR")}</span>
+                              <span className="text-[0.625rem] text-muted-foreground font-bold uppercase tracking-tight">Desde {date.toLocaleDateString("pt-BR")}</span>
                             )}
                           </div>
                           <Button
@@ -752,7 +752,7 @@ export default function TerritoryMapPage({
                   {territory.assigned_to_user?.name?.slice(0, 2).toUpperCase()}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[10px] text-secondary-foreground/50 font-bold uppercase tracking-widest mb-0.5">Designado agora</p>
+                  <p className="text-[0.625rem] text-secondary-foreground/50 font-bold uppercase tracking-widest mb-0.5">Designado agora</p>
                   <p className="font-bold text-sm truncate">{territory.assigned_to_user?.name}</p>
                 </div>
               </div>
@@ -842,7 +842,7 @@ export default function TerritoryMapPage({
                 <div className="bg-destructive p-2 rounded-md">
                   <MapPin className="h-4 w-4 text-destructive-foreground" />
                 </div>
-                <div className="text-[11px] text-foreground leading-tight">
+                <div className="text-[0.6875rem] text-foreground leading-tight">
                   <p className="font-bold mb-0.5">Coordenadas capturadas:</p>
                   <p className="font-mono text-muted-foreground">{newDnvCoords?.[0].toFixed(6)}, {newDnvCoords?.[1].toFixed(6)}</p>
                 </div>

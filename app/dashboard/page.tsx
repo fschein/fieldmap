@@ -48,10 +48,10 @@ function SectionHeader({
     <div className="px-4 pt-3 pb-2">
       <div className="flex items-center gap-1.5">
         <span className="text-muted-foreground">{icon}</span>
-        <h2 className="text-[13px] font-semibold text-foreground">{title}</h2>
+        <h2 className="text-[0.8125rem] font-semibold text-foreground">{title}</h2>
         {badge}
       </div>
-      <p className="text-[11px] text-muted-foreground mt-0.5">{sub}</p>
+      <p className="text-[0.6875rem] text-muted-foreground mt-0.5">{sub}</p>
     </div>
   )
 }
@@ -75,19 +75,19 @@ function StatCard({
 }) {
   return (
     <div className="bg-card rounded-2xl border border-border p-3.5 flex flex-col gap-1.5 shadow-sm transition-transform active:scale-[0.98]">
-      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+      <div className="flex items-center gap-1.5 text-[0.625rem] font-semibold uppercase tracking-wider text-muted-foreground">
         <span className={cn(danger && value > 0 ? "text-red-500" : "text-muted-foreground")}>
           {icon}
         </span>
         {label}
       </div>
       <p className={cn(
-        "text-[30px] font-medium leading-none tracking-tight",
+        "text-[1.875rem] font-medium leading-none tracking-tight",
         danger && value > 0 ? "text-red-500" : "text-foreground"
       )}>
         {value}
       </p>
-      <p className="text-[10px] text-muted-foreground font-medium uppercase">{hint}</p>
+      <p className="text-[0.625rem] text-muted-foreground font-medium uppercase">{hint}</p>
     </div>
   )
 }
@@ -240,10 +240,10 @@ export default function DashboardPage() {
     <div className="space-y-4 pb-10">
       {/* ── Greeting ── */}
       <div className="pt-2 pb-1">
-        <h1 className="text-[20px] font-black text-foreground tracking-tight">
+        <h1 className="text-[1.25rem] font-black text-foreground tracking-tight">
           Olá, {firstName} 👋
         </h1>
-        <p className="text-[12px] text-muted-foreground font-medium">{todayFormatted}</p>
+        <p className="text-[0.75rem] text-muted-foreground font-medium">{todayFormatted}</p>
       </div>
 
       {/* ── Hero Stat Cards ── */}
@@ -272,7 +272,7 @@ export default function DashboardPage() {
           title="Em campo"
           sub="Progresso das designações ativas"
           badge={
-            <span className="ml-auto text-[14px] font-black px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+            <span className="ml-auto text-[0.875rem] font-black px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
               {territories.filter(t => t.isActive).length}
             </span>
           }
@@ -280,7 +280,7 @@ export default function DashboardPage() {
         <Divider />
         <div className="divide-y divide-border/30">
           {territories.filter(t => t.isActive).length === 0 ? (
-            <div className="p-10 text-center text-muted-foreground text-[11px] font-medium italic">
+            <div className="p-10 text-center text-muted-foreground text-[0.6875rem] font-medium italic">
               Nenhum território em campo
             </div>
           ) : (
@@ -291,18 +291,18 @@ export default function DashboardPage() {
                 <div key={territory.id} className="flex flex-col gap-2.5 px-4 py-3.5 hover:bg-muted/5 transition-colors">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="h-8 w-8 rounded-full bg-muted border border-border flex items-center justify-center text-[10px] font-black text-muted-foreground shrink-0">
+                      <div className="h-8 w-8 rounded-full bg-muted border border-border flex items-center justify-center text-[0.625rem] font-black text-muted-foreground shrink-0">
                         {getInitials(territory.name)}
                       </div>
                       <div className="flex flex-col min-w-0">
-                        <h4 className="text-[13px] font-bold text-foreground leading-tight truncate">{territory.name}</h4>
-                        <span className="text-[11px] font-medium text-muted-foreground/80 uppercase tracking-wide truncate">
+                        <h4 className="text-[0.8125rem] font-bold text-foreground leading-tight truncate">{territory.name}</h4>
+                        <span className="text-[0.6875rem] font-medium text-muted-foreground/80 uppercase tracking-wide truncate">
                           {territory.activeAssignee || "Ativo"}
                         </span>
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className="text-[11px] font-bold text-muted-foreground/60 whitespace-nowrap">
+                      <span className="text-[0.6875rem] font-bold text-muted-foreground/60 whitespace-nowrap">
                         {territory.daysInField}d · {progress}%
                       </span>
                     </div>
@@ -324,7 +324,7 @@ export default function DashboardPage() {
           title="Mais trabalhados"
           sub="Territórios com mais conclusões recentes"
           badge={
-            <span className="ml-auto text-[10px] font-black px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/60 uppercase">
+            <span className="ml-auto text-[0.625rem] font-black px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/60 uppercase">
               6 meses
             </span>
           }
@@ -338,15 +338,15 @@ export default function DashboardPage() {
               const rankColors = ["#E24B4A", "#378ADD", "#378ADD", "#378ADD", "#A1A1AA"]
               return (
                 <div key={t.id} className="flex items-center px-4 py-3 hover:bg-muted/5 transition-colors gap-3">
-                  <span className="w-4 text-center text-[11px] font-black text-muted-foreground/30">{i + 1}</span>
+                  <span className="w-4 text-center text-[0.6875rem] font-black text-muted-foreground/30">{i + 1}</span>
                   <div className="w-[3px] h-7 rounded-full shrink-0" style={{ backgroundColor: rankColors[i] || "#A1A1AA" }} />
                   <div className="flex-1 min-w-0 ml-1">
-                    <h4 className="text-[13px] font-bold text-foreground leading-tight truncate">{t.name}</h4>
-                    <span className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest leading-none">Nº {t.number}</span>
+                    <h4 className="text-[0.8125rem] font-bold text-foreground leading-tight truncate">{t.name}</h4>
+                    <span className="text-[0.625rem] font-black text-muted-foreground/60 uppercase tracking-widest leading-none">Nº {t.number}</span>
                   </div>
                   <div className="text-right flex flex-col items-end">
-                    <span className="text-[22px] font-medium text-foreground leading-none">{t.assignmentCount}</span>
-                    <span className="text-[9px] font-black text-muted-foreground/60 uppercase tracking-widest mt-0.5">vezes</span>
+                    <span className="text-[1.375rem] font-medium text-foreground leading-none">{t.assignmentCount}</span>
+                    <span className="text-[0.5625rem] font-black text-muted-foreground/60 uppercase tracking-widest mt-0.5">vezes</span>
                   </div>
                 </div>
               )
@@ -371,17 +371,17 @@ export default function DashboardPage() {
               )} />
               <div className="flex-1 min-w-0">
                 <span className={cn(
-                  "inline-flex text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-[4px] mb-1.5 outline outline-1 outline-offset-0",
+                  "inline-flex text-[0.5625rem] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-[4px] mb-1.5 outline outline-1 outline-offset-0",
                   activity.type === 'completed' ? 'bg-emerald-500/10 text-emerald-600 outline-emerald-500/20' :
                     activity.type === 'returned' ? 'bg-red-400/10 text-red-600 outline-red-400/20' :
                       'bg-amber-400/10 text-amber-600 outline-amber-400/20'
                 )}>
                   {activity.type === 'completed' ? 'Concluído' : activity.type === 'returned' ? 'Devolvido' : 'Designado'}
                 </span>
-                <h4 className="text-[13px] font-bold text-foreground truncate leading-tight">{activity.territory}</h4>
-                <p className="text-[11px] font-medium text-muted-foreground/80 truncate">{activity.publisher}</p>
+                <h4 className="text-[0.8125rem] font-bold text-foreground truncate leading-tight">{activity.territory}</h4>
+                <p className="text-[0.6875rem] font-medium text-muted-foreground/80 truncate">{activity.publisher}</p>
               </div>
-              <span className="text-[10px] font-bold text-muted-foreground/40 mt-1 uppercase whitespace-nowrap">
+              <span className="text-[0.625rem] font-bold text-muted-foreground/40 mt-1 uppercase whitespace-nowrap">
                 {new Date(activity.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')}
               </span>
             </div>

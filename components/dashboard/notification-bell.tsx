@@ -39,7 +39,7 @@ export function NotificationBell() {
         >
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm animate-pulse">
+            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[0.625rem] font-bold text-primary-foreground shadow-sm animate-pulse">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
@@ -101,7 +101,7 @@ export function NotificationBell() {
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-xs text-foreground line-clamp-1">{notif.title}</p>
                   <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{notif.message}</p>
-                  <p className="text-[10px] text-muted-foreground mt-1">
+                  <p className="text-[0.625rem] text-muted-foreground mt-1">
                     {new Date(notif.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                   </p>
                 </div>

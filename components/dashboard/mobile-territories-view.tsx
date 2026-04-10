@@ -120,7 +120,7 @@ export function MobileTerritoriesView() {
 
       {/* Ativos Agora */}
       <section className="space-y-3">
-        <h2 className="text-[12px] font-bold text-muted-foreground uppercase tracking-widest px-1">Ativos agora</h2>
+        <h2 className="text-[0.75rem] font-bold text-muted-foreground uppercase tracking-widest px-1">Ativos agora</h2>
         {active.length === 0 ? (
           <div className="py-12 flex flex-col items-center justify-center space-y-3 text-muted-foreground bg-card rounded-xl border border-dashed border-border">
             <MapPin className="h-8 w-8 opacity-20" />
@@ -149,7 +149,7 @@ export function MobileTerritoriesView() {
                       <span className="font-extrabold text-foreground text-base">Território {t.number}</span>
                     </div>
                     <div className={cn(
-                      "text-[10px] font-black px-2 py-0.5 rounded-full border",
+                      "text-[0.625rem] font-black px-2 py-0.5 rounded-full border",
                       progress > 60 ? "bg-green-50 text-green-600 border-green-500/10" : "bg-red-50 text-red-600 border-red-500/10"
                     )}>
                       {progress}%
@@ -170,7 +170,7 @@ export function MobileTerritoriesView() {
 
       {/* Histórico */}
       <section className="space-y-3">
-        <h2 className="text-[13px] font-bold text-muted-foreground uppercase tracking-widest px-1">Histórico</h2>
+        <h2 className="text-[0.8125rem] font-bold text-muted-foreground uppercase tracking-widest px-1">Histórico</h2>
         <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
           {history.length === 0 ? (
             <p className="p-10 text-center text-xs text-muted-foreground">Nenhum registro encontrado.</p>
@@ -186,14 +186,14 @@ export function MobileTerritoriesView() {
                     <div className="flex items-center gap-3">
                       <div className="w-2 h-2 rounded-full bg-muted" />
                       <div className="space-y-0.5">
-                        <p className="font-bold text-foreground text-[15px]">Território {h.territory?.number}</p>
-                        <p className="text-[13px] text-muted-foreground font-bold uppercase tracking-tight">
+                        <p className="font-bold text-foreground text-[0.9375rem]">Território {h.territory?.number}</p>
+                        <p className="text-[0.8125rem] text-muted-foreground font-bold uppercase tracking-tight">
                           {isCompleted ? 'Concluído' : 'Devolvido'} • {date ? format(new Date(date), "MMM yyyy", { locale: ptBR }) : '-'}
                         </p>
                       </div>
                     </div>
                     <div className={cn(
-                      "text-[10px] font-black px-2 py-0.5 rounded-full border shadow-sm",
+                      "text-[0.625rem] font-black px-2 py-0.5 rounded-full border shadow-sm",
                       progress >= 100
                         ? "bg-muted text-muted-foreground border-border/50"
                         : "bg-primary/10 text-primary border-primary/20"

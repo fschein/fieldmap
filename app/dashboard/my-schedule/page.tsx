@@ -66,8 +66,8 @@ export default function MySchedulePage() {
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-[22px] font-semibold tracking-tight text-foreground leading-none">Minhas escalas</h1>
-          <p className="text-[10px] font-black text-primary uppercase tracking-widest mt-1">
+          <h1 className="text-[1.375rem] font-semibold tracking-tight text-foreground leading-none">Minhas escalas</h1>
+          <p className="text-[0.625rem] font-black text-primary uppercase tracking-widest mt-1">
             {format(new Date(), "MMMM yyyy", { locale: ptBR })}
           </p>
         </div>
@@ -94,13 +94,13 @@ export default function MySchedulePage() {
                 <div className="text-2xl font-black text-primary leading-none">
                   {format(parseISO(item.date), "dd")}
                 </div>
-                <div className="text-[10px] uppercase font-black text-muted-foreground">
+                <div className="text-[0.625rem] uppercase font-black text-muted-foreground">
                   {format(parseISO(item.date), "eee", { locale: ptBR })}
                 </div>
               </div>
 
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-0.5">
+                <p className="text-[0.625rem] font-black uppercase tracking-widest text-primary mb-0.5">
                   Designação
                 </p>
                 <p className="text-sm font-bold text-foreground truncate uppercase tracking-tight">
@@ -122,7 +122,7 @@ export default function MySchedulePage() {
           </p>
           <Button
             variant="outline"
-            className="w-full gap-2 font-black text-[11px] uppercase tracking-wider text-foreground border-2 border-border rounded-xl h-11 bg-card hover:bg-muted"
+            className="w-full gap-2 font-black text-[0.6875rem] uppercase tracking-wider text-foreground border-2 border-border rounded-xl h-11 bg-card hover:bg-muted"
             onClick={() => window.open('https://drive.google.com/drive/folders/13CKIT-W69ZlHwVKV2GJ-Z-EjAcd77zjs?usp=sharing', '_blank')}
           >
             <ExternalLink className="h-4 w-4" />

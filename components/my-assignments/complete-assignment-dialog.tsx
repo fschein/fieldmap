@@ -81,7 +81,7 @@ export function CompleteAssignmentDialog({
 
             {!allCompleted ? (
               <div className="space-y-3">
-                <div className={`rounded-lg p-3 text-[13px] border ${daysRemaining < 0 ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+                <div className={`rounded-lg p-3 text-[0.8125rem] border ${daysRemaining < 0 ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
                   {daysRemaining < 0 ? (
                     <>
                       <p className="font-semibold">⚠️ Território atrasado</p>
@@ -105,7 +105,7 @@ export function CompleteAssignmentDialog({
                   <Textarea 
                     id="reason"
                     placeholder="Ex: Não consegui terminar a Rua X pois choveu..."
-                    className="h-24 text-[13px]"
+                    className="h-24 text-[0.8125rem]"
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
                     required
