@@ -87,23 +87,20 @@ export function ScheduleCalendar({
                   {format(parseISO(item.date), "EEEE", { locale: ptBR })}
                 </Badge>
               </div>
-              <CardHeader className="pb-2 pt-6">
-                <div className="text-5xl font-black tracking-tighter text-primary/10 absolute -left-1 -top-2 select-none group-hover:text-primary/20 transition-colors">
-                  {format(parseISO(item.date), "dd")}
-                </div>
+              <CardHeader className="pb-2 pt-4">
                 <div className="relative z-10">
-                   <div className="text-4xl font-black tracking-tighter text-foreground mb-1">
+                   <div className="text-3xl font-black tracking-tighter text-foreground mb-0">
                       {format(parseISO(item.date), "dd")}
                    </div>
-                   <CardTitle className="text-[12px] font-black uppercase tracking-widest text-muted-foreground">
+                   <CardTitle className="text-[11px] font-black uppercase tracking-widest text-muted-foreground mt-0">
                     {item.arrangement.label}
                   </CardTitle>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4 pt-4">
-                <div className="flex items-center gap-3 bg-muted/30 p-3 rounded-lg border border-muted">
-                  <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center border-2 border-background shrink-0">
-                    <User className="h-5 w-5 text-white" />
+              <CardContent className="space-y-3 pt-2">
+                <div className="flex items-center gap-3 bg-muted/30 p-2.5 rounded-lg border border-muted">
+                  <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center border-2 border-background shrink-0">
+                    <User className="h-4 w-4 text-white" />
                   </div>
                   <div className="min-w-0">
                     <p className="font-black text-sm uppercase tracking-tight truncate">

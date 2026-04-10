@@ -73,7 +73,7 @@ const navItems = [
     roles: ["admin"],
   },
   {
-    title: "Escala",
+    title: "Minha Escala",
     href: "/dashboard/my-schedule",
     icon: ClipboardList,
     roles: ["admin", "supervisor", "dirigente", "publicador"],

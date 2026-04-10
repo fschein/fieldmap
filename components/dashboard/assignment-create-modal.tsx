@@ -518,6 +518,7 @@ export function AssignmentCreateModal({
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
                   className="h-9"
+                  max={new Date().toISOString().split("T")[0]}
                 />
               </div>
               <div className="space-y-1.5">
@@ -530,6 +531,7 @@ export function AssignmentCreateModal({
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
                   min={startDate}
+                  max={new Date().toISOString().split("T")[0]}
                   className="h-9"
                 />
               </div>

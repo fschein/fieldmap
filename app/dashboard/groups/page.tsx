@@ -328,52 +328,45 @@ export default function GroupsPage() {
       ) : (
         // ...existing code...
 
-<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
   {groups.map((group) => (
-    <Card key={group.id}>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            <div
-              className="h-10 w-10 rounded-lg flex-shrink-0 border-2 border-border"
-              style={{ backgroundColor: group.color }}
-            />
-            <div className="min-w-0 flex-1">
-              <CardTitle className="text-lg truncate">{group.name}</CardTitle>
-              {group.description && (
-                <CardDescription className="line-clamp-2 mt-1">
-                  {group.description}
-                </CardDescription>
-              )}
-            </div>
+    <Card key={group.id} className="p-3">
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div
+            className="h-6 w-6 rounded border border-border flex-shrink-0"
+            style={{ backgroundColor: group.color }}
+          />
+          <div className="min-w-0 flex-1">
+            <h3 className="text-sm font-semibold truncate text-foreground">{group.name}</h3>
+            {group.description && (
+              <p className="text-xs text-muted-foreground truncate">
+                {group.description}
+              </p>
+            )}
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="flex-shrink-0">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleOpenDialog(group)}>
-                <Pencil className="mr-2 h-4 w-4" />
-                Editar
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-destructive"
-                onClick={() => handleDelete(group.id)}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Excluir
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
-      </CardHeader>
-      <CardContent>
-        <Badge variant="outline" className="font-mono">
-          {group.color}
-        </Badge>
-      </CardContent>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 -mr-2 text-muted-foreground hover:text-foreground">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleOpenDialog(group)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Editar
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-destructive"
+              onClick={() => handleDelete(group.id)}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Excluir
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </Card>
   ))}
 </div>

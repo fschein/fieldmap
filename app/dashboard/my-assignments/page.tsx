@@ -372,10 +372,10 @@ export default function MyAssignmentsPage() {
           <div className="flex-1 text-left">
             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground leading-none mb-1">
               {nextSchedule ? (
-                isToday(parseISO(nextSchedule.date)) ? "📅 Você dirige hoje!" :
-                  isTomorrow(parseISO(nextSchedule.date)) ? "📅 Próxima escala: amanhã" :
-                    "📅 Próxima escala"
-              ) : "📅 Escala"}
+                isToday(parseISO(nextSchedule.date)) ? "Você dirige hoje!" :
+                  isTomorrow(parseISO(nextSchedule.date)) ? "Próxima escala: amanhã" :
+                    "Próxima escala"
+              ) : "Escala"}
             </p>
             {fetchingSchedule ? (
               <div className="h-4 w-24 bg-muted animate-pulse rounded" />

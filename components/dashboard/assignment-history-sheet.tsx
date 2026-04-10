@@ -136,6 +136,11 @@ export function AssignmentHistorySheet({
 
       const { error } = await supabase.from("assignments").update(updateData).eq("id", assignmentId)
       if (error) throw error
+      
+      if (territoryId) {
+        await syncTerritoryOwner(territoryId)
+      }
+
       toast.success(`Designação ${newStatus === 'completed' ? 'concluída' : 'devolvida'}`)
       await loadHistory()
       onUpdate()
@@ -406,6 +411,7 @@ export function AssignmentHistorySheet({
                                     value={editStart}
                                     onChange={(e) => setEditStart(e.target.value)}
                                     className="h-8 text-xs"
+                                    max={new Date().toISOString().split("T")[0]}
                                   />
                                 </div>
                                 <div className="space-y-1">
@@ -418,6 +424,7 @@ export function AssignmentHistorySheet({
                                     onChange={(e) => setEditEnd(e.target.value)}
                                     className="h-8 text-xs"
                                     min={editStart}
+                                    max={new Date().toISOString().split("T")[0]}
                                   />
                                 </div>
                               </div>

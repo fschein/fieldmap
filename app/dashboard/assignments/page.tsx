@@ -65,29 +65,38 @@ const STATUS_CLASS: Record<string, string> = {
 
 // Pills de filtro rápido para mobile
 const QUICK_FILTERS = [
-  { id: "active" as StatusFilter, label: "Em Campo", emoji: "📌" },
-  { id: "overdue" as StatusFilter, label: "Atrasados", emoji: "🔥" },
-  { id: "available" as StatusFilter, label: "Devolvidos", emoji: "↩️" },
-  { id: "completed" as StatusFilter, label: "Livres", emoji: "✅" },
-  { id: "all" as StatusFilter, label: "Todos", emoji: undefined },
+  { id: "active" as StatusFilter, label: "Designados" },
+  { id: "completed" as StatusFilter, label: "Livres" },
+  { id: "all" as StatusFilter, label: "Todos" },
+  { id: "overdue" as StatusFilter, label: "Atrasados" },
+  { id: "available" as StatusFilter, label: "Devolvidos" },
 ]
 
-function FilterPill({ label, emoji, active, count, onClick }: any) {
+function FilterPill({ label, active, count, onClick, id }: any) {
+  const getStyles = () => {
+    if (!active) return "bg-card text-muted-foreground border-border hover:bg-muted/50"
+    
+    switch (id) {
+      case 'active': return "bg-foreground text-background border-foreground"
+      case 'completed': return "bg-green-100 text-green-800 border-green-200"
+      case 'overdue': return "bg-red-100 text-red-800 border-red-200"
+      case 'available': return "bg-amber-100 text-amber-800 border-amber-200"
+      default: return "bg-foreground text-background border-foreground"
+    }
+  }
+
   return (
     <button
       onClick={onClick}
       className={cn(
-        "whitespace-nowrap px-3 py-1.5 rounded-full text-[11px] font-black uppercase tracking-tight transition-all flex items-center gap-1.5 border shadow-sm flex-shrink-0",
-        active
-          ? "bg-primary text-primary-foreground border-primary shadow-md"
-          : "bg-card text-muted-foreground border-border hover:border-muted-foreground/30"
+        "shrink-0 h-10 px-4 rounded-full text-sm font-bold border transition-colors shadow-sm flex items-center gap-2",
+        getStyles()
       )}
     >
-      {emoji && <span>{emoji}</span>}
       {label}
       <span className={cn(
-        "text-[9px] px-1.5 py-0.5 rounded-full font-black min-w-[16px] text-center",
-        active ? "bg-primary-foreground/20 text-primary-foreground" : "bg-muted text-muted-foreground"
+        "text-[10px] px-1.5 py-0.5 rounded-full font-black min-w-[18px]",
+        active ? "bg-black/10 text-inherit" : "bg-muted text-muted-foreground"
       )}>
         {count}
       </span>
@@ -118,6 +127,7 @@ export default function AssignmentsPage() {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [showOnlyRemaining, setShowOnlyRemaining] = useState(false)
+  const [showFilters, setShowFilters] = useState(false)
 
   const fetchData = async () => {
     try {
@@ -192,14 +202,20 @@ export default function AssignmentsPage() {
       const activeAssignments = terrAssignments.filter(a => a.status === 'active')
       const activeAssig = activeAssignments.sort((a, b) => new Date(b.assigned_at).getTime() - new Date(a.assigned_at).getTime())[0]
 
-      const completed = terrAssignments
-        .filter(a => a.completed_at || a.status === 'completed')
-        .sort((a, b) => new Date(b.completed_at || 0).getTime() - new Date(a.completed_at || 0).getTime())
+      const finished = terrAssignments
+        .filter(a => a.status === 'completed' || a.status === 'returned')
+        .sort((a, b) => {
+          const dateA = new Date(a.completed_at || a.returned_at || a.assigned_at || 0).getTime()
+          const dateB = new Date(b.completed_at || b.returned_at || b.assigned_at || 0).getTime()
+          return dateB - dateA
+        })
 
-      const lastCompletedAt = completed.length > 0 ? completed[0].completed_at : null
+      const lastFinishedAt = finished.length > 0 
+        ? (finished[0].completed_at || finished[0].returned_at || finished[0].assigned_at) 
+        : null
 
-      const completionsInPeriod = completed.filter(a =>
-        new Date(a.completed_at).getTime() >= periodStartTime
+      const completionsInPeriod = terrAssignments.filter(a =>
+        a.status === 'completed' && a.completed_at && new Date(a.completed_at).getTime() >= periodStartTime
       ).length
 
       const totalSubdivisions = (t as any).subdivisions?.length || 0
@@ -222,14 +238,14 @@ export default function AssignmentsPage() {
 
           if (isFull || isEmpty) {
             status = 'completed'
-            if (lastCompletedAt) {
-              const start = new Date(lastCompletedAt).getTime()
+            if (lastFinishedAt) {
+              const start = new Date(lastFinishedAt).getTime()
               daysInField = Math.max(0, Math.floor((now.getTime() - start) / (1000 * 60 * 60 * 24)))
             }
           } else {
             status = 'available'
-            if (lastCompletedAt) {
-              const start = new Date(lastCompletedAt).getTime()
+            if (lastFinishedAt) {
+              const start = new Date(lastFinishedAt).getTime()
               daysInField = Math.max(0, Math.floor((now.getTime() - start) / (1000 * 60 * 60 * 24)))
             }
           }
@@ -245,9 +261,9 @@ export default function AssignmentsPage() {
         activePublisher: activeAssig?.publisherName || null,
         assignedAt: activeAssig?.assigned_at || null,
         daysInField,
-        totalCompletions: completed.length,
+        totalCompletions: finished.length,
         completionsInPeriod,
-        lastCompletedAt,
+        lastCompletedAt: lastFinishedAt,
         campaignId: t.campaign_id,
         assignedTo: t.assigned_to,
         groupColor: (t as any).group?.color || null
@@ -371,33 +387,44 @@ export default function AssignmentsPage() {
           </div>
         </div>
 
-        {/* Barra de progresso geral */}
-        <div className="bg-card border rounded-xl p-3 space-y-2">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span className="font-semibold">Progresso Geral</span>
-            <span className="font-bold text-foreground">
-              {inFieldTotal} de {data.length} em campo
-              {counts.overdue > 0 && (
-                <span className="ml-2 text-red-500 font-bold">({counts.overdue} atrasados)</span>
+        {/* Busca e Filtros (Layout igual ao Territórios) */}
+        <div className="flex flex-col gap-4">
+          {/* Busca */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar território ou publicador..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10 h-14 sm:h-11 bg-card border-border shadow-sm w-full rounded-xl text-base"
+            />
+          </div>
+
+          {/* Filtros rápidos horizontalmente roláveis */}
+          <div className="flex items-center gap-2">
+            <div className="flex overflow-x-auto pb-2 gap-2 hide-scrollbar flex-1">
+              {QUICK_FILTERS.map(f => (
+                <FilterPill
+                  key={f.id}
+                  id={f.id}
+                  label={f.label}
+                  active={statusFilter === f.id}
+                  count={f.id === "active" ? counts.active + counts.overdue : f.id === "all" ? counts.all : counts[f.id as keyof typeof counts] || 0}
+                  onClick={() => setStatusFilter(f.id)}
+                />
+              ))}
+            </div>
+            <Button
+              variant={showFilters ? "default" : "outline"}
+              size="icon"
+              className={cn(
+                "h-10 w-10 shrink-0 rounded-full transition-all border shadow-sm",
+                showFilters ? "bg-foreground text-background" : "bg-card text-muted-foreground"
               )}
-            </span>
-          </div>
-          <div className="relative h-2 bg-muted rounded-full overflow-hidden">
-            {/* barra de atrasados */}
-            <div
-              className="absolute top-0 left-0 h-full bg-red-500 rounded-full transition-all duration-500"
-              style={{ width: `${((counts.overdue) / (data.length || 1)) * 100}%` }}
-            />
-            {/* barra de em campo (active) */}
-            <div
-              className="absolute top-0 left-0 h-full bg-primary rounded-full transition-all duration-500"
-              style={{ width: `${((counts.active) / (data.length || 1)) * 100}%` }}
-            />
-          </div>
-          <div className="flex gap-4 text-[10px] text-muted-foreground">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary inline-block" />Em Campo: {counts.active}</span>
-            {counts.overdue > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500 inline-block" />Atrasados: {counts.overdue}</span>}
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-muted-foreground/30 border inline-block" />Livres: {counts.completed + counts.available}</span>
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
@@ -447,34 +474,11 @@ export default function AssignmentsPage() {
           </Card>
         )}
 
-        {/* Pills rápidos de filtro (mobile-first) */}
-        <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
-          {QUICK_FILTERS.map(f => (
-            <FilterPill
-              key={f.id}
-              label={f.label}
-              emoji={f.emoji}
-              active={statusFilter === f.id}
-              count={f.id === "active" ? counts.active + counts.overdue : f.id === "all" ? counts.all : counts[f.id as keyof typeof counts] || 0}
-              onClick={() => setStatusFilter(f.id)}
-            />
-          ))}
-        </div>
-
-        {/* Filter Bar (desktop) */}
-        <div className="hidden md:flex bg-muted border rounded-xl p-3 flex-row items-center gap-3">
-          <div className="relative w-full md:max-w-[300px] xl:max-w-sm flex-shrink-0">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Buscar território ou publicador..."
-              className="pl-9 bg-card border-border w-full"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <div className="flex flex-wrap flex-1 w-full justify-end gap-2.5">
+        {/* Desktop Filter Bar (Secondary Selects) - Now collapsible on mobile */}
+        {showFilters && (
+          <div className="flex flex-wrap items-center gap-2.5 p-3 bg-muted/30 rounded-2xl border border-border/50 animate-in fade-in slide-in-from-top-2 duration-200">
             <Select value={periodFilter} onValueChange={(v: PeriodFilter) => setPeriodFilter(v)}>
-              <SelectTrigger className="w-auto min-w-[160px] px-3 bg-card border-border">
+              <SelectTrigger className="w-full sm:w-auto min-w-[160px] px-3 bg-card border-border rounded-xl">
                 <Clock className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-muted-foreground" />
                 <SelectValue placeholder="Período" />
               </SelectTrigger>
@@ -485,19 +489,23 @@ export default function AssignmentsPage() {
               </SelectContent>
             </Select>
             <Select value={campaignFilter} onValueChange={setCampaignFilter}>
-              <SelectTrigger className="w-auto min-w-[150px] px-3 bg-card border-border">
+              <SelectTrigger className="w-full sm:w-auto min-w-[150px] px-3 bg-card border-border rounded-xl">
                 <Calendar className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-muted-foreground" />
                 <SelectValue placeholder="Campanha" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todas Campanhas</SelectItem>
-                {campaigns.map(c => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                ))}
+                {campaigns.length > 0 ? (
+                  campaigns.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))
+                ) : (
+                  <SelectItem value="none" disabled>Nenhuma campanha ativa</SelectItem>
+                )}
               </SelectContent>
             </Select>
             <Select value={sortBy} onValueChange={(v: SortOption) => setSortBy(v)}>
-              <SelectTrigger className="w-auto min-w-[200px] px-3 bg-card border-border">
+              <SelectTrigger className="w-full sm:w-auto min-w-[200px] px-3 bg-card border-border rounded-xl">
                 <ArrowUpDown className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-muted-foreground" />
                 <SelectValue placeholder="Ordenar por" />
               </SelectTrigger>
@@ -511,18 +519,7 @@ export default function AssignmentsPage() {
               </SelectContent>
             </Select>
           </div>
-        </div>
-
-        {/* Mobile search */}
-        <div className="md:hidden relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar..."
-            className="pl-9 bg-card border-border w-full"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
+        )}
       </div>
 
       {filtered.length === 0 ? (

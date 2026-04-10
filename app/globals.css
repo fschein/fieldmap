@@ -126,6 +126,7 @@
 @layer base {
   html {
     font-size: calc(17.5px * var(--font-scale, 1));
+    scrollbar-gutter: stable;
   }
   * {
     @apply border-border outline-ring/50;

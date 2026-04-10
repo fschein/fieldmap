@@ -418,7 +418,7 @@ export default function TerritoryMapPage({
   return (
     <div className="flex h-[calc(100vh-4rem)] flex-col gap-0 bg-background">
       {/* Header Compacto */}
-      <div className="border-b bg-card px-3 sm:px-6 py-2 sm:py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm gap-2">
+      <div className="border-b bg-card pl-14 pr-3 sm:px-6 py-2 sm:py-3 flex items-center justify-between sticky top-0 z-20 shadow-sm gap-2">
         <div className="flex items-center gap-2 sm:gap-4 min-w-0">
           <Button variant="ghost" size="sm" asChild className="text-muted-foreground hover:text-foreground flex-shrink-0 h-8 px-2 sm:px-3">
             <Link href="/dashboard/territories">
