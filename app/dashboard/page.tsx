@@ -195,7 +195,8 @@ export default function DashboardPage() {
             ...t,
             assignmentCount: tA.filter((a: any) => a.status === 'completed').length,
             isActive: !!active,
-            daysInField: active ? Math.ceil((new Date().getTime() - new Date(active.assigned_at).getTime()) / (1000 * 60 * 60 * 24)) : undefined
+            daysInField: active ? Math.ceil((new Date().getTime() - new Date(active.assigned_at).getTime()) / (1000 * 60 * 60 * 24)) : undefined,
+            activeAssignee: active ? (lookup.get(active.user_id) || lookup.get(active.group_id) || '?') : undefined
           }
         })
       setTerritories(tStats)
@@ -294,7 +295,9 @@ export default function DashboardPage() {
                       </div>
                       <div className="flex flex-col min-w-0">
                         <h4 className="text-[13px] font-bold text-foreground leading-tight truncate">{territory.name}</h4>
-                        <span className="text-[11px] font-medium text-muted-foreground/80 uppercase tracking-wide truncate">Ativo</span>
+                        <span className="text-[11px] font-medium text-muted-foreground/80 uppercase tracking-wide truncate">
+                          {territory.activeAssignee || "Ativo"}
+                        </span>
                       </div>
                     </div>
                     <div className="text-right">
