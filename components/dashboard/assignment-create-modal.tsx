@@ -27,6 +27,7 @@ interface Territory {
   daysInField?: number | null
   last_completed_at: string | null
   urgencyDays: number
+  completedCount6m: number
 }
 
 interface Publisher {
@@ -117,7 +118,11 @@ export function AssignmentCreateModal({
           .from("groups")
           .select("id, name, color")
           .order("name"),
+        supabase
+          .rpc("get_territories_completed_count", { months_ago: 6 }),
       ])
+
+      const completedCountsData = (res[5] as any).data || []
 
       if (terrRes.data && activeAssignmentsRes.data) {
         const activeAssigs = activeAssignmentsRes.data || []
@@ -147,7 +152,9 @@ export function AssignmentCreateModal({
             }
           }
 
-          return { ...t, urgencyDays, assignedName, daysInField }
+          const count6m = completedCountsData.find((c: any) => c.territory_id === t.id)?.count || 0
+
+          return { ...t, urgencyDays, assignedName, daysInField, completedCount6m: count6m }
         })
 
         mapped.sort((a, b) => {
@@ -320,6 +327,11 @@ export function AssignmentCreateModal({
                     <span className="text-muted-foreground">Território:</span>{" "}
                     <strong className="text-foreground">{selectedTerr.name}</strong>{" "}
                     <span className="text-muted-foreground opacity-70">#{selectedTerr.number}</span>
+                    {selectedTerr.completedCount6m > 0 && (
+                      <span className="ml-2 text-xs font-black text-primary px-1.5 py-0.5 rounded-md bg-primary/10 border border-primary/20">
+                        {selectedTerr.completedCount6m}x nos últimos 6 meses
+                      </span>
+                    )}
                     {selectedTerr.assigned_to && (
                       <span className="ml-2 text-xs text-orange-500 font-medium">
                         (já em campo)
@@ -391,6 +403,11 @@ export function AssignmentCreateModal({
                       <span className="text-[10px] text-muted-foreground flex-shrink-0 flex items-center gap-0.5">
                         <Clock className="w-3 h-3" />
                         {t.urgencyDays}d
+                      </span>
+                    )}
+                    {t.completedCount6m > 0 && (
+                      <span className="text-[10px] font-black text-primary bg-primary/5 px-1.5 py-0.5 rounded border border-primary/10 flex-shrink-0">
+                        {t.completedCount6m}x
                       </span>
                     )}
                     {t.urgencyDays === 9999 && !t.assigned_to && (
