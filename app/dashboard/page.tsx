@@ -116,6 +116,7 @@ interface TerritoryWithStats {
   isActive: boolean
   daysInField?: number
   subdivisions?: any[]
+  activeAssignee?: string
 }
 
 interface RecentActivity {
@@ -271,7 +272,7 @@ export default function DashboardPage() {
           title="Em campo"
           sub="Progresso das designações ativas"
           badge={
-            <span className="ml-auto text-[10px] font-black px-1.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+            <span className="ml-auto text-[14px] font-black px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
               {territories.filter(t => t.isActive).length}
             </span>
           }
@@ -371,9 +372,9 @@ export default function DashboardPage() {
               <div className="flex-1 min-w-0">
                 <span className={cn(
                   "inline-flex text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-[4px] mb-1.5 outline outline-1 outline-offset-0",
-                  activity.type === 'completed' ? 'bg-emerald-500/10 text-emerald-600 outline-emerald-500/20' : 
-                  activity.type === 'returned' ? 'bg-red-400/10 text-red-600 outline-red-400/20' : 
-                  'bg-amber-400/10 text-amber-600 outline-amber-400/20'
+                  activity.type === 'completed' ? 'bg-emerald-500/10 text-emerald-600 outline-emerald-500/20' :
+                    activity.type === 'returned' ? 'bg-red-400/10 text-red-600 outline-red-400/20' :
+                      'bg-amber-400/10 text-amber-600 outline-amber-400/20'
                 )}>
                   {activity.type === 'completed' ? 'Concluído' : activity.type === 'returned' ? 'Devolvido' : 'Designado'}
                 </span>
