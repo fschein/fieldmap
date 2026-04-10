@@ -8,12 +8,11 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2, Search, AlertTriangle, Clock, User, Users } from "lucide-react"
+import { Loader2, Search, AlertTriangle, Clock, User, Users, CheckCircle2 } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
@@ -66,7 +65,6 @@ export function AssignmentCreateModal({
   const [groups, setGroups] = useState<Group[]>([])
   const [campaigns, setCampaigns] = useState<{ id: string; name: string; start_date?: string | null; end_date?: string | null }[]>([])
 
-  // assignee type: publicador ou grupo
   const [assigneeType, setAssigneeType] = useState<AssigneeType>("publisher")
   const [selectedTerritoryId, setSelectedTerritoryId] = useState<string>("")
   const [selectedPublisherId, setSelectedPublisherId] = useState<string>("")
@@ -95,7 +93,7 @@ export function AssignmentCreateModal({
   const loadData = async () => {
     setLoading(true)
     try {
-      const [terrRes, pubRes, campRes, activeAssignmentsRes, groupsRes] = await Promise.all([
+      const results = await Promise.all([
         supabase
           .from("territories")
           .select("id, name, number, color, assigned_to, last_completed_at")
@@ -119,10 +117,14 @@ export function AssignmentCreateModal({
           .select("id, name, color")
           .order("name"),
         supabase
-          .rpc("get_territories_completed_count", { months_ago: 6 }),
+          .from("assignments")
+          .select("territory_id")
+          .eq("status", "completed")
+          .gte("completed_at", new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString()),
       ])
 
-      const completedCountsData = (res[5] as any).data || []
+      const [terrRes, pubRes, campRes, activeAssignmentsRes, groupsRes, countRes] = results
+      const completedCountsData = countRes.data || []
 
       if (terrRes.data && activeAssignmentsRes.data) {
         const activeAssigs = activeAssignmentsRes.data || []
@@ -152,7 +154,7 @@ export function AssignmentCreateModal({
             }
           }
 
-          const count6m = completedCountsData.find((c: any) => c.territory_id === t.id)?.count || 0
+          const count6m = completedCountsData.filter((c: any) => c.territory_id === t.id).length
 
           return { ...t, urgencyDays, assignedName, daysInField, completedCount6m: count6m }
         })
@@ -180,9 +182,7 @@ export function AssignmentCreateModal({
           return today >= start && (!end || today <= end)
         })
 
-        if (currentCampaign) {
-          setSelectedCampaignId(currentCampaign.id)
-        }
+        if (currentCampaign) setSelectedCampaignId(currentCampaign.id)
       }
     } catch (e) {
       console.error(e)
@@ -206,39 +206,25 @@ export function AssignmentCreateModal({
   const selectedGroup = groups.find((g) => g.id === selectedGroupId)
 
   const handleSave = async () => {
-    if (!selectedTerritoryId) {
-      toast.error("Selecione um território")
-      return
-    }
-    if (assigneeType === "publisher" && !selectedPublisherId) {
-      toast.error("Selecione um publicador")
-      return
-    }
-    if (assigneeType === "group" && !selectedGroupId) {
-      toast.error("Selecione um grupo")
-      return
-    }
-    if (!startDate) {
-      toast.error("Data de início é obrigatória")
-      return
-    }
+    if (!selectedTerritoryId) { toast.error("Selecione um território"); return }
+    if (assigneeType === "publisher" && !selectedPublisherId) { toast.error("Selecione um publicador"); return }
+    if (assigneeType === "group" && !selectedGroupId) { toast.error("Selecione um grupo"); return }
+    if (!startDate) { toast.error("Data de início é obrigatória"); return }
 
     setSaving(true)
     try {
       const startISO = toLocalISOString(startDate)
       const endISO = toLocalISOString(endDate)
       const isCompleted = !!endISO
+      const isGroupAssign = assigneeType === "group"
 
-      // Retornar designação ativa anterior
       if (!isCompleted) {
         await supabase
           .from("assignments")
-          .update({ status: 'returned', returned_at: new Date().toISOString() })
+          .update({ status: "returned", returned_at: new Date().toISOString() })
           .eq("territory_id", selectedTerritoryId)
           .eq("status", "active")
       }
-
-      const isGroupAssign = assigneeType === "group"
 
       const { error: assignErr } = await supabase.from("assignments").insert({
         territory_id: selectedTerritoryId,
@@ -252,7 +238,6 @@ export function AssignmentCreateModal({
 
       if (assignErr) throw assignErr
 
-      // Atualiza o territory
       const terrUpdate: any = {}
       if (isCompleted) {
         terrUpdate.assigned_to = null
@@ -260,23 +245,14 @@ export function AssignmentCreateModal({
       } else if (!isGroupAssign) {
         terrUpdate.assigned_to = selectedPublisherId
       } else {
-        // designação de grupo — não altera assigned_to (fica null para ser acessível pelo grupo)
-        // mas registra o group_id se relevante para o contexto de domingo
         terrUpdate.assigned_to = null
       }
 
-      if (selectedCampaignId) {
-        terrUpdate.campaign_id = selectedCampaignId
-      } else {
-        terrUpdate.campaign_id = null
-      }
+      if (selectedCampaignId) terrUpdate.campaign_id = selectedCampaignId
+      else terrUpdate.campaign_id = null
 
-      await supabase
-        .from("territories")
-        .update(terrUpdate)
-        .eq("id", selectedTerritoryId)
+      await supabase.from("territories").update(terrUpdate).eq("id", selectedTerritoryId)
 
-      // Enviar notificação push apenas para designações individuais ativas
       if (!isCompleted && !isGroupAssign) {
         fetch("/api/push/send", {
           method: "POST",
@@ -285,17 +261,17 @@ export function AssignmentCreateModal({
             userId: selectedPublisherId,
             title: "Novo Território!",
             message: `Você recebeu o território ${selectedTerr?.number} - ${selectedTerr?.name}.`,
-            url: `/dashboard/my-assignments/${selectedTerritoryId}/map`
-          })
+            url: `/dashboard/my-assignments/${selectedTerritoryId}/map`,
+          }),
         }).catch((err: unknown) => console.error("Erro ao disparar push:", err))
       }
 
       toast.success(
         isCompleted
-          ? "Designação histórica salva com sucesso!"
+          ? "Designação histórica salva!"
           : isGroupAssign
-          ? `${selectedTerr?.name} designado para o grupo ${selectedGroup?.name}`
-          : `${selectedTerr?.name} designado para ${selectedPub?.name}`
+            ? `${selectedTerr?.name} → grupo ${selectedGroup?.name}`
+            : `${selectedTerr?.name} → ${selectedPub?.name}`
       )
       onOpenChange(false)
       onSuccess()
@@ -306,272 +282,403 @@ export function AssignmentCreateModal({
     }
   }
 
+  // ─── Derived state for summary chips ───────────────────────────────────────
+  const isCompleted = !!endDate
+  const canSubmit = selectedTerritoryId &&
+    (assigneeType === "publisher" ? !!selectedPublisherId : !!selectedGroupId)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Nova Designação</DialogTitle>
-        </DialogHeader>
-
-        {loading ? (
-          <div className="flex justify-center py-10">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          </div>
-        ) : (
-          <div className="space-y-5 py-2">
-            {/* Resumo da Seleção */}
-            {(selectedTerr || selectedPub || selectedGroup) && (
-              <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-sm space-y-1">
-                {selectedTerr && (
-                  <p>
-                    <span className="text-muted-foreground">Território:</span>{" "}
-                    <strong className="text-foreground">{selectedTerr.name}</strong>{" "}
-                    <span className="text-muted-foreground opacity-70">#{selectedTerr.number}</span>
-                    {selectedTerr.completedCount6m > 0 && (
-                      <span className="ml-2 text-xs font-black text-primary px-1.5 py-0.5 rounded-md bg-primary/10 border border-primary/20">
-                        {selectedTerr.completedCount6m}x nos últimos 6 meses
-                      </span>
-                    )}
-                    {selectedTerr.assigned_to && (
-                      <span className="ml-2 text-xs text-orange-500 font-medium">
-                        (já em campo)
-                      </span>
-                    )}
-                  </p>
-                )}
-                {selectedPub && assigneeType === "publisher" && (
-                  <p>
-                    <span className="text-muted-foreground">Publicador:</span>{" "}
-                    <strong className="text-foreground">{selectedPub.name}</strong>
-                  </p>
-                )}
-                {selectedGroup && assigneeType === "group" && (
-                  <p>
-                    <span className="text-muted-foreground">Grupo:</span>{" "}
-                    <strong className="text-foreground">{selectedGroup.name}</strong>
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Território */}
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold">Território</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar por nome ou número..."
-                  className="pl-8 h-8 text-sm"
-                  value={searchTerritory}
-                  onChange={(e) => setSearchTerritory(e.target.value)}
+      {/*
+        Layout strategy (mobile-first):
+        - DialogContent fills up to 92dvh, no horizontal overflow
+        - Header: fixed 64px (h-16), matches app header spec
+        - Body: flex-1 + overflow-y-auto, contains all form fields
+        - Footer: fixed height, always visible above keyboard
+      */}
+      <DialogContent
+        className={cn(
+          // Dimensions
+          "flex flex-col p-0 gap-0",
+          "w-full max-w-md",
+          // Height: use dvh for mobile browser chrome awareness
+          "max-h-[92dvh]",
+          // Shape
+          "rounded-2xl overflow-hidden",
+          // Prevent any child from causing X overflow
+          "overflow-x-hidden",
+        )}
+      >
+        {/* ── HEADER ── 64px fixed, matches h-16 app spec */}
+        <DialogHeader className="flex-none h-16 flex flex-row items-center gap-3 px-4 border-b bg-card shrink-0">
+          <div className="flex-1 min-w-0">
+            <DialogTitle className="text-base font-black uppercase tracking-tight leading-none">
+              Nova Designação
+            </DialogTitle>
+            {/* Summary line — replaces the floating summary card */}
+            {selectedTerr && (
+              <p className="text-[11px] text-muted-foreground mt-0.5 truncate leading-none">
+                <span
+                  className="inline-block w-2 h-2 rounded-full mr-1 align-middle"
+                  style={{ backgroundColor: selectedTerr.color }}
                 />
-              </div>
-              <div className="border rounded-lg max-h-[160px] overflow-y-auto divide-y bg-card">
-                {filteredTerritories.length === 0 && (
-                  <p className="text-center text-sm text-muted-foreground py-4">
-                    Nenhum território encontrado
-                  </p>
+                {selectedTerr.name}
+                {(selectedPub || selectedGroup) && (
+                  <span className="text-primary font-bold">
+                    {" "}→{" "}
+                    {assigneeType === "publisher" ? selectedPub?.name : selectedGroup?.name}
+                  </span>
                 )}
-                {filteredTerritories.map((t) => (
-                  <button
-                    key={t.id}
-                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-accent transition-colors ${selectedTerritoryId === t.id ? "bg-primary/5 border-l-2 border-l-primary" : ""
-                      }`}
-                    onClick={() => setSelectedTerritoryId(t.id)}
-                  >
-                    <div
-                      className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: t.color || "#C65D3B" }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {t.name}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground">
-                        #{t.number}
-                        {t.assigned_to && (
-                          <span className="ml-2 text-primary font-bold">
-                            Com {t.assignedName} ({t.daysInField ?? 0} d)
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    {t.urgencyDays > 180 && !t.assigned_to && (
-                      <AlertTriangle className="w-3.5 h-3.5 text-red-500 flex-shrink-0" />
-                    )}
-                    {t.urgencyDays > 0 && t.urgencyDays < 9999 && !t.assigned_to && (
-                      <span className="text-[10px] text-muted-foreground flex-shrink-0 flex items-center gap-0.5">
-                        <Clock className="w-3 h-3" />
-                        {t.urgencyDays}d
-                      </span>
-                    )}
-                    {t.completedCount6m > 0 && (
-                      <span className="text-[10px] font-black text-primary bg-primary/5 px-1.5 py-0.5 rounded border border-primary/10 flex-shrink-0">
-                        {t.completedCount6m}x
-                      </span>
-                    )}
-                    {t.urgencyDays === 9999 && !t.assigned_to && (
-                      <span className="text-[10px] text-primary font-bold flex-shrink-0">
-                        Nunca
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Toggle Publicador / Grupo */}
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold">Designar para</Label>
-              <div className="flex rounded-lg border border-border overflow-hidden">
-                <button
-                  className={cn(
-                    "flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold transition-colors",
-                    assigneeType === "publisher"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80"
-                  )}
-                  onClick={() => { setAssigneeType("publisher"); setSelectedGroupId("") }}
-                >
-                  <User className="w-3.5 h-3.5" />
-                  Publicador
-                </button>
-                <button
-                  className={cn(
-                    "flex-1 flex items-center justify-center gap-2 py-2 text-sm font-semibold transition-colors border-l border-border",
-                    assigneeType === "group"
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted text-muted-foreground hover:bg-muted/80"
-                  )}
-                  onClick={() => { setAssigneeType("group"); setSelectedPublisherId("") }}
-                >
-                  <Users className="w-3.5 h-3.5" />
-                  Grupo
-                </button>
-              </div>
-            </div>
-
-            {/* Publicador */}
-            {assigneeType === "publisher" && (
-              <div className="space-y-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                  <Input
-                    placeholder="Buscar publicador..."
-                    className="pl-8 h-8 text-sm"
-                    value={searchPublisher}
-                    onChange={(e) => setSearchPublisher(e.target.value)}
-                  />
-                </div>
-                <div className="border rounded-lg max-h-[120px] overflow-y-auto divide-y bg-card">
-                  {filteredPublishers.map((p) => (
-                    <button
-                      key={p.id}
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent transition-colors ${selectedPublisherId === p.id ? "bg-primary/5 border-l-2 border-l-primary font-medium" : ""
-                        }`}
-                      onClick={() => setSelectedPublisherId(p.id)}
-                    >
-                      <span className="text-foreground">{p.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Grupo */}
-            {assigneeType === "group" && (
-              <div className="space-y-2">
-                <div className="border rounded-lg max-h-[120px] overflow-y-auto divide-y bg-card">
-                  {groups.length === 0 && (
-                    <p className="text-center text-sm text-muted-foreground py-4">Nenhum grupo cadastrado</p>
-                  )}
-                  {groups.map((g) => (
-                    <button
-                      key={g.id}
-                      className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-accent transition-colors",
-                        selectedGroupId === g.id ? "bg-primary/5 border-l-2 border-l-primary" : ""
-                      )}
-                      onClick={() => setSelectedGroupId(g.id)}
-                    >
-                      {g.color && (
-                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: g.color }} />
-                      )}
-                      <span className="text-sm font-medium text-foreground">{g.name}</span>
-                    </button>
-                  ))}
-                </div>
-                <p className="text-[11px] text-muted-foreground bg-amber-500/10 border border-amber-500/20 rounded-md p-2">
-                  ☀️ Designação de grupo — o território ficará disponível para o grupo trabalhar (ex: modo domingo). Não será sobrescrito automaticamente.
-                </p>
-              </div>
-            )}
-
-            {/* Campanha */}
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold">Campanha (Opcional)</Label>
-              <select
-                className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none text-foreground"
-                value={selectedCampaignId}
-                onChange={(e) => setSelectedCampaignId(e.target.value)}
-              >
-                <option value="">Nenhuma campanha...</option>
-                {campaigns.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Datas */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-sm font-semibold">
-                  Entrega <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="h-9"
-                  max={new Date().toISOString().split("T")[0]}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-sm font-semibold text-muted-foreground">
-                  Conclusão{" "}
-                  <span className="font-normal opacity-70">(opcional)</span>
-                </Label>
-                <Input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  min={startDate}
-                  max={new Date().toISOString().split("T")[0]}
-                  className="h-9"
-                />
-              </div>
-            </div>
-            {endDate && (
-              <p className="text-xs text-muted-foreground bg-muted/30 border border-muted-foreground/10 rounded-md p-2">
-                ℹ️ Data de conclusão preenchida — este registro será salvo como{" "}
-                <strong className="text-foreground">histórico concluído</strong>.
               </p>
             )}
           </div>
-        )}
+          {/* 6m badge — compact, lives in header when territory is selected */}
+          {selectedTerr && selectedTerr.completedCount6m > 0 && (
+            <span className="shrink-0 text-[10px] font-black text-primary px-2 py-1 rounded-full bg-primary/10 border border-primary/20 leading-none">
+              {selectedTerr.completedCount6m}× (6m)
+            </span>
+          )}
+        </DialogHeader>
 
-        <DialogFooter className="gap-2">
-          <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSave} disabled={saving || loading}>
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {saving ? "Salvando..." : "Confirmar Designação"}
-          </Button>
-        </DialogFooter>
+        {/* ── BODY — scrollable ── */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain">
+          {loading ? (
+            <div className="flex flex-col items-center justify-center h-48 gap-3">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <p className="text-xs text-muted-foreground">Carregando...</p>
+            </div>
+          ) : (
+            <div className="px-4 py-3 space-y-4">
+
+              {/* ── TERRITÓRIO ── */}
+              <section className="space-y-1.5">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  Território
+                </Label>
+                {/* Search */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                  <Input
+                    placeholder="Nome ou número..."
+                    className="pl-9 h-9 text-sm bg-muted/40 border-border rounded-xl"
+                    value={searchTerritory}
+                    onChange={(e) => setSearchTerritory(e.target.value)}
+                  />
+                </div>
+                {/* List — tighter max-h to leave room for the rest */}
+                <div className="border rounded-xl overflow-hidden bg-card shadow-sm divide-y divide-border">
+                  <div className="max-h-36 overflow-y-auto overscroll-contain">
+                    {filteredTerritories.length === 0 ? (
+                      <p className="text-center text-xs text-muted-foreground py-5">
+                        Nenhum território encontrado
+                      </p>
+                    ) : (
+                      filteredTerritories.map((t) => (
+                        <TerritoryRow
+                          key={t.id}
+                          territory={t}
+                          selected={selectedTerritoryId === t.id}
+                          onSelect={() => setSelectedTerritoryId(t.id)}
+                        />
+                      ))
+                    )}
+                  </div>
+                </div>
+              </section>
+
+              {/* ── DESIGNAR PARA ── */}
+              <section className="space-y-1.5">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  Designar para
+                </Label>
+                {/* Toggle */}
+                <div className="flex p-1 rounded-xl bg-muted border border-border gap-1">
+                  <SegmentButton
+                    active={assigneeType === "publisher"}
+                    icon={<User className="w-3.5 h-3.5" />}
+                    label="Publicador"
+                    onClick={() => { setAssigneeType("publisher"); setSelectedGroupId("") }}
+                  />
+                  <SegmentButton
+                    active={assigneeType === "group"}
+                    icon={<Users className="w-3.5 h-3.5" />}
+                    label="Grupo"
+                    onClick={() => { setAssigneeType("group"); setSelectedPublisherId("") }}
+                  />
+                </div>
+
+                {/* Publisher list */}
+                {assigneeType === "publisher" && (
+                  <div className="space-y-1.5">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                      <Input
+                        placeholder="Filtrar publicadores..."
+                        className="pl-9 h-9 text-sm bg-muted/40 border-border rounded-xl"
+                        value={searchPublisher}
+                        onChange={(e) => setSearchPublisher(e.target.value)}
+                      />
+                    </div>
+                    <div className="border rounded-xl overflow-hidden bg-card shadow-sm divide-y divide-border">
+                      <div className="max-h-28 overflow-y-auto overscroll-contain">
+                        {filteredPublishers.map((p) => (
+                          <button
+                            key={p.id}
+                            className={cn(
+                              "w-full flex items-center gap-2 px-3 py-2.5 text-left text-sm hover:bg-accent transition-colors",
+                              selectedPublisherId === p.id && "bg-primary/8 border-l-2 border-primary"
+                            )}
+                            onClick={() => setSelectedPublisherId(p.id)}
+                          >
+                            {selectedPublisherId === p.id && (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
+                            )}
+                            <span className={cn(
+                              "truncate",
+                              selectedPublisherId === p.id ? "font-semibold text-foreground" : "text-foreground"
+                            )}>
+                              {p.name}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Group list */}
+                {assigneeType === "group" && (
+                  <div className="border rounded-xl overflow-hidden bg-card shadow-sm divide-y divide-border">
+                    <div className="max-h-28 overflow-y-auto overscroll-contain">
+                      {groups.length === 0 ? (
+                        <p className="text-center text-xs text-muted-foreground py-4">
+                          Nenhum grupo cadastrado
+                        </p>
+                      ) : (
+                        groups.map((g) => (
+                          <button
+                            key={g.id}
+                            className={cn(
+                              "w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm hover:bg-accent transition-colors",
+                              selectedGroupId === g.id && "bg-primary/8 border-l-2 border-primary"
+                            )}
+                            onClick={() => setSelectedGroupId(g.id)}
+                          >
+                            {g.color && (
+                              <span
+                                className="w-2.5 h-2.5 rounded-full shrink-0"
+                                style={{ backgroundColor: g.color }}
+                              />
+                            )}
+                            {selectedGroupId === g.id && (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
+                            )}
+                            <span className={cn(
+                              "truncate",
+                              selectedGroupId === g.id ? "font-semibold text-foreground" : "font-medium text-foreground"
+                            )}>
+                              {g.name}
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </section>
+
+              {/* ── CAMPANHA ── */}
+              {campaigns.length > 0 && (
+                <section className="space-y-1.5">
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                    Campanha
+                    <span className="ml-1 font-normal normal-case tracking-normal opacity-50">(opcional)</span>
+                  </Label>
+                  <select
+                    className="w-full h-10 rounded-xl border border-border bg-card px-3 text-sm shadow-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none text-foreground"
+                    value={selectedCampaignId}
+                    onChange={(e) => setSelectedCampaignId(e.target.value)}
+                  >
+                    <option value="">Nenhuma...</option>
+                    {campaigns.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </section>
+              )}
+
+              {/* ── DATAS ── */}
+              <section className="space-y-1.5">
+                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  Datas
+                </Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-muted-foreground font-medium">Entrega</span>
+                    <Input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="h-10 rounded-xl bg-muted/40 border-border text-sm"
+                      max={new Date().toISOString().split("T")[0]}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] text-muted-foreground font-medium">
+                      Conclusão
+                      <span className="ml-1 opacity-50">opt.</span>
+                    </span>
+                    <Input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      min={startDate}
+                      max={new Date().toISOString().split("T")[0]}
+                      className="h-10 rounded-xl bg-muted/40 border-border text-sm"
+                    />
+                  </div>
+                </div>
+                {/* Historical record hint */}
+                {isCompleted && (
+                  <p className="text-[10px] text-muted-foreground bg-muted/60 rounded-lg px-2.5 py-1.5 leading-snug">
+                    Com data de conclusão, será salvo como registro histórico.
+                  </p>
+                )}
+              </section>
+
+              {/* Bottom breathing room so last item isn't glued to footer */}
+              <div className="h-2" />
+            </div>
+          )}
+        </div>
+
+        {/* ── FOOTER — fixed, always visible ── */}
+        <div className="flex-none border-t bg-card px-4 py-3 shrink-0">
+          <div className="flex gap-2">
+            <Button
+              className={cn(
+                "flex-1 h-12 rounded-xl font-bold text-sm transition-all",
+                canSubmit
+                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/20 active:scale-[0.98]"
+                  : "bg-muted text-muted-foreground cursor-not-allowed"
+              )}
+              onClick={handleSave}
+              disabled={saving || loading || !canSubmit}
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                "Confirmar Designação"
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              className="h-12 px-4 rounded-xl text-muted-foreground font-medium shrink-0"
+              onClick={() => onOpenChange(false)}
+              disabled={saving}
+            >
+              Cancelar
+            </Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// ─── Sub-components ────────────────────────────────────────────────────────────
+
+function TerritoryRow({
+  territory: t,
+  selected,
+  onSelect,
+}: {
+  territory: Territory
+  selected: boolean
+  onSelect: () => void
+}) {
+  return (
+    <button
+      className={cn(
+        "w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-accent",
+        selected && "bg-primary/8 border-l-2 border-primary"
+      )}
+      onClick={onSelect}
+    >
+      {/* Color dot */}
+      <span
+        className="w-2 h-2 rounded-full shrink-0"
+        style={{ backgroundColor: t.color || "#C65D3B" }}
+      />
+
+      {/* Main text */}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-foreground truncate leading-tight">
+          {t.name}
+        </p>
+        <p className="text-[10px] text-muted-foreground leading-tight">
+          #{t.number}
+          {t.assigned_to && (
+            <span className="ml-1.5 text-primary font-semibold">
+              · {t.assignedName} ({t.daysInField ?? 0}d)
+            </span>
+          )}
+        </p>
+      </div>
+
+      {/* Right-side badges — max 2 to keep rows narrow */}
+      <div className="flex items-center gap-1 shrink-0">
+        {t.urgencyDays === 9999 && !t.assigned_to && (
+          <span className="text-[9px] text-primary font-black uppercase">Nunca</span>
+        )}
+        {t.urgencyDays > 180 && t.urgencyDays < 9999 && !t.assigned_to && (
+          <AlertTriangle className="w-3 h-3 text-red-500" />
+        )}
+        {t.urgencyDays > 0 && t.urgencyDays <= 180 && !t.assigned_to && (
+          <span className="text-[9px] text-muted-foreground flex items-center gap-0.5">
+            <Clock className="w-2.5 h-2.5" />
+            {t.urgencyDays}d
+          </span>
+        )}
+        {t.completedCount6m > 0 && (
+          <span className="text-[9px] font-black text-primary bg-primary/8 px-1 py-0.5 rounded border border-primary/15">
+            {t.completedCount6m}×
+          </span>
+        )}
+        {selected && (
+          <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
+        )}
+      </div>
+    </button>
+  )
+}
+
+function SegmentButton({
+  active,
+  icon,
+  label,
+  onClick,
+}: {
+  active: boolean
+  icon: React.ReactNode
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      className={cn(
+        "flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-bold transition-all rounded-lg",
+        active
+          ? "bg-card text-foreground shadow-sm border border-border"
+          : "text-muted-foreground hover:bg-card/50"
+      )}
+      onClick={onClick}
+    >
+      {icon}
+      {label}
+    </button>
   )
 }
