@@ -27,6 +27,7 @@ interface Territory {
   last_completed_at: string | null
   urgencyDays: number
   completedCount6m: number
+  groups?: { color?: string }
 }
 
 interface Publisher {
@@ -98,7 +99,7 @@ export function AssignmentCreateModal({
       const results = await Promise.all([
         supabase
           .from("territories")
-          .select("id, name, number, color, assigned_to, last_completed_at")
+          .select("id, name, number, color, assigned_to, last_completed_at, groups ( color )")
           .order("number"),
         supabase
           .from("profiles")
@@ -319,7 +320,7 @@ export function AssignmentCreateModal({
             </DialogTitle>
             {/* Summary line — replaces the floating summary card */}
             {selectedTerr && (
-              <p className="text-[11px] text-muted-foreground mt-0.5 truncate leading-none">
+              <p className="text-[0.6875rem] text-muted-foreground mt-0.5 truncate leading-none">
                 <span
                   className="inline-block w-2 h-2 rounded-full mr-1 align-middle"
                   style={{ backgroundColor: selectedTerr.color }}
@@ -336,7 +337,7 @@ export function AssignmentCreateModal({
           </div>
           {/* 6m badge — compact, lives in header when territory is selected */}
           {selectedTerr && selectedTerr.completedCount6m > 0 && (
-            <span className="shrink-0 text-[10px] font-black text-primary px-2 py-1 rounded-full bg-primary/10 border border-primary/20 leading-none">
+            <span className="shrink-0 text-[0.625rem] font-black text-primary px-2 py-1 rounded-full bg-primary/10 border border-primary/20 leading-none">
               {selectedTerr.completedCount6m}× (6m)
             </span>
           )}
@@ -354,7 +355,7 @@ export function AssignmentCreateModal({
 
               {/* ── TERRITÓRIO ── */}
               <section className="space-y-1.5">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                <Label className="text-[0.625rem] font-black uppercase tracking-widest text-muted-foreground">
                   Território
                 </Label>
                 {/* Search */}
@@ -390,7 +391,7 @@ export function AssignmentCreateModal({
 
               {/* ── DESIGNAR PARA ── */}
               <section className="space-y-1.5">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                <Label className="text-[0.625rem] font-black uppercase tracking-widest text-muted-foreground">
                   Designar para
                 </Label>
                 {/* Toggle */}
@@ -492,7 +493,7 @@ export function AssignmentCreateModal({
               {/* ── CAMPANHA ── */}
               {campaigns.length > 0 && (
                 <section className="space-y-1.5">
-                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                  <Label className="text-[0.625rem] font-black uppercase tracking-widest text-muted-foreground">
                     Campanha
                     <span className="ml-1 font-normal normal-case tracking-normal opacity-50">(opcional)</span>
                   </Label>
@@ -511,12 +512,12 @@ export function AssignmentCreateModal({
 
               {/* ── DATAS ── */}
               <section className="space-y-1.5">
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                <Label className="text-[0.625rem] font-black uppercase tracking-widest text-muted-foreground">
                   Datas
                 </Label>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
-                    <span className="text-[10px] text-muted-foreground font-medium">Entrega</span>
+                    <span className="text-[0.625rem] text-muted-foreground font-medium">Entrega</span>
                     <Input
                       type="date"
                       value={startDate}
@@ -526,7 +527,7 @@ export function AssignmentCreateModal({
                     />
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] text-muted-foreground font-medium">
+                    <span className="text-[0.625rem] text-muted-foreground font-medium">
                       Conclusão
                       <span className="ml-1 opacity-50">opt.</span>
                     </span>
@@ -542,7 +543,7 @@ export function AssignmentCreateModal({
                 </div>
                 {/* Historical record hint */}
                 {isCompleted && (
-                  <p className="text-[10px] text-muted-foreground bg-muted/60 rounded-lg px-2.5 py-1.5 leading-snug">
+                  <p className="text-[0.625rem] text-muted-foreground bg-muted/60 rounded-lg px-2.5 py-1.5 leading-snug">
                     Com data de conclusão, será salvo como registro histórico.
                   </p>
                 )}
@@ -613,7 +614,7 @@ function TerritoryRow({
       {/* Color dot */}
       <span
         className="w-2 h-2 rounded-full shrink-0"
-        style={{ backgroundColor: t.color || "#C65D3B" }}
+        style={{ backgroundColor: t.groups?.color || t.color || "#C65D3B" }}
       />
 
       {/* Main text */}
@@ -621,7 +622,7 @@ function TerritoryRow({
         <p className="text-sm font-medium text-foreground truncate leading-tight">
           {t.name}
         </p>
-        <p className="text-[10px] text-muted-foreground leading-tight">
+        <p className="text-[0.625rem] text-muted-foreground leading-tight">
           #{t.number}
           {t.assigned_to && (
             <span className="ml-1.5 text-primary font-semibold">
@@ -634,19 +635,19 @@ function TerritoryRow({
       {/* Right-side badges — max 2 to keep rows narrow */}
       <div className="flex items-center gap-1 shrink-0">
         {t.urgencyDays === 9999 && !t.assigned_to && (
-          <span className="text-[9px] text-primary font-black uppercase">Nunca</span>
+          <span className="text-[0.5625rem] text-primary font-black uppercase">Nunca</span>
         )}
         {t.urgencyDays > 180 && t.urgencyDays < 9999 && !t.assigned_to && (
           <AlertTriangle className="w-3 h-3 text-red-500" />
         )}
         {t.urgencyDays > 0 && t.urgencyDays <= 180 && !t.assigned_to && (
-          <span className="text-[9px] text-muted-foreground flex items-center gap-0.5">
+          <span className="text-[0.5625rem] text-muted-foreground flex items-center gap-0.5">
             <Clock className="w-2.5 h-2.5" />
             {t.urgencyDays}d
           </span>
         )}
         {t.completedCount6m > 0 && (
-          <span className="text-[9px] font-black text-primary bg-primary/8 px-1 py-0.5 rounded border border-primary/15">
+          <span className="text-[0.5625rem] font-black text-primary bg-primary/8 px-1 py-0.5 rounded border border-primary/15">
             {t.completedCount6m}×
           </span>
         )}
