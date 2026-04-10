@@ -166,7 +166,7 @@ export default function CampaignsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black uppercase tracking-tight text-foreground">Campanhas</h1>
+          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Campanhas</h1>
           <p className="text-xs text-muted-foreground font-medium mt-1">
             Gerencie as campanhas de pregação e progresso global.
           </p>

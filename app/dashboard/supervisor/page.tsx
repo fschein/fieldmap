@@ -92,7 +92,7 @@ export default function SupervisorDashboard() {
     <div className="space-y-6 pb-24 px-1">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black uppercase tracking-tight text-foreground">Gestão</h1>
+          <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Gestão</h1>
           <p className="text-xs text-muted-foreground font-medium">Controle de territórios em campo</p>
         </div>
         <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">

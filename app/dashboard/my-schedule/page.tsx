@@ -66,7 +66,7 @@ export default function MySchedulePage() {
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-2xl font-black uppercase tracking-tight text-foreground leading-none">Minhas Escalas</h1>
+          <h1 className="text-[22px] font-semibold tracking-tight text-foreground leading-none">Minhas escalas</h1>
           <p className="text-[10px] font-black text-primary uppercase tracking-widest mt-1">
             {format(new Date(), "MMMM yyyy", { locale: ptBR })}
           </p>

@@ -340,7 +340,7 @@ export default function MyAssignmentsPage() {
     <div className="min-h-screen bg-background">
 
       <div className="px-2.5 mb-6">
-        <h1 className="text-2xl font-black uppercase tracking-tight text-foreground">Meus Territórios</h1>
+        <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Meus territórios</h1>
         <p className="text-xs text-muted-foreground font-medium">Olá, {firstName}!</p>
       </div>
 

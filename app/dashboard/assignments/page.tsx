@@ -368,7 +368,7 @@ export default function AssignmentsPage() {
       <div className="print:hidden space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-black uppercase tracking-tight text-foreground">Designações</h1>
+            <h1 className="text-[22px] font-semibold tracking-tight text-foreground">Designações</h1>
             <p className="text-xs text-muted-foreground font-medium mt-1">
               {inFieldTotal} em campo · {counts.overdue > 0 && <span className="text-red-500 font-bold">{counts.overdue} atrasados · </span>}{counts.available} devolvidos · {counts.completed} livres
             </p>

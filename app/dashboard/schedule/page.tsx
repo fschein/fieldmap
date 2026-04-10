@@ -36,8 +36,8 @@ export default function SchedulePage() {
         territory:territories(number, name)
       `)
       .eq('status', 'published')
-      .gte('date', start.toISOString())
-      .lte('date', end.toISOString())
+      .gte('date', format(start, 'yyyy-MM-dd'))
+      .lte('date', format(end, 'yyyy-MM-dd'))
       .order('date', { ascending: true })
 
     if (error || !data || data.length === 0) {
@@ -57,7 +57,7 @@ export default function SchedulePage() {
     <div className="container mx-auto p-4 space-y-6 pb-24 md:pb-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-black uppercase tracking-tight text-foreground leading-none">Gestão de Escala</h1>
+          <h1 className="text-[22px] font-semibold tracking-tight text-foreground leading-none">Gestão de escala</h1>
           <p className="text-[11px] text-muted-foreground font-medium mt-1 uppercase tracking-wider">
             Organização de saídas e designações
           </p>
@@ -118,7 +118,7 @@ export default function SchedulePage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsContent value="calendar" className="mt-0">
-          <ScheduleCalendar currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} />
+          {activeTab === "calendar" && <ScheduleCalendar currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} />}
         </TabsContent>
 
         {isAdmin && (
@@ -128,7 +128,7 @@ export default function SchedulePage() {
             </TabsContent>
 
             <TabsContent value="generator">
-              <ScheduleGenerator />
+              {activeTab === "generator" && <ScheduleGenerator currentMonth={currentMonth} setCurrentMonth={setCurrentMonth} />}
             </TabsContent>
           </>
         )}
