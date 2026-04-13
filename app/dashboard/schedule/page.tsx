@@ -46,9 +46,10 @@ export default function SchedulePage() {
     }
 
     try {
-      await exportScheduleToPDF(data, currentMonth)
+      await exportScheduleToPDF(data as any, currentMonth)
       toast.success("PDF gerado com sucesso!")
     } catch (err) {
+      console.error(err)
       toast.error("Erro ao gerar PDF")
     }
   }

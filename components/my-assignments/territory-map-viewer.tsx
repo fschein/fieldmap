@@ -100,13 +100,24 @@ export default function TerritoryMapViewer({
         })
 
         const isCompleted = subdivision.completed || subdivision.status === "completed"
-        const fillColor = isCompleted ? "#22c55e" : territory.color || "#3b82f6"
-        const color = isCompleted ? "#16a34a" : territory.color || "#2563eb"
+        const hasNotes = !!subdivision.notes
+        
+        // Regra de cores: Azul (padrão), Amarelo (iniciada/notas), Verde (concluída)
+        let fillColor = "#3b82f6" // Azul padrão
+        let strokeColor = "#2563eb"
+
+        if (isCompleted) {
+          fillColor = "#22c55e" // Verde
+          strokeColor = "#16a34a"
+        } else if (hasNotes) {
+          fillColor = "#facc15" // Amarelo
+          strokeColor = "#ca8a04"
+        }
 
         const polygon = L.polygon(latLngs, {
-          color: color,
+          color: strokeColor,
           fillColor: fillColor,
-          fillOpacity: isCompleted ? 0.4 : 0.3,
+          fillOpacity: isCompleted ? 0.4 : 0.45,
           weight: 2,
           opacity: 0.8,
           className: animatingSubdivisionId === subdivision.id ? `subdivision-animating-${subdivision.id}` : ''
@@ -298,8 +309,12 @@ export default function TerritoryMapViewer({
           <h3 className="text-xs font-bold mb-2 text-foreground uppercase tracking-wider">Legenda</h3>
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded border border-border" style={{ backgroundColor: territory.color || "hsl(var(--primary))", opacity: 0.5 }} />
+              <div className="w-3 h-3 rounded border border-blue-600 bg-blue-500 opacity-50" />
               <span className="text-[0.625rem] font-bold text-muted-foreground uppercase">Pendente</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded border border-yellow-600 bg-yellow-400 opacity-60" />
+              <span className="text-[0.625rem] font-bold text-yellow-700 uppercase">Em Progresso</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded border border-green-600 bg-green-500 opacity-60" />

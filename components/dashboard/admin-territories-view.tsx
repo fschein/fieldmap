@@ -28,6 +28,7 @@ import {
   Pencil,
   ArrowRight
 } from "lucide-react"
+import { toast } from "sonner"
 import type { Subdivision } from "@/lib/types"
 
 // ============================================================================
@@ -305,6 +306,17 @@ export function AdminTerritoriesView() {
   }, [loadData])
 
   const handleOpenAssignModal = (territory: TerritoryWithDetails) => {
+    // Verifica se há designação de grupo ativa
+    const activeGroupAssignment = (territory as any).assignments?.find((a: any) => a.status === 'active' && !!a.group_id)
+    
+    if (activeGroupAssignment) {
+      const groupName = territory.group?.name || "um grupo"
+      toast.error(`Este território está em uso pelo grupo ${groupName}`, {
+        description: "Finalize a missão do grupo antes de designar individualmente."
+      })
+      return
+    }
+
     setAssignPreselectedId(territory.id)
     setAssignModalOpen(true)
   }

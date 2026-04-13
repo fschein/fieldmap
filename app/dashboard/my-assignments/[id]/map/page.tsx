@@ -72,10 +72,16 @@ export default function TerritoryMapPage() {
         return
       }
 
-      // Access check
+      // Access & Edit check
       const isSunday = new Date().getDay() === 0
-      const { data: profile } = await supabase.from("profiles").select("group_id").eq("id", user.id).single()
-      const canAccess = data.assigned_to === user.id || (isSunday && data.group_id && data.group_id === profile?.group_id)
+      const { data: profile } = await supabase.from("profiles").select("group_id, role").eq("id", user.id).single()
+      
+      const isOwner = data.assigned_to === user.id
+      const isGroupMember = !!(data.group_id && data.group_id === profile?.group_id)
+      const isAdmin = profile?.role === 'admin'
+      
+      const canAccess = isOwner || (isSunday && isGroupMember) || (isGroupMember && !isSunday) || isAdmin
+      const canEdit = isOwner || (isSunday && isGroupMember) || isAdmin
       
       if (!canAccess) {
         toast.error("Você não tem acesso a este território.")
@@ -83,9 +89,7 @@ export default function TerritoryMapPage() {
         return
       }
 
-      // Guardar no cache para uso offline
-      localStorage.setItem(`territory_cache_${territoryId}`, JSON.stringify(data))
-      setTerritory(data as TerritoryWithSubdivisions)
+      setTerritory({ ...data, canEdit } as any)
     } catch (error: any) {
       if (error.name === 'AbortError') {
         toast.error("Tempo esgotado ao carregar mapa.")
@@ -304,6 +308,33 @@ export default function TerritoryMapPage() {
   const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
   const isFullyCompleted = progress === 100
 
+  const handleSaveNotes = async (notes: string) => {
+    if (!selectedSubdivision || !user?.id || saving) return
+    
+    try {
+      const { error } = await supabase
+        .from("subdivisions")
+        .update({ notes })
+        .eq("id", selectedSubdivision.id)
+
+      if (error) throw error
+      
+      // Atualizar estado local sem re-fetch total para ser mais rápido
+      setTerritory(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          subdivisions: prev.subdivisions?.map(s => 
+            s.id === selectedSubdivision.id ? { ...s, notes } : s
+          ) || []
+        }
+      })
+    } catch (error: any) {
+      console.error("Erro ao salvar notas:", error)
+      toast.error("Erro ao salvar notas")
+    }
+  }
+
   return (
     <div className="flex flex-col bg-background overflow-hidden relative" style={{ height: '100dvh' }}>
       {/* Header Fixo Sólido (Mobile) / Flutuante (Desktop) */}
@@ -323,8 +354,11 @@ export default function TerritoryMapPage() {
               className="w-3 h-3 rounded-full ring-2 ring-muted flex-shrink-0"
               style={{ backgroundColor: territory.color }}
             />
-            <h1 className="text-sm sm:text-base font-bold leading-tight truncate text-foreground">
+            <h1 className="text-sm sm:text-base font-bold leading-tight truncate text-foreground flex items-center gap-2">
               Território {territory.number}
+              {(territory as any).group_id && (
+                <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded uppercase tracking-tighter">Grupo</span>
+              )}
             </h1>
           </div>
         </div>
@@ -367,7 +401,7 @@ export default function TerritoryMapPage() {
             variant="outline"
             className={`flex-1 min-h-[48px] border-destructive/20 text-destructive hover:bg-destructive/10 font-bold rounded-xl ${pinMode ? 'bg-destructive/10 animate-pulse outline-none ring-2 ring-destructive' : ''}`}
             onClick={handleAddDnvClick}
-            disabled={pinMode}
+            disabled={pinMode || !(territory as any).canEdit}
           >
             <MapPinOff className="h-4 w-4 mr-2" />
             Não Visitar
@@ -378,6 +412,8 @@ export default function TerritoryMapPage() {
                 : 'bg-primary hover:bg-primary/90 active:scale-[0.98]'
               }`}
             onClick={() => setShowCompleteDialog(true)}
+            disabled={!(territory as any).canEdit && !isFullyCompleted} // Permite devolver mesmo em read-only? Não, user disse "NÃO pode: editar, adicionar nota, marcar concluído. Só o admin."
+            // Mas devolver é "encerrar". Acho que deve ser bloqueado também.
           >
             {isFullyCompleted ? 'Concluir' : 'Devolver'}
           </Button>
@@ -393,6 +429,8 @@ export default function TerritoryMapPage() {
             }}
             subdivision={selectedSubdivision}
             onToggle={handleToggleSubdivision}
+            onSaveNotes={handleSaveNotes}
+            canEdit={(territory as any).canEdit}
           />
         )}
 

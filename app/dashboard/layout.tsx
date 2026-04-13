@@ -112,7 +112,7 @@ export default function DashboardLayout({
           <div className={cn(
             "container mx-auto p-2 pt-20 md:pt-6",
             isSetupPage && "pt-6",
-            isMapPage && "p-0 pt-0" // Removendo padding do container no mapa para ser edge-to-edge
+            isMapPage && "p-0 pt-16 md:pt-0" // Removendo padding do container no mapa para ser edge-to-edge, mas mantendo espaço para o header no mobile
           )}>
             <PushSubscriptionManager />
             {children}

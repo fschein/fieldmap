@@ -67,9 +67,10 @@ export default function MyAssignmentsPage() {
       if (error) throw error
 
       let allTerritories: TerritoryAssignment[] = [...((personal as TerritoryAssignment[]) || [])]
+      const profileGroupId = profile?.group_id
 
-      if (isSunday && profile?.group_id) {
-        // Campanha ativa vigente
+      if (profileGroupId) {
+        // Campanha ativa vigente (precisamos para exibição e reconciliação)
         const { data: campaign } = await supabase
           .from("campaigns")
           .select("id, name")
@@ -78,16 +79,18 @@ export default function MyAssignmentsPage() {
           .limit(1)
           .maybeSingle()
 
-        // Busca TODAS as designações de grupo ativas (detecta fantasmas/duplicatas)
-        const { data: groupAssignments } = await supabase
+        // 1. Busca sempre as designações de grupo ativas (visíveis a semana toda)
+        const { data: groupAssignments, error: groupErr } = await supabase
           .from("assignments")
           .select(`id, territory_id, status, campaign_id, territories!inner(assigned_to)`)
-          .eq("group_id", profile.group_id)
+          .eq("group_id", profileGroupId)
           .eq("status", "active")
+        
+        if (groupErr) throw groupErr
 
         let activeGroupId = groupAssignments?.[0]?.territory_id
 
-        // RECONCILIAÇÃO GLOBAL: Limpa fantasmas e atualiza campanhas
+        // 2. RECONCILIAÇÃO E CRIAÇÃO AUTOMÁTICA (Só domingo)
         if (groupAssignments && groupAssignments.length > 0) {
           // 1. Dedup: Mantém apenas a primeira, cancela o resto (fantasmas)
           if (groupAssignments.length > 1) {
@@ -111,7 +114,7 @@ export default function MyAssignmentsPage() {
             activeGroupId = undefined
           }
           // 3. Campanha: Sincroniza com a única campanha verdadeiramente "Vigente"
-          else {
+          else if (isSunday) { // Só mexe na campanha no domingo para evitar side-effects durante a semana
             // Regra de ouro: Se existe uma campanha ativa, a missão DEVE ser dela (salvo se já concluída nela)
             if (campaign) {
               if (currentCampaignId !== campaign.id) {
@@ -139,15 +142,15 @@ export default function MyAssignmentsPage() {
           }
         }
 
-        // Se não há designação de grupo ativa, cria uma
-        if (!activeGroupId) {
+        // Se não há designação de grupo ativa, tenta criar uma apenas no DOMINGO
+        if (!activeGroupId && isSunday) {
           let territoryToAssign: { id: string; number: string } | null = null
           let finalCampaignId: string | null = null
 
           const { data: allGroupTerrs } = await supabase
             .from("territories")
             .select("id, number")
-            .eq("group_id", profile.group_id)
+            .eq("group_id", profileGroupId)
             .is("assigned_to", null)
             .neq("status", "inactive")
             .order("last_completed_at", { ascending: true, nullsFirst: true })

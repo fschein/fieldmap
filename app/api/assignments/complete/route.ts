@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     // 0. Verifica se o território ainda está designado para este usuário ou seu grupo (Modo Domingo)
     const { data: userProfile } = await supabaseAdmin
       .from("profiles")
-      .select("group_id")
+      .select("group_id, role")
       .eq("id", userId)
       .single()
 
@@ -45,6 +45,22 @@ export async function POST(request: Request) {
     }
 
     const isComplete = action === "complete"
+
+    // Validação extra para Modo Grupo: Só conclui se todas as quadras estiverem finalizadas (Admin ignora)
+    if (isComplete && isGroupAssignment && userProfile?.role !== "admin") {
+      const { data: subdivisions } = await supabaseAdmin
+        .from("subdivisions")
+        .select("completed")
+        .eq("territory_id", territoryId)
+      
+      const allDone = subdivisions?.every(s => s.completed) ?? false
+      if (!allDone) {
+        return NextResponse.json({ 
+          error: "Este território de grupo só pode ser concluído quando todas as quadras estiverem finalizadas." 
+        }, { status: 400 })
+      }
+    }
+
     const now = new Date().toISOString()
 
     // 1. Atualiza o assignment (do usuário ou do grupo)

@@ -9,7 +9,7 @@ export function GlobalHeader() {
   const pathname = usePathname()
   const isMapPage = pathname.includes("/map")
 
-  if (isMapPage) return null
+  // if (isMapPage) return null // Comentado para permitir que o header apareça no mapa conforme solicitado
 
   return (
     <header className="fixed top-0 left-0 right-0 z-40 h-16 bg-card/80 backdrop-blur-md border-b md:hidden flex items-center justify-between px-4">
