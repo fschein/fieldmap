@@ -248,7 +248,7 @@ export default function TerritoryMapPage() {
       await fetchTerritory()
       setDrawerOpen(false)
 
-      // Fluxo UX: Selecionar próxima quadra disponível
+      // Fluxo UX: Selecionar próxima quadra disponível ou sugerir conclusão
       if (isNowCompleting && territory?.subdivisions) {
         const next = territory.subdivisions.find(s => 
           s.id !== selectedSubdivision.id && 
@@ -259,6 +259,11 @@ export default function TerritoryMapPage() {
           setTimeout(() => {
             setSelectedSubdivision(next)
           }, 600)
+        } else {
+          // Nenhuma quadra pendente, sugerir conclusão do território
+          setTimeout(() => {
+            setShowCompleteDialog(true)
+          }, 800)
         }
       }
     } catch (error: any) {
