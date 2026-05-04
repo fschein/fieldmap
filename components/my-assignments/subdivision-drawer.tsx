@@ -62,17 +62,11 @@ export function SubdivisionDrawer({
     }
   }, [canEdit, onSaveNotes, subdivision.notes])
 
-  // Debounced effect for notes
-  useEffect(() => {
-    if (!open || notes === subdivision.notes) return
-    
-    setSaveStatus("idle") // Se mudou, volta pro idle antes do timeout se necessário
-    const timer = setTimeout(() => {
+  const handleBlur = () => {
+    if (notes !== subdivision.notes) {
       silentSave(notes)
-    }, 800)
-
-    return () => clearTimeout(timer)
-  }, [notes, silentSave, open, subdivision.notes])
+    }
+  }
 
   const handleToggle = async () => {
     if (!canEdit) return
@@ -100,26 +94,27 @@ export function SubdivisionDrawer({
 
   return (
     <Dialog open={open} onOpenChange={(val) => !loading && onOpenChange(val)}>
-      <DialogContent className="sm:max-w-[440px] w-[95vw] p-0 overflow-hidden z-[10001] animate-in fade-in zoom-in-95 duration-200 focus:outline-none focus-visible:outline-none">
-        <DialogHeader className="p-5 pb-0">
-          <div className="flex items-center justify-between mb-1">
+      <DialogContent 
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        className="sm:max-w-[440px] w-[95vw] p-0 overflow-hidden z-[10001] animate-in fade-in zoom-in-95 duration-200 focus:outline-none focus-visible:outline-none"
+      >
+        <DialogHeader className="p-5 pb-0 pr-12 text-left">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 mb-1">
              <div className="flex items-center gap-2.5">
-              <div className="w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(var(--primary),0.4)]" style={{ backgroundColor: isCompleted ? '#22c55e' : '#3b82f6' }} />
+              <div className="w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(var(--primary),0.4)] shrink-0" style={{ backgroundColor: isCompleted ? '#22c55e' : '#3b82f6' }} />
               <DialogTitle className="text-lg font-black text-foreground tracking-tight">
                 Quadra {subdivision.name || "??"}
               </DialogTitle>
             </div>
-            <div>
-               {isCompleted ? (
-                  <span className="text-[0.5625rem] font-black px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-500 uppercase tracking-widest">
-                    Concluída
-                  </span>
-                ) : (
-                  <span className="text-[0.5625rem] font-black px-2 py-1 rounded-full bg-primary/10 text-primary uppercase tracking-widest">
-                    Pendente
-                  </span>
-                )}
-            </div>
+            {isCompleted ? (
+              <span className="text-[0.5625rem] font-black px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-500 uppercase tracking-widest shrink-0">
+                Concluída
+              </span>
+            ) : (
+              <span className="text-[0.5625rem] font-black px-2 py-1 rounded-full bg-primary/10 text-primary uppercase tracking-widest shrink-0">
+                Pendente
+              </span>
+            )}
           </div>
           <DialogDescription className="sr-only">
             Detalhes e anotações da quadra {subdivision.name}
@@ -134,35 +129,41 @@ export function SubdivisionDrawer({
                 <Label htmlFor="notes" className="text-[0.5625rem] font-black text-muted-foreground uppercase tracking-[0.2em]">
                   Anotações de Progresso
                 </Label>
-                
-                {/* Indicador de Save Discreto */}
-                <div className={cn(
-                  "flex items-center gap-1.5 text-[0.5rem] font-black uppercase tracking-tighter transition-all duration-300",
-                  saveStatus === "idle" ? "opacity-0 translate-x-1" : "opacity-100 translate-x-0",
-                  saveStatus === "saving" ? "text-primary anim-pulse" : "text-emerald-500"
-                )}>
-                  {saveStatus === "saving" ? (
-                    <>
-                      <Loader2 className="h-2 w-2 animate-spin" />
-                      Salvando
-                    </>
-                  ) : (
-                    <>
-                      <Check className="h-2.5 w-2.5" />
-                      Salvo
-                    </>
-                  )}
-                </div>
               </div>
               
               <Textarea
                 id="notes"
                 placeholder="Onde parou? Algum detalhe importante?"
                 value={notes}
-                onChange={(e) => setNotes(e.target.value)}
+                onChange={(e) => {
+                  setNotes(e.target.value)
+                  if (saveStatus === "saved") setSaveStatus("idle")
+                }}
+                onBlur={handleBlur}
                 disabled={!canEdit || loading}
                 className="min-h-[100px] bg-muted/30 border-border rounded-xl font-medium text-sm shadow-sm focus:ring-primary/20 resize-none transition-all duration-200"
               />
+
+              <div className="flex items-center justify-between px-1 mt-2">
+                <p className="text-[0.5625rem] font-medium text-muted-foreground/70 italic">
+                  Salva ao sair ou fechar o teclado
+                </p>
+                <Button
+                  onClick={() => silentSave(notes)}
+                  disabled={!canEdit || loading || saveStatus === "saving" || notes === subdivision.notes}
+                  variant="secondary"
+                  size="sm"
+                  className="h-7 text-[0.5625rem] font-black uppercase tracking-wider gap-1.5 rounded-lg px-3 transition-all"
+                >
+                  {saveStatus === "saving" ? (
+                    <><Loader2 className="h-3 w-3 animate-spin" /> Salvando...</>
+                  ) : saveStatus === "saved" ? (
+                    <><Check className="h-3 w-3 text-emerald-500" /> Salvo!</>
+                  ) : (
+                    <><CloudUpload className="h-3 w-3" /> Salvar</>
+                  )}
+                </Button>
+              </div>
             </div>
           )}
 
