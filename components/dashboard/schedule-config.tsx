@@ -78,7 +78,7 @@ export function ScheduleConfig() {
       weekday: parseInt(newArr.weekday),
       start_time: newArr.start_time,
       label: newArr.label,
-      is_group_mode: parseInt(newArr.weekday) === 0,
+      is_group_mode: false,
     })
     if (error) toast.error("Erro ao criar arranjo")
     else { toast.success("Arranjo criado"); setIsAdding(false); fetchData() }

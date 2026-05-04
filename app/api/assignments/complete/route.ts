@@ -21,50 +21,21 @@ export async function POST(request: Request) {
     }
 
     // 0. Verifica se o território ainda está designado para este usuário ou seu grupo (Modo Domingo)
-    const { data: userProfile } = await supabaseAdmin
-      .from("profiles")
-      .select("group_id, role")
-      .eq("id", userId)
-      .single()
-
     const { data: currentTerritory } = await supabaseAdmin
       .from("territories")
-      .select("assigned_to, group_id")
+      .select("assigned_to")
       .eq("id", territoryId)
       .single()
-    
-    const isSunday = new Date().getDay() === 0
-    const isGroupAssignment = !currentTerritory?.assigned_to && isSunday && currentTerritory?.group_id === userProfile?.group_id
 
-    if (currentTerritory?.assigned_to !== userId && !isGroupAssignment) {
-      return NextResponse.json({ error: "Este território não está disponível para você hoje." }, { status: 403 })
-    }
-
-    if (!["complete", "return"].includes(action)) {
-      return NextResponse.json({ error: "action deve ser 'complete' ou 'return'" }, { status: 400 })
-    }
-
-    const isComplete = action === "complete"
-
-    // Validação extra para Modo Grupo: Só conclui se todas as quadras estiverem finalizadas (Admin ignora)
-    if (isComplete && isGroupAssignment && userProfile?.role !== "admin") {
-      const { data: subdivisions } = await supabaseAdmin
-        .from("subdivisions")
-        .select("completed")
-        .eq("territory_id", territoryId)
-      
-      const allDone = subdivisions?.every(s => s.completed) ?? false
-      if (!allDone) {
-        return NextResponse.json({ 
-          error: "Este território de grupo só pode ser concluído quando todas as quadras estiverem finalizadas." 
-        }, { status: 400 })
-      }
+    if (currentTerritory?.assigned_to !== userId) {
+      return NextResponse.json({ error: "Este território não está designado para você." }, { status: 403 })
     }
 
     const now = new Date().toISOString()
+    const isComplete = action === "complete"
 
-    // 1. Atualiza o assignment (do usuário ou do grupo)
-    const query = supabaseAdmin
+    // 1. Atualiza o assignment
+    const { error: assignmentError } = await supabaseAdmin
       .from("assignments")
       .update({
         status: isComplete ? "completed" : "returned",
@@ -77,14 +48,7 @@ export async function POST(request: Request) {
       })
       .eq("territory_id", territoryId)
       .eq("status", "active")
-
-    if (isGroupAssignment) {
-      query.eq("group_id", userProfile?.group_id)
-    } else {
-      query.eq("user_id", userId)
-    }
-
-    const { error: assignmentError } = await query
+      .eq("user_id", userId)
 
     if (assignmentError) throw assignmentError
 

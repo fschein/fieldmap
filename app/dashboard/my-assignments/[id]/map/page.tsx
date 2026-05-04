@@ -73,15 +73,13 @@ export default function TerritoryMapPage() {
       }
 
       // Access & Edit check
-      const isSunday = new Date().getDay() === 0
-      const { data: profile } = await supabase.from("profiles").select("group_id, role").eq("id", user.id).single()
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
       
       const isOwner = data.assigned_to === user.id
-      const isGroupMember = !!(data.group_id && data.group_id === profile?.group_id)
       const isAdmin = profile?.role === 'admin'
       
-      const canAccess = isOwner || (isSunday && isGroupMember) || (isGroupMember && !isSunday) || isAdmin
-      const canEdit = isOwner || (isSunday && isGroupMember) || isAdmin
+      const canAccess = isOwner || isAdmin
+      const canEdit = isOwner || isAdmin
       
       if (!canAccess) {
         toast.error("Você não tem acesso a este território.")
@@ -218,13 +216,19 @@ export default function TerritoryMapPage() {
       const updateData: any = {
         status: nextStatus,
         completed: nextCompleted,
+        updated_at: new Date().toISOString(),
       }
       
-      if (isNowCompleting && completionDate) {
-        // Garantir que a data de conclusão seja salva no updated_at para exibição
-        updateData.updated_at = new Date(completionDate).toISOString()
+      if (isNowCompleting) {
+        // Save exact completion timestamp (use chosen date at current time)
+        const base = completionDate ? new Date(completionDate) : new Date()
+        // Keep today's time but use selected date
+        const now = new Date()
+        base.setHours(now.getHours(), now.getMinutes(), now.getSeconds())
+        updateData.completed_at = base.toISOString()
       } else {
-        updateData.updated_at = new Date().toISOString()
+        // Reopen: clear completion timestamp
+        updateData.completed_at = null
       }
 
       const { error } = await supabase
@@ -354,11 +358,8 @@ export default function TerritoryMapPage() {
               className="w-3 h-3 rounded-full ring-2 ring-muted flex-shrink-0"
               style={{ backgroundColor: territory.color }}
             />
-            <h1 className="text-sm sm:text-base font-bold leading-tight truncate text-foreground flex items-center gap-2">
+            <h1 className="text-sm sm:text-base font-bold leading-tight truncate text-foreground">
               Território {territory.number}
-              {(territory as any).group_id && (
-                <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded uppercase tracking-tighter">Grupo</span>
-              )}
             </h1>
           </div>
         </div>

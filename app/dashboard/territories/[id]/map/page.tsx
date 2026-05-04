@@ -178,7 +178,11 @@ export default function TerritoryMapPage({
   const toggleSubdivisionStatus = async (subdivision: Subdivision) => {
     const newCompleted = !subdivision.completed
     await supabase.from("subdivisions")
-      .update({ completed: newCompleted, status: newCompleted ? "completed" : "available" })
+      .update({
+        completed: newCompleted,
+        status: newCompleted ? "completed" : "available",
+        completed_at: newCompleted ? new Date().toISOString() : null,
+      })
       .eq("id", subdivision.id)
     fetchTerritory()
   }
@@ -516,6 +520,17 @@ export default function TerritoryMapPage({
                             </button>
                           </div>
                         </div>
+
+                        {isCompleted && (
+                          <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mb-1.5 flex items-center gap-1">
+                            <Check className="h-3 w-3 shrink-0" />
+                            Concluída em{" "}
+                            {new Date(subdivision.completed_at || subdivision.updated_at).toLocaleString("pt-BR", {
+                              day: "2-digit", month: "2-digit", year: "numeric",
+                              hour: "2-digit", minute: "2-digit",
+                            })}
+                          </p>
+                        )}
 
                         {subdivision.notes && (
                           <p className="text-[11px] text-muted-foreground bg-muted rounded-lg px-2 py-1.5 mb-2 line-clamp-2">

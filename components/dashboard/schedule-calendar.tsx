@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Calendar, User, Clock, MapPin, ChevronLeft, ChevronRight, PlusCircle, LayoutDashboard, BookmarkCheck, CheckCircle2 } from "lucide-react"
+import { Clock, ChevronLeft, ChevronRight, PlusCircle, LayoutDashboard, BookmarkCheck, CheckCircle2 } from "lucide-react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { format, startOfMonth, endOfMonth, addMonths, subMonths, parseISO, isSameDay, addDays } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -126,7 +125,7 @@ export function ScheduleCalendar({
             const itemDate = parseISO(item.date)
             const isNext = isSameDay(itemDate, tomorrow)
             const hasAssignment = item.leader?.id ? activeAssignments[item.leader.id] : false
-            const canAssign = item.leader?.id && !hasAssignment && !item.arrangement.is_group_mode
+            const canAssign = item.leader?.id && !hasAssignment
 
             return (
               <div 
@@ -162,44 +161,35 @@ export function ScheduleCalendar({
 
                   <div className="flex items-center gap-2 group-hover:translate-x-1 transition-transform">
                     <p className="font-bold text-sm sm:text-lg tracking-tight truncate leading-tight">
-                      {item.leader?.name || (item.arrangement.is_group_mode ? "Grupo Master" : "Sem dirigente")}
+                      {item.leader?.name || "Sem dirigente"}
                     </p>
-                    {hasAssignment && !item.arrangement.is_group_mode && (
+                    {hasAssignment && (
                       <BookmarkCheck className="h-4 w-4 text-primary shrink-0" />
                     )}
                   </div>
 
                   {/* Smart Actions / Info */}
                   <div className="mt-1 flex flex-wrap items-center gap-2">
-                    {item.arrangement.is_group_mode ? (
-                      <div className="flex items-center gap-2 px-2 py-1 bg-primary/10 rounded-lg border border-primary/20 text-[0.625rem] font-black text-primary uppercase">
-                        <MapPin className="h-3 w-3" />
-                        {item.territory ? `Focar: T${item.territory.number}` : "Modo Domingo"}
+                    {hasAssignment ? (
+                      <div className="text-[0.625rem] font-bold text-muted-foreground italic flex items-center gap-1">
+                        <CheckCircle2 className="h-3 w-3 text-primary" />
+                        Com território
                       </div>
+                    ) : canAssign ? (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-7 px-2 text-[0.625rem] font-black uppercase tracking-wider text-primary hover:text-primary hover:bg-primary/10 gap-1.5 rounded-lg border border-primary/20 transition-all active:scale-95"
+                        onClick={() => {
+                          setSelectedLeaderId(item.leader.id)
+                          setDesignationModalOpen(true)
+                        }}
+                      >
+                        <PlusCircle className="h-3.5 w-3.5" />
+                        Designar Agora
+                      </Button>
                     ) : (
-                      <>
-                        {hasAssignment ? (
-                          <div className="text-[0.625rem] font-bold text-muted-foreground italic flex items-center gap-1">
-                            <CheckCircle2 className="h-3 w-3 text-primary" />
-                            Com território
-                          </div>
-                        ) : canAssign ? (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="h-7 px-2 text-[0.625rem] font-black uppercase tracking-wider text-primary hover:text-primary hover:bg-primary/10 gap-1.5 rounded-lg border border-primary/20 transition-all active:scale-95"
-                            onClick={() => {
-                              setSelectedLeaderId(item.leader.id)
-                              setDesignationModalOpen(true)
-                            }}
-                          >
-                            <PlusCircle className="h-3.5 w-3.5" />
-                            Designar Agora
-                          </Button>
-                        ) : (
-                          <span className="text-[0.625rem] text-muted-foreground/40 italic">Sem dirigente definido</span>
-                        )}
-                      </>
+                      <span className="text-[0.625rem] text-muted-foreground/40 italic">Sem dirigente definido</span>
                     )}
                   </div>
                 </div>

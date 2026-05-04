@@ -6,7 +6,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { createTimeoutSignal } from "@/lib/utils/api-utils"
 import { useAuth } from "@/hooks/use-auth"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, MapPin, ChevronRight, Users } from "lucide-react"
+import { Loader2, MapPin, ChevronRight } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { TerritoryWithSubdivisions, Subdivision } from "@/lib/types"
 import { toast } from "sonner"
@@ -54,7 +54,6 @@ export default function MyAssignmentsPage() {
     if (!user?.id) return
     setLoading(true)
     const { signal, clear } = createTimeoutSignal(15000)
-    const isSunday = new Date().getDay() === 0
 
     try {
       const { data: personal, error } = await supabase
@@ -66,169 +65,7 @@ export default function MyAssignmentsPage() {
 
       if (error) throw error
 
-      let allTerritories: TerritoryAssignment[] = [...((personal as TerritoryAssignment[]) || [])]
-      const profileGroupId = profile?.group_id
-
-      if (profileGroupId) {
-        // Campanha ativa vigente (precisamos para exibição e reconciliação)
-        const { data: campaign } = await supabase
-          .from("campaigns")
-          .select("id, name")
-          .eq("active", true)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        // 1. Busca sempre as designações de grupo ativas (visíveis a semana toda)
-        const { data: groupAssignments, error: groupErr } = await supabase
-          .from("assignments")
-          .select(`id, territory_id, status, campaign_id, territories!inner(assigned_to)`)
-          .eq("group_id", profileGroupId)
-          .eq("status", "active")
-        
-        if (groupErr) throw groupErr
-
-        let activeGroupId = groupAssignments?.[0]?.territory_id
-
-        // 2. RECONCILIAÇÃO E CRIAÇÃO AUTOMÁTICA (Só domingo)
-        if (groupAssignments && groupAssignments.length > 0) {
-          // 1. Dedup: Mantém apenas a primeira, cancela o resto (fantasmas)
-          if (groupAssignments.length > 1) {
-            const extraIds = groupAssignments.slice(1).map((a: any) => a.id)
-            await supabase
-              .from("assignments")
-              .update({ status: "returned", notes: "Sistema: Duplicata automática removida." })
-              .in("id", extraIds)
-          }
-
-          const mainAssignment = groupAssignments[0]
-          const currentAssignmentId = mainAssignment.id
-          const currentCampaignId = mainAssignment.campaign_id
-
-          // 2. Isolamento: Se alguém pegou o território individualmente, cancela o grupo
-          if (mainAssignment.territories?.assigned_to) {
-            await supabase
-              .from("assignments")
-              .update({ status: "returned", notes: "Cancelado: Território designado individualmente." })
-              .eq("id", currentAssignmentId)
-            activeGroupId = undefined
-          }
-          // 3. Campanha: Sincroniza com a única campanha verdadeiramente "Vigente"
-          else if (isSunday) { // Só mexe na campanha no domingo para evitar side-effects durante a semana
-            // Regra de ouro: Se existe uma campanha ativa, a missão DEVE ser dela (salvo se já concluída nela)
-            if (campaign) {
-              if (currentCampaignId !== campaign.id) {
-                const { data: alreadyDone } = await supabase
-                  .from("assignments")
-                  .select("id")
-                  .eq("territory_id", mainAssignment.territory_id)
-                  .eq("campaign_id", campaign.id)
-                  .eq("status", "completed")
-                  .limit(1)
-                  .maybeSingle()
-
-                await supabase
-                  .from("assignments")
-                  .update({ campaign_id: alreadyDone ? null : campaign.id })
-                  .eq("id", currentAssignmentId)
-              }
-            } else if (currentCampaignId) {
-              // Nenhuma campanha vigente no sistema, limpa a tag
-              await supabase
-                .from("assignments")
-                .update({ campaign_id: null })
-                .eq("id", currentAssignmentId)
-            }
-          }
-        }
-
-        // Se não há designação de grupo ativa, tenta criar uma apenas no DOMINGO
-        if (!activeGroupId && isSunday) {
-          let territoryToAssign: { id: string; number: string } | null = null
-          let finalCampaignId: string | null = null
-
-          const { data: allGroupTerrs } = await supabase
-            .from("territories")
-            .select("id, number")
-            .eq("group_id", profileGroupId)
-            .is("assigned_to", null)
-            .neq("status", "inactive")
-            .order("last_completed_at", { ascending: true, nullsFirst: true })
-
-          if (allGroupTerrs?.length) {
-            if (campaign) {
-              for (const terr of allGroupTerrs) {
-                const { data: alreadyDone } = await supabase
-                  .from("assignments")
-                  .select("id")
-                  .eq("territory_id", terr.id)
-                  .eq("campaign_id", campaign.id)
-                  .eq("status", "completed")
-                  .limit(1)
-                  .maybeSingle()
-
-                if (!alreadyDone) {
-                  territoryToAssign = terr
-                  finalCampaignId = campaign.id
-                  break
-                }
-              }
-            }
-
-            if (!territoryToAssign) {
-              territoryToAssign = allGroupTerrs[0]
-              finalCampaignId = null
-            }
-          }
-
-          if (!territoryToAssign) {
-            const { data: anyFree } = await supabase
-              .from("territories")
-              .select("id, number")
-              .eq("group_id", profile.group_id)
-              .is("assigned_to", null)
-              .neq("status", "inactive")
-              .order("last_completed_at", { ascending: true, nullsFirst: true })
-              .limit(1)
-
-            if (anyFree?.[0]) {
-              territoryToAssign = anyFree[0]
-              finalCampaignId = null
-            }
-          }
-
-          if (territoryToAssign) {
-            const { error: assignErr } = await supabase.from("assignments").insert({
-              territory_id: territoryToAssign.id,
-              group_id: profile.group_id,
-              campaign_id: finalCampaignId,
-              status: "active",
-              assigned_at: new Date().toISOString(),
-            })
-
-            if (!assignErr) activeGroupId = territoryToAssign.id
-          }
-        }
-
-        // Busca os dados completos do território de grupo após reconciliação
-        if (activeGroupId) {
-          const { data: groupTerritory } = await supabase
-            .from("territories")
-            .select(`*, campaign:campaigns(*), subdivisions(*), assignments(${ASSIGNMENTS_SELECT})`)
-            .eq("id", activeGroupId)
-            .single()
-
-          if (groupTerritory) {
-            const index = allTerritories.findIndex(t => t.id === groupTerritory.id)
-            if (index !== -1) {
-              // Substitui a versão "suja" pela versão reconciliada
-              allTerritories[index] = groupTerritory as TerritoryAssignment
-            } else {
-              allTerritories.push(groupTerritory as TerritoryAssignment)
-            }
-          }
-        }
-      }
+      const allTerritories: TerritoryAssignment[] = (personal as TerritoryAssignment[]) || []
 
       setTerritories(allTerritories)
       localStorage.setItem("my_assignments_cache", JSON.stringify(allTerritories))
@@ -262,7 +99,7 @@ export default function MyAssignmentsPage() {
       clear()
       setLoading(false)
     }
-  }, [user?.id, profile?.group_id])
+  }, [user?.id])
 
   useEffect(() => {
     if (isReady) {
@@ -347,14 +184,7 @@ export default function MyAssignmentsPage() {
         <p className="text-xs text-muted-foreground font-medium">Olá, {firstName}!</p>
       </div>
 
-      {new Date().getDay() === 0 && profile?.group_id && (
-        <div className="px-2.5 mb-4">
-          <Badge className="bg-warning/10 text-warning border-warning/20 py-1.5 px-3 rounded-full flex items-center gap-1.5 shadow-sm w-fit">
-            <span className="w-1.5 h-1.5 bg-warning rounded-full animate-pulse" />
-            Modo Grupo Ativo
-          </Badge>
-        </div>
-      )}
+
 
       <div className="px-2.5 mb-2">
         {cooldown > 0 && (
@@ -429,12 +259,7 @@ export default function MyAssignmentsPage() {
               const isOverdue = days > 90
               const done = t.subdivisions?.filter(s => s.completed || s.status === "completed").length || 0
               const total = t.subdivisions?.length || 0
-              const isGroupWork = !!(t.group_id && profile?.group_id && t.group_id === profile.group_id)
-
-              // FIX: group_id agora está no select — find funciona corretamente
-              const activeAssignment = isGroupWork
-                ? t.assignments?.find(a => a.status === "active" && a.group_id === profile?.group_id)
-                : t.assignments?.find(a => a.status === "active" && !a.group_id)
+              const activeAssignment = t.assignments?.find(a => a.status === "active")
 
               // FIX: só exibe campanha se active === true na designação ativa
               const campaignName =
@@ -474,11 +299,7 @@ export default function MyAssignmentsPage() {
                     <ChevronRight className="h-4 w-4 text-muted-foreground/30 flex-shrink-0" />
                   </div>
 
-                  {isGroupWork && (
-                    <div className="flex items-center gap-1.5 bg-warning/10 text-warning text-[0.625rem] font-bold px-2 py-0.5 rounded-md w-fit border border-warning/20">
-                      <Users className="h-3 w-3" /> TRABALHO DE GRUPO
-                    </div>
-                  )}
+
 
                   <div className="h-1 rounded-full bg-muted overflow-hidden">
                     <div className={cn("h-full rounded-full transition-all", progressColor)} style={{ width: `${progress}%` }} />

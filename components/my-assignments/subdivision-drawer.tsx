@@ -87,12 +87,14 @@ export function SubdivisionDrawer({
     }
   }
 
-  const formatDate = (dateString: string) => {
+  const formatDateTime = (dateString: string | null | undefined) => {
     if (!dateString) return ""
-    return new Date(dateString).toLocaleDateString("pt-BR", {
+    return new Date(dateString).toLocaleString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     })
   }
 
@@ -184,7 +186,7 @@ export function SubdivisionDrawer({
                   <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto mb-3" />
                   <p className="text-xs font-black text-emerald-500 mb-1 tracking-wider">TRABALHO FINALIZADO</p>
                   <p className="text-[0.625rem] text-emerald-500/60 font-medium uppercase tracking-tight">
-                    Registrado em {formatDate(subdivision.updated_at)}
+                    Concluída em {formatDateTime(subdivision.completed_at || subdivision.updated_at)}
                   </p>
                 </div>
                 <Button

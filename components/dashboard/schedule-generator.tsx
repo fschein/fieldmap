@@ -34,7 +34,6 @@ interface ScheduleItem {
     id: string
     label: string
     start_time: string
-    is_group_mode: boolean
   }
   leader?: { name: string }
   territory?: { number: string; name: string }
@@ -130,28 +129,18 @@ export function ScheduleGenerator({
           const existing = drafts.find((d) => d.date === dateStr && d.arrangement_id === arr.id)
           if (existing) { if (existing.leader_id) slotLastLeaders[arr.id] = existing.leader_id; continue }
 
-          let selectedLeaderId = null
-          let selectedTerritoryId = null
-
-          if (arr.is_group_mode) {
-            if (availableTerritories && territoryIdx < availableTerritories.length) {
-              selectedTerritoryId = availableTerritories[territoryIdx].id
-              territoryIdx++
-            }
-          } else {
-            const candidates = (leaderArrsData?.filter((la: any) => la.arrangement_id === arr.id) || []).map((c: any) => ({
-              profile_id: c.profile_id, arrangement_id: c.arrangement_id, frequency: c.frequency,
-            }))
-            selectedLeaderId = selectBestLeader(
-              dateStr, arr.id, candidates, localSchedules,
-              { avoidSameWeek, prioritizeInterval }, slotLastLeaders[arr.id] || null,
-            )
-            if (selectedLeaderId) slotLastLeaders[arr.id] = selectedLeaderId
-          }
+          const candidates = (leaderArrsData?.filter((la: any) => la.arrangement_id === arr.id) || []).map((c: any) => ({
+            profile_id: c.profile_id, arrangement_id: c.arrangement_id, frequency: c.frequency,
+          }))
+          const selectedLeaderId = selectBestLeader(
+            dateStr, arr.id, candidates, localSchedules,
+            { avoidSameWeek, prioritizeInterval }, slotLastLeaders[arr.id] || null,
+          )
+          if (selectedLeaderId) slotLastLeaders[arr.id] = selectedLeaderId
 
           const newItem: any = {
             date: dateStr, arrangement_id: arr.id,
-            leader_id: selectedLeaderId, territory_id: selectedTerritoryId, status: "draft",
+            leader_id: selectedLeaderId, territory_id: null, status: "draft",
           }
           newSchedules.push(newItem)
           localSchedules.push(newItem)
@@ -372,7 +361,6 @@ function ArrangementCard({
             item={item}
             leaders={leaders}
             leaderArrs={leaderArrs}
-            isGroupMode={arr.is_group_mode}
             onUpdate={onUpdate}
           />
         ))}
@@ -384,12 +372,11 @@ function ArrangementCard({
 // ─── SlotRow ──────────────────────────────────────────────────────────────────
 
 function SlotRow({
-  item, leaders, leaderArrs, isGroupMode, onUpdate,
+  item, leaders, leaderArrs, onUpdate,
 }: {
   item: ScheduleItem
   leaders: { id: string; name: string }[]
   leaderArrs: { profile_id: string; arrangement_id: string }[]
-  isGroupMode: boolean
   onUpdate: () => void
 }) {
   const dayNum = format(parseISO(item.date), "dd")
@@ -416,39 +403,28 @@ function SlotRow({
       </div>
 
       {/* Assignee */}
-      {isGroupMode ? (
-        <div className="min-w-0">
-          <span className="text-[0.625rem] font-semibold uppercase tracking-wide text-primary">Modo Grupo</span>
-          {item.territory && (
-            <p className="text-[0.75rem] font-medium text-foreground truncate mt-0.5">
-              T{item.territory.number} · {item.territory.name}
-            </p>
-          )}
-        </div>
-      ) : (
-        <Select
-          value={item.leader_id || "none"}
-          onValueChange={async (val) => {
-            const { error } = await supabase
-              .from("schedules")
-              .update({ leader_id: val === "none" ? null : val, status: "manual" })
-              .eq("id", item.id)
-            if (!error) onUpdate()
-          }}
-        >
-          <SelectTrigger className="h-8 w-full text-[0.75rem] font-medium border-border">
-            <SelectValue placeholder="Pendente" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="none" className="text-[0.75rem]">Pendente</SelectItem>
-            {leaders
-              .filter((l) => leaderArrs.some((la) => la.profile_id === l.id && la.arrangement_id === item.arrangement_id))
-              .map((l) => (
-                <SelectItem key={l.id} value={l.id} className="text-[0.75rem]">{l.name}</SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
-      )}
+      <Select
+        value={item.leader_id || "none"}
+        onValueChange={async (val) => {
+          const { error } = await supabase
+            .from("schedules")
+            .update({ leader_id: val === "none" ? null : val, status: "manual" })
+            .eq("id", item.id)
+          if (!error) onUpdate()
+        }}
+      >
+        <SelectTrigger className="h-8 w-full text-[0.75rem] font-medium border-border">
+          <SelectValue placeholder="Pendente" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="none" className="text-[0.75rem]">Pendente</SelectItem>
+          {leaders
+            .filter((l) => leaderArrs.some((la) => la.profile_id === l.id && la.arrangement_id === item.arrangement_id))
+            .map((l) => (
+              <SelectItem key={l.id} value={l.id} className="text-[0.75rem]">{l.name}</SelectItem>
+            ))}
+        </SelectContent>
+      </Select>
 
       {/* Status badge */}
       <span className={cn(

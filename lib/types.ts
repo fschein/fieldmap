@@ -48,6 +48,7 @@ export interface Subdivision {
   geometry: GeoJSON.Polygon | null
   order_index: number
   completed: boolean
+  completed_at: string | null
   notes?: string
   created_at: string
   updated_at: string
