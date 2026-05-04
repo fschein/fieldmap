@@ -1,24 +1,84 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { Bell, CheckCheck, MapPin, ArrowDownToLine, UserX } from "lucide-react"
+import {
+  Bell,
+  CheckCheck,
+  MapPin,
+  ArrowDownToLine,
+  UserX,
+  CheckCircle2,
+  Clock,
+  LayoutList,
+  TrendingUp,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { useNotifications, AppNotification } from "@/hooks/use-notifications"
+import { useNotifications, AppNotification, NotificationType } from "@/hooks/use-notifications"
 import { useAuth } from "@/hooks/use-auth"
 import { cn } from "@/lib/utils"
+import { PushSubscriptionManager } from "@/components/dashboard/push-subscription-manager"
 
-function NotifIcon({ type }: { type: AppNotification["type"] }) {
-  if (type === "request") return <MapPin className="h-4 w-4 text-blue-500" />
-  if (type === "returned") return <ArrowDownToLine className="h-4 w-4 text-emerald-500" />
-  if (type === "idle") return <UserX className="h-4 w-4 text-amber-500" />
-  if (type === "assigned") return <MapPin className="h-4 w-4 text-primary" />
-  return <Bell className="h-4 w-4 text-muted-foreground" />
+
+function NotifIcon({ type }: { type: NotificationType }) {
+  switch (type) {
+    case "assigned":
+      return <MapPin className="h-4 w-4 text-primary" />
+    case "returned":
+      return <ArrowDownToLine className="h-4 w-4 text-emerald-500" />
+    case "completed":
+      return <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+    case "overdue":
+      return <Clock className="h-4 w-4 text-red-500" />
+    case "idle_publisher":
+      return <UserX className="h-4 w-4 text-amber-500" />
+    case "completed_subdivisions":
+      return <LayoutList className="h-4 w-4 text-blue-500" />
+    case "progress_60":
+      return <TrendingUp className="h-4 w-4 text-orange-500" />
+    case "request":
+      return <MapPin className="h-4 w-4 text-blue-500" />
+    default:
+      return <Bell className="h-4 w-4 text-muted-foreground" />
+  }
+}
+
+function notifIconBg(type: NotificationType) {
+  switch (type) {
+    case "assigned":             return "bg-primary/10"
+    case "returned":             return "bg-emerald-500/10"
+    case "completed":            return "bg-emerald-600/10"
+    case "overdue":              return "bg-red-500/10"
+    case "idle_publisher":       return "bg-amber-500/10"
+    case "completed_subdivisions": return "bg-blue-500/10"
+    case "progress_60":            return "bg-orange-500/10"
+    case "request":              return "bg-blue-500/10"
+    default:                     return "bg-muted"
+  }
+}
+
+function notifRoute(notif: AppNotification): string | null {
+  switch (notif.type) {
+    case "assigned":
+      return "/dashboard/my-assignments"
+    case "returned":
+    case "completed":
+    case "overdue":
+    case "completed_subdivisions":
+    case "progress_60":
+      return notif.territory_id
+        ? `/dashboard/territories/${notif.territory_id}`
+        : "/dashboard/assignments"
+    case "idle_publisher":
+    case "request":
+      return "/dashboard/assignments"
+    default:
+      return null
+  }
 }
 
 export function NotificationBell() {
@@ -26,8 +86,8 @@ export function NotificationBell() {
   const { notifications, unreadCount, loading, markAllAsRead, markAsRead } = useNotifications()
   const router = useRouter()
 
-  // Only show to admins and dirigentes
-  if (!profile || !["admin", "dirigente"].includes(profile.role)) return null
+  // Visível para admins, supervisores e dirigentes
+  if (!profile || !["admin", "supervisor", "dirigente"].includes(profile.role)) return null
 
   return (
     <Popover>
@@ -36,6 +96,7 @@ export function NotificationBell() {
           variant="ghost"
           size="icon"
           className="relative h-9 w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted"
+          aria-label="Notificações"
         >
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
@@ -71,48 +132,48 @@ export function NotificationBell() {
               <p className="text-sm text-muted-foreground">Nenhuma notificação ainda.</p>
             </div>
           ) : (
-            notifications.map((notif) => (
-              <button
-                key={notif.id}
-                onClick={async () => {
-                  await markAsRead(notif.id)
-                  if (notif.type === "request") {
-                    router.push("/dashboard/assignments")
-                  } else if (notif.type === "returned" && notif.territory_id) {
-                    router.push(`/dashboard/territories/${notif.territory_id}`)
-                  } else if (notif.type === "assigned") {
-                    router.push("/dashboard/my-assignments")
-                  }
-                }}
-                className={cn(
-                  "w-full text-left flex items-start gap-3 p-3.5 transition-colors hover:bg-muted",
-                  !notif.read && "bg-primary/5"
-                )}
-              >
-                <span className={cn(
-                  "mt-0.5 p-1.5 rounded-full shrink-0",
-                  notif.type === "request" && "bg-primary/10",
-                  notif.type === "returned" && "bg-emerald-500/10",
-                  notif.type === "idle" && "bg-amber-500/10",
-                  notif.type === "assigned" && "bg-primary/10",
-                )}>
-                  <NotifIcon type={notif.type} />
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-xs text-foreground line-clamp-1">{notif.title}</p>
-                  <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{notif.message}</p>
-                  <p className="text-[0.625rem] text-muted-foreground mt-1">
-                    {new Date(notif.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-                  </p>
-                </div>
-                {!notif.read && (
-                  <span className="mt-1.5 h-2 w-2 rounded-full bg-primary shrink-0 animate-pulse" />
-                )}
-              </button>
-            ))
+            notifications.map((notif) => {
+              const route = notifRoute(notif)
+              return (
+                <button
+                  key={notif.id}
+                  onClick={async () => {
+                    await markAsRead(notif.id)
+                    if (route) router.push(route)
+                  }}
+                  className={cn(
+                    "w-full text-left flex items-start gap-3 p-3.5 transition-colors hover:bg-muted",
+                    !notif.read && "bg-primary/5"
+                  )}
+                >
+                  <span className={cn("mt-0.5 p-1.5 rounded-full shrink-0", notifIconBg(notif.type))}>
+                    <NotifIcon type={notif.type} />
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-xs text-foreground line-clamp-1">{notif.title}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{notif.message}</p>
+                    <p className="text-[0.625rem] text-muted-foreground mt-1">
+                      {new Date(notif.created_at).toLocaleDateString("pt-BR", {
+                        day: "2-digit",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
+                  {!notif.read && (
+                    <span className="mt-1.5 h-2 w-2 rounded-full bg-primary shrink-0 animate-pulse" />
+                  )}
+                </button>
+              )
+            })
           )}
         </div>
+        
+        {/* Footer with Push Settings */}
+        <PushSubscriptionManager />
       </PopoverContent>
     </Popover>
   )
 }
+

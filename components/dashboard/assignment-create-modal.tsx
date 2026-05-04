@@ -257,14 +257,17 @@ export function AssignmentCreateModal({
       await supabase.from("territories").update(terrUpdate).eq("id", selectedTerritoryId)
 
       if (!isCompleted && !isGroupAssign) {
+        // Dispara push + insere notificação in-app para o dirigente
         fetch("/api/push/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            userId: selectedPublisherId,
-            title: "Novo Território!",
-            message: `Você recebeu o território ${selectedTerr?.number} - ${selectedTerr?.name}.`,
+            type: "assigned",
+            targetUserId: selectedPublisherId,
+            title: "Novo Território! 🗺️",
+            message: `Você recebeu o Território ${selectedTerr?.number}${selectedTerr?.name ? ` - ${selectedTerr.name}` : ""}.`,
             url: `/dashboard/my-assignments/${selectedTerritoryId}/map`,
+            territoryId: selectedTerritoryId,
           }),
         }).catch((err: unknown) => console.error("Erro ao disparar push:", err))
       }

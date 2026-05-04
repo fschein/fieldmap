@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
+import { sendNotification, notifyAdmins } from "@/lib/notifications"
 
 export async function POST(request: Request) {
   try {
@@ -20,7 +21,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "territoryId, userId e action são obrigatórios" }, { status: 400 })
     }
 
-    // 0. Verifica se o território ainda está designado para este usuário ou seu grupo (Modo Domingo)
+    // 0. Verifica se o território ainda está designado para este usuário
     const { data: currentTerritory } = await supabaseAdmin
       .from("territories")
       .select("assigned_to")
@@ -41,10 +42,7 @@ export async function POST(request: Request) {
         status: isComplete ? "completed" : "returned",
         completed_at: isComplete ? now : null,
         returned_at: !isComplete ? now : null,
-        ...(reason ? { 
-          notes: reason,
-          return_reason: reason 
-        } : {}),
+        ...(reason ? { notes: reason, return_reason: reason } : {}),
       })
       .eq("territory_id", territoryId)
       .eq("status", "active")
@@ -52,7 +50,7 @@ export async function POST(request: Request) {
 
     if (assignmentError) throw assignmentError
 
-    // 2. Atualiza o território: limpa assigned_to e status
+    // 2. Atualiza o território
     const { error: territoryError } = await supabaseAdmin
       .from("territories")
       .update({
@@ -64,15 +62,11 @@ export async function POST(request: Request) {
 
     if (territoryError) throw territoryError
 
-    // 3. Reseta as quadras (subdivisions) APENAS se for conclusão TOTAL
+    // 3. Reseta as quadras APENAS se for conclusão TOTAL
     if (isComplete) {
       const { error: subdivisionError } = await supabaseAdmin
         .from("subdivisions")
-        .update({
-          completed: false,
-          status: "available",
-          updated_at: now,
-        })
+        .update({ completed: false, status: "available", updated_at: now })
         .eq("territory_id", territoryId)
 
       if (subdivisionError) {
@@ -80,59 +74,41 @@ export async function POST(request: Request) {
       }
     }
 
+    // 4. Busca dados para enriquecer as notificações
+    const [profileRes, territoryRes] = await Promise.all([
+      supabaseAdmin.from("profiles").select("name, email").eq("id", userId).single(),
+      supabaseAdmin.from("territories").select("number, name").eq("id", territoryId).single(),
+    ])
 
+    const userName = profileRes.data?.name || profileRes.data?.email || "Um publicador"
+    const territoryNumber = territoryRes.data?.number || territoryId
+    const territoryName = territoryRes.data?.name || ""
 
-    // 3. Busca o nome do usuário para notificação
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("name, email")
-      .eq("id", userId)
-      .single()
-
-    const { data: territory } = await supabaseAdmin
-      .from("territories")
-      .select("number")
-      .eq("id", territoryId)
-      .single()
-
-    // Conta quadras para enriquecer a mensagem de devolução
-    const { data: subdivisions } = await supabaseAdmin
-      .from("subdivisions")
-      .select("completed")
-      .eq("territory_id", territoryId)
-
-    const totalSubs = subdivisions?.length ?? 0
-    // Note: at this point subdivisions were already reset, so count from the original request
-    // We retrieve from the assignment context instead — use preReset count passed in body (or just describe action)
-    const userName = profile?.name || profile?.email || "Um publicador"
-    const territoryNumber = territory?.number || territoryId
-
-    // 5. Insere notificação para o admin
-    // Para devoluções parciais, a mensagem informa o progresso
-    const notificationMessage = isComplete
-      ? `${userName} concluiu o Território ${territoryNumber}.`
-      : `${userName} devolveu o Território ${territoryNumber} sem concluir todas as quadras.`
-
-    await supabaseAdmin.from("notifications").insert({
+    // 5. Notifica os admins sobre a ação do dirigente
+    await notifyAdmins(supabaseAdmin, {
       type: isComplete ? "completed" : "returned",
-      title: isComplete ? "Território Concluído" : "Território Devolvido",
-      message: notificationMessage,
-      created_by: userId,
-      territory_id: territoryId,
+      title: isComplete ? "Território Concluído ✅" : "Território Devolvido 🔄",
+      message: isComplete
+        ? `${userName} concluiu o Território ${territoryNumber}${territoryName ? ` - ${territoryName}` : ""}.`
+        : `${userName} devolveu o Território ${territoryNumber}${territoryName ? ` - ${territoryName}` : ""} sem concluir todas as quadras.`,
+      url: `/dashboard/territories/${territoryId}`,
+      createdBy: userId,
+      territoryId,
     })
 
-    // 5. Verifica se o usuário ficou sem territórios → idle notification
+    // 6. Verifica se o dirigente ficou sem territórios → notifica admins
     const { count } = await supabaseAdmin
       .from("territories")
       .select("id", { count: "exact", head: true })
       .eq("assigned_to", userId)
 
     if ((count ?? 1) === 0) {
-      await supabaseAdmin.from("notifications").insert({
-        type: "idle",
-        title: "Publicador sem Território",
+      await notifyAdmins(supabaseAdmin, {
+        type: "idle_publisher",
+        title: "Dirigente Sem Território ⚠️",
         message: `${userName} ficou sem territórios após devolver o Território ${territoryNumber}.`,
-        created_by: userId,
+        url: "/dashboard/assignments",
+        createdBy: userId,
       })
     }
 

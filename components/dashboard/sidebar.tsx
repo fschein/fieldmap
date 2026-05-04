@@ -167,7 +167,8 @@ export function Sidebar() {
                 Field<span className="text-primary">Map</span>
               </span>
             </div>
-            <div className="shrink-0 flex items-center">
+            <div className="shrink-0 flex items-center gap-1">
+              <NotificationBell />
               <A11yControls />
             </div>
           </div>

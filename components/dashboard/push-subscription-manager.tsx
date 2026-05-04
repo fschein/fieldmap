@@ -100,20 +100,21 @@ export function PushSubscriptionManager() {
   if (!isSupported || !user) return null
 
   return (
-    <div className="flex items-center gap-2 p-2 bg-muted/50 border border-border rounded-lg shadow-sm mb-4">
-      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-        {subscription ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-bold text-foreground">Notificações no Celular</p>
-        <p className="text-[0.625rem] text-muted-foreground truncate">
-          {subscription ? "Você receberá notificações sobre seus territórios" : "Ative para receber notificações em tempo real"}
-        </p>
+    <div className="flex items-center justify-between px-4 py-3 bg-muted/30 border-t">
+      <div className="flex items-center gap-2 min-w-0">
+        <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+          {subscription ? <Bell className="h-3.5 w-3.5" /> : <BellOff className="h-3.5 w-3.5" />}
+        </div>
+        <div className="flex flex-col min-w-0">
+          <span className="text-xs font-medium text-foreground truncate">
+            {subscription ? "Notificações Ativas" : "Receber Push no Celular"}
+          </span>
+        </div>
       </div>
       <Button 
         variant={subscription ? "ghost" : "default"} 
         size="sm" 
-        className="h-8 text-[0.6875rem]"
+        className="h-7 text-[0.6875rem] px-2"
         onClick={subscription ? unsubscribe : subscribe}
         disabled={loading}
       >

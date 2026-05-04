@@ -5,6 +5,8 @@ import { A11yControls } from "@/components/dashboard/a11y-controls"
 import { cn } from "@/lib/utils"
 import { usePathname } from "next/navigation"
 
+import { NotificationBell } from "@/components/dashboard/notification-bell"
+
 export function GlobalHeader() {
   const pathname = usePathname()
   const isMapPage = pathname.includes("/map")
@@ -22,7 +24,8 @@ export function GlobalHeader() {
         </span>
       </div>
 
-      <div className="flex items-center">
+      <div className="flex items-center gap-1">
+        <NotificationBell />
         <A11yControls />
       </div>
     </header>

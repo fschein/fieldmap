@@ -114,7 +114,6 @@ export default function DashboardLayout({
             isSetupPage && "pt-6",
             isMapPage && "p-0 pt-16 md:pt-0" // Removendo padding do container no mapa para ser edge-to-edge, mas mantendo espaço para o header no mobile
           )}>
-            <PushSubscriptionManager />
             {children}
           </div>
         </main>
