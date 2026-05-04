@@ -95,7 +95,7 @@ if (!isReady) return <Loader2 className="animate-spin" />
             <FieldMapLogoBrand className="h-10 w-10 shrink-0" />
             <CardTitle className="text-4xl font-black tracking-tighter">
               <span className="text-slate-900">Field</span>
-              <span className="text-[#C65D3B]">Map</span>
+              <span className="text-primary">Map</span>
             </CardTitle>
           </div>
           <CardDescription>
@@ -156,7 +156,7 @@ if (!isReady) return <Loader2 className="animate-spin" />
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 shadow-sm">
                 <div className="flex flex-col gap-4">
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 bg-[#C65D3B] text-white rounded text-[0.5625rem] font-black uppercase tracking-tighter shadow-sm">Onboarding</span>
+                    <span className="px-2 py-0.5 bg-primary text-primary-foreground rounded text-[0.5625rem] font-black uppercase tracking-tighter shadow-sm">Onboarding</span>
                     <h3 className="text-xs font-black uppercase tracking-widest text-slate-800">Primeira Instalação?</h3>
                   </div>
                   
@@ -164,7 +164,7 @@ if (!isReady) return <Loader2 className="animate-spin" />
                     Detectamos que este banco está vazio. Se você é o responsável pela montagem do sistema, crie a primeira conta agora:
                   </p>
                   
-                  <Button asChild variant="default" className="w-full bg-[#C65D3B] hover:bg-[#A84A2B] text-white shadow-md font-bold py-6">
+                  <Button asChild variant="default" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-md font-bold py-6">
                     <Link href="/signup">Criar Conta de Administrador</Link>
                   </Button>
                 </div>

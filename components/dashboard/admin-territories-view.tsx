@@ -325,7 +325,7 @@ export function AdminTerritoriesView() {
     setEditingTerritory(territory)
     setEditName(territory.name)
     setEditNumber(territory.number)
-    setEditColor(territory.color || "#C65D3B")
+    setEditColor(territory.color || "#044454")
     setEditGroupId(territory.group?.id || null)
     setEditInactive(territory.status === 'inactive')
     setEditDialogOpen(true)
@@ -358,7 +358,7 @@ export function AdminTerritoriesView() {
             number: editNumber,
             group_id: editGroupId,
             status: 'available',
-            color: '#C65D3B'
+            color: '#044454'
           })
         if (error) throw error
       }
@@ -375,7 +375,7 @@ export function AdminTerritoriesView() {
     setEditingTerritory(null)
     setEditName("")
     setEditNumber("")
-    setEditColor("#C65D3B")
+    setEditColor("#044454")
     setEditGroupId(null)
     setEditInactive(false)
     setEditDialogOpen(true)

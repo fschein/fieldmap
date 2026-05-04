@@ -127,8 +127,8 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile menu button - Only for Admins or if on Map page */}
-      {(isAdmin || profile?.role === "supervisor") && (
+      {/* Mobile menu button - Only for Supervisor or if on Map page */}
+      {(profile?.role === "supervisor") && (
         <Button
           variant="ghost"
           size="icon"
@@ -141,7 +141,7 @@ export function Sidebar() {
       )}
 
       {/* Overlay - Only for authorized users on mobile */}
-      {(isAdmin || profile?.role === "supervisor") && mobileOpen && (
+      {(profile?.role === "supervisor") && mobileOpen && (
         <div
           className="fixed inset-0 z-[90] bg-background/80 backdrop-blur-sm md:hidden"
           onClick={closeMobileMenu}
@@ -167,7 +167,7 @@ export function Sidebar() {
                 Field<span className="text-primary">Map</span>
               </span>
             </div>
-            <div className="shrink-0 flex items-center gap-1">
+            <div className="shrink-0 hidden md:flex items-center gap-1">
               <NotificationBell />
               <A11yControls />
             </div>

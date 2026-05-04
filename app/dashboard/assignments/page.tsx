@@ -256,7 +256,7 @@ export default function AssignmentsPage() {
         id: t.id,
         number: t.number || "",
         name: t.name,
-        color: t.color || "#C65D3B",
+        color: t.color || "#044454",
         status,
         activePublisher: activeAssig?.publisherName || null,
         assignedAt: activeAssig?.assigned_at || null,

@@ -5,7 +5,7 @@ import { ptBR } from "date-fns/locale"
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const BRAND   = [198, 93, 59]   as [number, number, number]  // #C65D3B terracotta
+const BRAND   = [4, 68, 84]   as [number, number, number]  // #044454 new brand color
 const DARK    = [30,  30,  30]  as [number, number, number]  // quase preto
 const MUTED   = [120, 120, 120] as [number, number, number]  // cinza médio
 const LIGHT   = [245, 244, 241] as [number, number, number]  // off-white quente

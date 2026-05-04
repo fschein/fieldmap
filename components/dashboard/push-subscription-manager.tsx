@@ -28,14 +28,16 @@ export function PushSubscriptionManager() {
       // Pequeno timeout para não travar se o Service Worker não carregar
       const registration = await Promise.race([
         navigator.serviceWorker.ready,
-        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout SW")), 3000))
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout SW")), 5000))
       ]) as ServiceWorkerRegistration
 
+      console.log("[Push] SW Ready:", registration.scope)
       const sub = await registration.pushManager.getSubscription()
+      console.log("[Push] Current sub:", sub ? "exists" : "none")
       setSubscription(sub)
     } catch (error) {
-      console.warn("Aviso ao verificar inscrição push (pode estar em ambiente de dev):", error)
-      setIsSupported(false) // Desabilita se o SW não estiver pronto
+      console.warn("Erro ao verificar inscrição push:", error)
+      setIsSupported(false)
     } finally {
       setLoading(false)
     }

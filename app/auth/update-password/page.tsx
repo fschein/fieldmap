@@ -92,13 +92,13 @@ export default function UpdatePasswordPage() {
     <div className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-terracotta/10">
-            <Lock className="h-6 w-6 text-terracotta" />
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+            <Lock className="h-6 w-6 text-primary" />
           </div>
           <CardTitle>Crie sua senha definitiva</CardTitle>
           <CardDescription className="text-sm font-medium text-slate-600 mt-2">
             Como este é seu primeiro acesso (ou sua senha foi redefinida), 
-            você <span className="text-terracotta font-bold">precisa criar uma nova senha</span> agora para continuar.
+            você <span className="text-primary font-bold">precisa criar uma nova senha</span> agora para continuar.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -145,7 +145,7 @@ export default function UpdatePasswordPage() {
 
             <Button
               type="submit"
-              className="w-full bg-terracotta hover:bg-terracotta/90"
+              className="w-full bg-primary hover:bg-primary/90"
               disabled={loading}
             >
               {loading ? (

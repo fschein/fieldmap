@@ -36,7 +36,7 @@ export default function SetupPasswordPage() {
   if (!isReady) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
-        <Loader2 className="h-8 w-8 animate-spin text-[#C65D3B]" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <p className="text-muted-foreground animate-pulse font-medium">Validando sua conta...</p>
       </div>
     )
@@ -46,7 +46,7 @@ export default function SetupPasswordPage() {
   if (!profile) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 text-center px-6">
-        <Loader2 className="h-8 w-8 animate-spin text-[#C65D3B]" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
         <h2 className="text-xl font-bold">Quase lá!</h2>
         <p className="text-muted-foreground">Estamos configurando seu perfil pela primeira vez...</p>
       </div>

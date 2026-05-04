@@ -617,7 +617,7 @@ function TerritoryRow({
       {/* Color dot */}
       <span
         className="w-2 h-2 rounded-full shrink-0"
-        style={{ backgroundColor: t.groups?.color || t.color || "#C65D3B" }}
+        style={{ backgroundColor: t.groups?.color || t.color || "#044454" }}
       />
 
       {/* Main text */}

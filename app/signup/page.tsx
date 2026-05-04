@@ -110,7 +110,7 @@ export default function SignupPage() {
             <FieldMapLogoBrand className="h-10 w-10 shrink-0" />
             <CardTitle className="text-4xl font-black tracking-tighter">
               <span className="text-slate-900">Field</span>
-              <span className="text-[#C65D3B]">Map</span>
+              <span className="text-primary">Map</span>
             </CardTitle>
           </div>
           <CardDescription>

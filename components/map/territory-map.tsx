@@ -34,7 +34,7 @@ interface TerritoryMapProps {
 
 const STATUS_COLORS: Record<string, string> = {
   available: "hsl(142, 71%, 45%)",
-  assigned: "hsl(15, 54%, 55%)",
+  assigned: "hsl(192, 60%, 45%)",
   completed: "hsl(215, 16%, 47%)",
 }
 

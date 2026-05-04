@@ -104,7 +104,7 @@ export default function TerritoryMapPage({
 
     if (data) {
       setTerritory(data as TerritoryWithSubdivisions)
-      setTerritoryForm({ name: data.name || "", number: data.number || "", color: data.color || "#C65D3B" })
+      setTerritoryForm({ name: data.name || "", number: data.number || "", color: data.color || "#044454" })
     }
     setLoading(false)
   }
@@ -679,7 +679,7 @@ export default function TerritoryMapPage({
               <div className="space-y-2">
                 <Label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Cor</Label>
                 <div className="flex flex-wrap gap-2">
-                  {["#C65D3B","#2563eb","#16a34a","#d97706","#7c3aed","#db2777","#4b5563"].map(c => (
+                  {["#044454","#2563eb","#16a34a","#d97706","#7c3aed","#db2777","#4b5563"].map(c => (
                     <button key={c} type="button"
                       className={["h-7 w-7 rounded-full border-2 transition-all", territoryForm.color === c ? "border-primary ring-2 ring-primary/20 scale-110" : "border-transparent"].join(" ")}
                       style={{ backgroundColor: c }}

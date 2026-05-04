@@ -25,7 +25,7 @@ export function TerritoryPrintReport({ data, campaignName }: TerritoryPrintRepor
       {/* Ultra Minimal Header */}
       <div className="flex items-center justify-between mb-8 border-b-2 border-slate-900 pb-4">
         <div className="flex items-center gap-3">
-          <FieldMapLogoBrand className="h-10 w-10 text-[#C65D3B]" />
+          <FieldMapLogoBrand className="h-10 w-10 text-primary" />
           <div>
             <h1 className="text-xl font-black uppercase tracking-tighter leading-none text-slate-900">Relatório de Territórios</h1>
             {campaignName && (

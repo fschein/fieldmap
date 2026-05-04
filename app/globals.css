@@ -6,26 +6,26 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #F5F1EB;
-  --foreground: #1F2933;
+  --background: #F8FAFC;
+  --foreground: #0F172A;
   --card: #FFFFFF;
-  --card-foreground: #1F2933;
+  --card-foreground: #0F172A;
   --popover: #FFFFFF;
-  --popover-foreground: #1F2933;
-  --primary: #C65D3B;
+  --popover-foreground: #0F172A;
+  --primary: #044454;
   --primary-foreground: #FFFFFF;
-  --secondary: #EBE5DB;
-  --secondary-foreground: #1F2933;
-  --muted: #EBE5DB;
-  --muted-foreground: #6B7280;
-  --accent: #EBE5DB;
-  --accent-foreground: #1F2933;
+  --secondary: #F1F5F9;
+  --secondary-foreground: #0F172A;
+  --muted: #F1F5F9;
+  --muted-foreground: #64748B;
+  --accent: #F1F5F9;
+  --accent-foreground: #0F172A;
   --destructive: #EF4444;
   --destructive-foreground: #FFFFFF;
-  --border: #E5E0D8;
-  --input: #E5E0D8;
-  --ring: #C65D3B;
-  --chart-1: #C65D3B;
+  --border: #E2E8F0;
+  --input: #E2E8F0;
+  --ring: #044454;
+  --chart-1: #044454;
   --chart-2: #2A9D8F;
   --chart-3: #E9C46A;
   --chart-4: #F4A261;
@@ -34,14 +34,14 @@
   --font-scale: 1;
   
   /* Sidebar Grafite (Dark) mesmo no Light mode */
-  --sidebar: #1F2933;
-  --sidebar-foreground: #F5F1EB;
-  --sidebar-primary: #C65D3B;
+  --sidebar: #0F172A;
+  --sidebar-foreground: #F8FAFC;
+  --sidebar-primary: #044454;
   --sidebar-primary-foreground: #FFFFFF;
-  --sidebar-accent: #374151;
-  --sidebar-accent-foreground: #F5F1EB;
-  --sidebar-border: #374151;
-  --sidebar-ring: #C65D3B;
+  --sidebar-accent: #1E293B;
+  --sidebar-accent-foreground: #F8FAFC;
+  --sidebar-border: #1E293B;
+  --sidebar-ring: #044454;
   --map-filter: none;
 }
 
@@ -52,20 +52,20 @@
   --card-foreground: hsl(210, 20%, 95%);
   --popover: hsl(222, 15%, 12%);
   --popover-foreground: hsl(210, 20%, 95%);
-  --primary: hsl(15, 54%, 55%);
+  --primary: hsl(192, 60%, 45%);
   --primary-foreground: #FFFFFF;
   --secondary: hsl(222, 15%, 18%);
   --secondary-foreground: hsl(210, 20%, 95%);
   --muted: hsl(222, 15%, 18%);
   --muted-foreground: hsl(215, 15%, 65%);
-  --accent: hsl(15, 44%, 20%);
+  --accent: hsl(192, 44%, 20%);
   --accent-foreground: hsl(210, 20%, 95%);
   --destructive: hsl(0, 84%, 60%);
   --destructive-foreground: #FFFFFF;
   --border: hsl(222, 15%, 20%);
   --input: hsl(222, 15%, 20%);
-  --ring: hsl(15, 54%, 55%);
-  --chart-1: hsl(15, 54%, 55%);
+  --ring: hsl(192, 60%, 45%);
+  --chart-1: hsl(192, 60%, 45%);
   --chart-2: #2A9D8F;
   --chart-3: #E9C46A;
   --chart-4: #F4A261;
@@ -73,12 +73,12 @@
   
   --sidebar: hsl(222, 15%, 7%);
   --sidebar-foreground: hsl(210, 20%, 95%);
-  --sidebar-primary: hsl(15, 54%, 55%);
+  --sidebar-primary: hsl(192, 60%, 45%);
   --sidebar-primary-foreground: #FFFFFF;
   --sidebar-accent: hsl(222, 15%, 15%);
   --sidebar-accent-foreground: hsl(210, 20%, 95%);
   --sidebar-border: hsl(222, 15%, 15%);
-  --sidebar-ring: hsl(15, 54%, 55%);
+  --sidebar-ring: hsl(192, 60%, 45%);
   --map-filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
 }
 

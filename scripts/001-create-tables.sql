@@ -24,7 +24,7 @@ CREATE TABLE territories (
   number TEXT,
   name TEXT NOT NULL,
   description TEXT,
-  color TEXT DEFAULT '#C65D3B',
+  color TEXT DEFAULT '#044454',
   status TEXT DEFAULT 'available' CHECK (status IN ('available', 'assigned', 'completed', 'inactive')),
   assigned_to UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   campaign_id UUID REFERENCES public.campaigns(id) ON DELETE SET NULL,

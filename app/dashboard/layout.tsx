@@ -13,7 +13,7 @@ import { BottomNav } from "@/components/layout/bottom-nav"
 import { SettingsProvider } from "@/providers/settings-provider"
 import { GlobalHeader } from "@/components/layout/global-header"
 
-const BOTTOM_NAV_ROLES = ["dirigente", "publicador", "supervisor"]
+const BOTTOM_NAV_ROLES = ["dirigente", "publicador", "supervisor", "admin"]
 
 export default function DashboardLayout({
   children,

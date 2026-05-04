@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS public.territories (
   number TEXT,
   name TEXT NOT NULL,
   description TEXT,
-  color TEXT DEFAULT '#C65D3B',
+  color TEXT DEFAULT '#044454',
   status TEXT DEFAULT 'available' CHECK (status IN ('available', 'assigned', 'completed', 'inactive')),
   assigned_to UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   group_id UUID REFERENCES public.groups(id) ON DELETE SET NULL,
