@@ -340,7 +340,7 @@ export default function TerritoryMapPage() {
   }
 
   return (
-    <div className="flex flex-col bg-background overflow-hidden relative" style={{ height: '100dvh' }}>
+    <div className="flex flex-col bg-background overflow-hidden relative h-[calc(100dvh-4rem)] md:h-[100dvh]">
       {/* Header Fixo Sólido (Mobile) / Flutuante (Desktop) */}
       <div className="absolute top-0 left-0 right-0 h-16 z-[40] bg-card/95 backdrop-blur-sm shadow-sm flex items-center justify-between px-2 md:relative md:h-auto md:bg-transparent md:shadow-none md:px-4 md:pt-4">
         <div className="flex items-center gap-2 overflow-hidden">
@@ -373,7 +373,7 @@ export default function TerritoryMapPage() {
 
       <div className="flex flex-col flex-1 min-h-0 pt-16 md:pt-4 relative w-full">
         {/* Mapa */}
-        <div className={`flex-1 min-h-0 shrink-0 border-y-0 md:border md:rounded-xl overflow-hidden shadow-sm relative z-0 ${pinMode ? 'border-destructive ring-inset ring-4 ring-destructive/30 cursor-crosshair' : 'border-border'}`}>
+        <div className={`flex-1 min-h-0 border-y-0 md:border md:rounded-xl overflow-hidden shadow-sm relative z-0 ${pinMode ? 'border-destructive ring-inset ring-4 ring-destructive/30 cursor-crosshair' : 'border-border'}`}>
           <TerritoryMapViewer
             territory={territory}
             onSubdivisionClick={handleSubdivisionClick}
