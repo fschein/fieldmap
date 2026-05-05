@@ -38,7 +38,7 @@ export function BottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
     }
 
     return (
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border safe-area-pb md:hidden shadow-[0_-1px_10px_rgba(0,0,0,0.1)] dark:shadow-[0_-1px_10px_rgba(0,0,0,0.5)]">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-t border-border/50 safe-area-pb md:hidden shadow-[0_-1px_10px_rgba(0,0,0,0.05)]">
         <div className="flex h-16">
           {adminMainItems.map((item) => {
             const active = isActive(item.href)
@@ -134,7 +134,7 @@ export function BottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
   navItems.push({ label: "Perfil", href: "/dashboard/profile", icon: User })
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border safe-area-pb md:hidden shadow-[0_-1px_10px_rgba(0,0,0,0.1)] dark:shadow-[0_-1px_10px_rgba(0,0,0,0.5)]">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-t border-border/50 safe-area-pb md:hidden shadow-[0_-1px_10px_rgba(0,0,0,0.05)]">
       <div className="flex h-16">
         {navItems.map((item) => {
           const active = isActive(item.href)

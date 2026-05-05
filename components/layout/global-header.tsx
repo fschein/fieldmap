@@ -15,7 +15,7 @@ export function GlobalHeader() {
   // if (isMapPage) return null // Comentado para permitir que o header apareça no mapa conforme solicitado
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-40 h-16 bg-card/80 backdrop-blur-md border-b md:hidden flex items-center justify-between px-4">
+    <header className="fixed top-0 left-0 right-0 z-40 h-16 bg-background/80 backdrop-blur-lg border-b border-border/50 md:hidden flex items-center justify-between px-4">
       <div className={cn("flex items-center gap-2", profile?.role === "supervisor" ? "ml-12" : "")}>
         <FieldMapLogoBrand className="h-7 w-auto opacity-90" />
         <span className="font-bold text-foreground tracking-tight text-lg">
