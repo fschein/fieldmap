@@ -118,12 +118,12 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
     -webkit-user-select: none;
     user-select: none;
     -webkit-touch-callout: none;
+  }
+  body {
+    @apply bg-background text-foreground;
   }
   input,
   textarea,
