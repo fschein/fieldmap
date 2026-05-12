@@ -1,54 +1,57 @@
 "use client"
 
 import { useEffect } from "react"
+import { toast } from "sonner"
 
-/**
- * PWAMonitor — detecta SW travado de forma cirúrgica.
- *
- * Estratégia:
- * - Escuta o evento "controllerchange" para saber quando um novo SW assumiu
- *   e recarrega a página nesse momento (evita estado misto).
- * - Escuta "online" para forçar update do SW quando o dispositivo volta
- *   a ter rede — resolve o caso de app aberto offline por muito tempo.
- * - NÃO usa timer fixo de 15s (causava updates desnecessários em toda sessão).
- * - NÃO recarrega a página sozinho sem motivo real.
- */
+function showUpdateToast(registration: ServiceWorkerRegistration) {
+  toast("Nova versão disponível", {
+    description: "Atualize para ter as últimas melhorias.",
+    duration: Infinity,
+    action: {
+      label: "Atualizar agora",
+      onClick: () => {
+        registration.waiting?.postMessage({ type: "SKIP_WAITING" })
+      },
+    },
+  })
+}
+
 export function PWAMonitor() {
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return
 
     const handleControllerChange = () => {
-      // Um novo SW assumiu o controle — recarregar garante que o app
-      // está usando os assets da versão nova, sem estado misto.
-      console.log("[PWA] Novo service worker ativo, recarregando...")
       window.location.reload()
     }
 
     const handleOnline = async () => {
-      // Voltou a ter rede — verifica se há atualização do SW pendente
       try {
         const registration = await navigator.serviceWorker.getRegistration()
-        if (registration) {
-          await registration.update()
-          // Se houver worker esperando (baixado enquanto offline), ativa agora
-          if (registration.waiting) {
-            registration.waiting.postMessage({ type: "SKIP_WAITING" })
-          }
-        }
-      } catch (err) {
-        console.warn("[PWA] Erro ao atualizar SW após reconexão:", err)
+        if (registration) await registration.update()
+      } catch {
+        // silencioso
       }
     }
 
     navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange)
     window.addEventListener("online", handleOnline)
 
-    // Ao montar: se já há um SW esperando (sessão antiga aberta),
-    // ativa imediatamente em vez de deixar em estado misto indefinidamente
     navigator.serviceWorker.getRegistration().then((registration) => {
-      if (registration?.waiting) {
-        registration.waiting.postMessage({ type: "SKIP_WAITING" })
+      if (!registration) return
+
+      if (registration.waiting) {
+        showUpdateToast(registration)
       }
+
+      registration.addEventListener("updatefound", () => {
+        const newWorker = registration.installing
+        if (!newWorker) return
+        newWorker.addEventListener("statechange", () => {
+          if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+            showUpdateToast(registration)
+          }
+        })
+      })
     })
 
     return () => {

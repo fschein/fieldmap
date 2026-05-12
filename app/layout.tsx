@@ -4,6 +4,7 @@ import "./globals.css"
 import { AuthProvider } from "@/providers/auth-provider"
 import { PWAMonitor } from "@/components/providers/pwa-monitor"
 import { NoSelect } from "@/components/providers/no-select"
+import { Toaster } from "sonner"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -43,6 +44,7 @@ export default function RootLayout({
           <NoSelect />
           <PWAMonitor />
           {children}
+          <Toaster position="top-center" richColors />
         </AuthProvider>
       </body>
     </html>
