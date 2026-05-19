@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { useAuth } from "@/hooks/use-auth"
 import { Loader2, MapPin, Clock } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, fmtTerritoryNumber } from "@/lib/utils"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
 
@@ -139,14 +139,15 @@ export function MobileTerritoriesView() {
                   key={t.id}
                   onClick={() => router.push(`/dashboard/my-assignments/${t.id}/map`)}
                   className={cn(
-                    "bg-card p-4 rounded-xl mx-0 space-y-3 shadow-sm border transition-all active:scale-[0.98] cursor-pointer",
+                    "bg-card rounded-xl mx-0 shadow-sm border transition-all active:scale-[0.98] cursor-pointer flex items-stretch overflow-hidden",
                     isOverdue ? "border-destructive/20 bg-destructive/5" : "border-border"
                   )}
                 >
+                  <div className="w-1 shrink-0 self-stretch rounded-full my-3 ml-3" style={{ backgroundColor: t.color || 'hsl(var(--primary))' }} />
+                  <div className="flex-1 p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-2.5 h-2.5 rounded-full shadow-inner" style={{ backgroundColor: t.color || 'hsl(var(--primary))' }} />
-                      <span className="font-extrabold text-foreground text-base">Território {t.number}</span>
+                      <span className="font-extrabold text-foreground text-base">{fmtTerritoryNumber(t.number)}</span>
                     </div>
                     <div className={cn(
                       "text-[0.625rem] font-black px-2 py-0.5 rounded-full border",
@@ -160,6 +161,7 @@ export function MobileTerritoriesView() {
                       className={cn("h-full transition-all rounded-full", progress > 60 ? "bg-emerald-500" : "bg-destructive")}
                       style={{ width: `${progress}%` }}
                     />
+                  </div>
                   </div>
                 </div>
               )
@@ -182,11 +184,12 @@ export function MobileTerritoriesView() {
                 const progress = h.final_progress ?? (isCompleted ? 100 : 0)
 
                 return (
-                  <div key={h.id} className="p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
+                  <div key={h.id} className="flex items-stretch hover:bg-muted/30 transition-colors overflow-hidden">
+                    <div className="w-1 shrink-0 my-3 ml-3 rounded-full" style={{ backgroundColor: h.territory?.color || 'hsl(var(--muted-foreground))' }} />
+                    <div className="flex flex-1 items-center justify-between gap-3 p-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-muted" />
                       <div className="space-y-0.5">
-                        <p className="font-bold text-foreground text-[0.9375rem]">Território {h.territory?.number}</p>
+                        <p className="font-bold text-foreground text-[0.9375rem]">{fmtTerritoryNumber(h.territory?.number)}</p>
                         <p className="text-[0.8125rem] text-muted-foreground font-bold uppercase tracking-tight">
                           {isCompleted ? 'Concluído' : 'Devolvido'} • {date ? format(new Date(date), "MMM yyyy", { locale: ptBR }) : '-'}
                         </p>
@@ -199,6 +202,7 @@ export function MobileTerritoriesView() {
                         : "bg-primary/10 text-primary border-primary/20"
                     )}>
                       {progress}%
+                    </div>
                     </div>
                   </div>
                 )

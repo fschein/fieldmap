@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { useAuth } from "@/hooks/use-auth"
-import { cn } from "@/lib/utils"
+import { cn, fmtTerritoryNumber } from "@/lib/utils"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -284,31 +284,40 @@ export default function DashboardPage() {
               Nenhum território em campo
             </div>
           ) : (
-            territories.filter(t => t.isActive).map((territory) => {
+            territories.filter(t => t.isActive).sort((a, b) => {
+              const subsA = a.subdivisions || []
+              const subsB = b.subdivisions || []
+              const progressA = subsA.length > 0 ? subsA.filter((s: any) => s.completed || s.status === 'completed').length / subsA.length : 0
+              const progressB = subsB.length > 0 ? subsB.filter((s: any) => s.completed || s.status === 'completed').length / subsB.length : 0
+              return progressB - progressA
+            }).map((territory) => {
               const subs = territory.subdivisions || []
               const progress = subs.length > 0 ? Math.round((subs.filter((s: any) => s.completed || s.status === 'completed').length / subs.length) * 100) : 0
               return (
-                <div key={territory.id} className="flex flex-col gap-2.5 px-4 py-3.5 hover:bg-muted/5 transition-colors">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="h-8 w-8 rounded-full bg-muted border border-border flex items-center justify-center text-[0.625rem] font-black text-muted-foreground shrink-0">
-                        {getInitials(territory.name)}
-                      </div>
+                <div key={territory.id} className="flex items-stretch hover:bg-muted/5 transition-colors overflow-hidden">
+                  <div className="w-1 shrink-0 my-3 ml-4 rounded-full" style={{ backgroundColor: territory.color || 'hsl(var(--primary))' }} />
+                  <div className="flex-1 px-3 py-3.5 flex flex-col gap-2.5 min-w-0">
+                    <div className="flex items-center justify-between gap-3">
                       <div className="flex flex-col min-w-0">
-                        <h4 className="text-[0.8125rem] font-bold text-foreground leading-tight truncate">{territory.name}</h4>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="text-[0.625rem] font-mono font-semibold text-muted-foreground shrink-0">
+                            {fmtTerritoryNumber(territory.number)}
+                          </span>
+                          <h4 className="text-[0.8125rem] font-bold text-foreground leading-tight truncate">{territory.name}</h4>
+                        </div>
                         <span className="text-[0.6875rem] font-medium text-muted-foreground/80 uppercase tracking-wide truncate">
                           {territory.activeAssignee || "Ativo"}
                         </span>
                       </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-[0.6875rem] font-bold text-muted-foreground/60 whitespace-nowrap">
+                          {territory.daysInField}d · {progress}%
+                        </span>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-[0.6875rem] font-bold text-muted-foreground/60 whitespace-nowrap">
-                        {territory.daysInField}d · {progress}%
-                      </span>
+                    <div className="h-[2px] w-full bg-muted/60 rounded-full overflow-hidden">
+                      <div className="h-full bg-primary/60 transition-all duration-700" style={{ width: `${progress}%` }} />
                     </div>
-                  </div>
-                  <div className="h-[2px] w-full bg-muted/60 rounded-full overflow-hidden">
-                    <div className="h-full bg-primary/60 transition-all duration-700" style={{ width: `${progress}%` }} />
                   </div>
                 </div>
               )

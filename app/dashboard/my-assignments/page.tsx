@@ -10,7 +10,7 @@ import { Loader2, MapPin, ChevronRight } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { TerritoryWithSubdivisions, Subdivision } from "@/lib/types"
 import { toast } from "sonner"
-import { cn } from "@/lib/utils"
+import { cn, fmtTerritoryNumber } from "@/lib/utils"
 import { format, parseISO, isToday, isTomorrow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { ClipboardList, CalendarDays, Calendar } from "lucide-react"
@@ -283,14 +283,15 @@ export default function MyAssignmentsPage() {
                   key={t.id}
                   onClick={() => router.push(`/dashboard/my-assignments/${t.id}/map`)}
                   className={cn(
-                    "w-full text-left bg-card rounded-xl border px-3 py-2.5 transition-all active:scale-[0.98] space-y-1.5",
+                    "w-full text-left bg-card rounded-xl border transition-all active:scale-[0.98] flex items-stretch overflow-hidden",
                     isOverdue ? "border-destructive/50" : "border-border hover:border-primary/30"
                   )}
                 >
+                  <div className="w-1 shrink-0 self-stretch my-2.5 ml-2.5 rounded-full" style={{ backgroundColor: t.color || "var(--primary)" }} />
+                  <div className="flex-1 px-3 py-2.5 space-y-1.5">
                   <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: t.color || "var(--primary)" }} />
                     <span className="text-sm font-medium text-foreground flex-1 truncate">
-                      Território {t.number}
+                      {fmtTerritoryNumber(t.number)}
                       {t.name && <span className="font-normal text-muted-foreground"> · {t.name}</span>}
                     </span>
                     <span className={cn("text-[0.6875rem] font-medium px-2 py-0.5 rounded-full", badgeClass)}>
@@ -317,6 +318,7 @@ export default function MyAssignmentsPage() {
                         {campaignName}
                       </span>
                     )}
+                  </div>
                   </div>
                 </button>
               )

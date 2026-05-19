@@ -7,7 +7,7 @@ import { createTimeoutSignal } from "@/lib/utils/api-utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { cn } from "@/lib/utils"
+import { cn, fmtTerritoryNumber } from "@/lib/utils"
 import {
   Dialog,
   DialogContent,
@@ -386,42 +386,22 @@ export function AdminTerritoriesView() {
     const territory = p.territory
     const isLivre = !territory.assigned_to
 
-    // Borda lateral e cor do texto baseadas na prioridade
-    let borderColor = "border-border"
-    let daysColor = "text-muted-foreground"
-    if (isLivre) {
-      if (p.daysInactive >= 30) {
-        borderColor = "border-l-4 border-red-500"
-        daysColor = "text-red-500"
-      } else if (p.daysInactive >= 10) {
-        borderColor = "border-l-4 border-yellow-400"
-        daysColor = "text-yellow-600"
-      } else {
-        borderColor = "border-l-4 border-border"
-      }
-    }
+    const barColor = territory.group?.color ||
+      (isLivre && p.daysInactive >= 30 ? '#ef4444' :
+       isLivre && p.daysInactive >= 10 ? '#eab308' :
+       'hsl(var(--border))')
 
     return (
       <div
         onClick={() => router.push(`/dashboard/territories/${territory.id}/map`)}
-        className={cn(
-          "bg-card p-4 rounded-xl border shadow-sm transition-all active:scale-[0.98] cursor-pointer hover:shadow-md flex items-center justify-between gap-4 overflow-hidden",
-          borderColor
-        )}
+        className="bg-card p-4 rounded-xl border shadow-sm transition-all active:scale-[0.98] cursor-pointer hover:shadow-md flex items-center gap-3 overflow-hidden"
       >
+        <div className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: barColor }} />
+
         <div className="flex-1 min-w-0 flex flex-col justify-center">
           <div className="flex items-center gap-2 mb-1 w-full min-w-0">
-            {territory.group ? (
-              <span
-                className="w-2.5 h-2.5 rounded-full shrink-0 shadow-inner"
-                style={{ backgroundColor: territory.group.color }}
-                title={`Grupo: ${territory.group.name}`}
-              />
-            ) : (
-              <span className="w-2.5 h-2.5 rounded-full shrink-0 border border-dashed border-border" />
-            )}
-            <span className="text-xs font-mono font-semibold text-muted-foreground mr-1 shrink-0">
-              [#{territory.number}]
+            <span className="text-xs font-mono font-semibold text-muted-foreground shrink-0">
+              {fmtTerritoryNumber(territory.number)}
             </span>
             <h3 className="font-bold text-foreground truncate text-sm flex-1 min-w-0">
               {territory.name || "Sem nome"}
@@ -440,7 +420,7 @@ export function AdminTerritoriesView() {
                     LIVRE
                   </span>
                 )}
-                <span className={cn("font-bold text-xs flex items-center gap-1", daysColor)}>
+                <span className="text-muted-foreground text-xs font-medium">
                   há {p.daysInactive}d
                 </span>
               </div>
@@ -449,7 +429,7 @@ export function AdminTerritoriesView() {
                 <span className="bg-primary/10 text-primary text-[0.625rem] font-black px-2 py-0.5 rounded-full uppercase tracking-tight border border-primary/20 truncate max-w-[90px]">
                   {territory.assigned_to_user?.name?.split(' ')[0]}
                 </span>
-                <span className="font-bold text-muted-foreground text-xs flex items-center gap-1">
+                <span className="text-muted-foreground text-xs font-medium">
                   há {p.daysAssigned}d
                 </span>
               </div>

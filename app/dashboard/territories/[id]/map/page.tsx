@@ -329,35 +329,26 @@ export default function TerritoryMapPage({
 
         <div className="h-4 w-px bg-border shrink-0" />
 
-        {/* Dot colorido + número + nome */}
+        {/* Número + nome */}
         <div className="flex items-center gap-1.5 flex-1 min-w-0">
-          <div
-            className="h-6 w-6 rounded-md shrink-0 flex items-center justify-center text-white font-bold text-[10px]"
-            style={{ backgroundColor: territory.color }}
+          <span className="text-[11px] font-mono text-muted-foreground shrink-0">
+            {(() => { const s = String(territory.number); return /^\d+$/.test(s) ? `R-${s.padStart(2,'0')}` : s })()}
+          </span>
+          <span className="text-[13px] font-semibold text-foreground truncate">
+            {territory.name}
+          </span>
+          <button
+            onClick={() => setEditTerritoryDialogOpen(true)}
+            className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
-            {territory.number.slice(0, 2)}
-          </div>
-          <div className="min-w-0 flex items-center gap-1">
-            <span className="text-[11px] font-mono text-muted-foreground shrink-0 hidden sm:inline">
-              T-{territory.number}
-            </span>
-            <span className="text-[13px] font-semibold text-foreground truncate">
-              {territory.name}
-            </span>
-            {/* Editar território */}
-            <button
-              onClick={() => setEditTerritoryDialogOpen(true)}
-              className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            >
-              <Pencil className="h-3 w-3" />
-            </button>
-          </div>
+            <Pencil className="h-3 w-3" />
+          </button>
         </div>
 
         {/* Progresso compacto — sempre visível */}
         <div className="flex items-center gap-1.5 shrink-0">
           <span className="text-[11px] font-medium text-foreground tabular-nums">
-            {stats.completed}/{stats.total}
+            {stats.completed}/{stats.total} quadras
           </span>
           <div className="h-1.5 w-14 bg-muted rounded-full overflow-hidden">
             <div
