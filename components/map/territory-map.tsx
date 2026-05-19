@@ -61,6 +61,14 @@ export function TerritoryMap({
   const hasInitialFitRef = useRef(false)
   const [isEditing, setIsEditing] = useState(false)
   const [selectedSubdivisionId, setSelectedSubdivisionId] = useState<string | null>(null)
+  const [instructionsOpen, setInstructionsOpen] = useState(false)
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const seen = localStorage.getItem('map-instructions-seen')
+    setInstructionsOpen(!seen)
+    if (!seen) localStorage.setItem('map-instructions-seen', '1')
+  }, [])
 
   const cbRef = useRef({ onSubdivisionCreate, onSubdivisionUpdate, onSubdivisionDelete, onMapClick, territoryColor: territory.color })
   useEffect(() => {
@@ -252,13 +260,32 @@ export function TerritoryMap({
       <div ref={mapRef} className="h-full w-full bg-background" style={{ zIndex: 1 }} />
 
       {editable && (
-        <div className="absolute bottom-4 left-4 z-10 rounded-xl bg-card/95 backdrop-blur-sm p-3 shadow-lg border border-border pointer-events-none sm:pointer-events-auto max-w-[200px]">
-          <p className="text-[11px] font-semibold text-foreground mb-1">Instruções</p>
-          <ul className="text-[10px] text-muted-foreground space-y-0.5 font-medium leading-relaxed">
-            <li>· Polígono (topo dir.) para novas quadras</li>
-            <li>· Clique na quadra para selecioná-la</li>
-            <li>· Aba "Não visitar" para restrições</li>
-          </ul>
+        <div className="absolute bottom-4 left-4 z-10">
+          {instructionsOpen ? (
+            <div className="rounded-xl bg-card/95 backdrop-blur-sm p-3 shadow-lg border border-border pointer-events-auto max-w-[200px]">
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[11px] font-semibold text-foreground">Instruções</p>
+                <button
+                  onClick={() => setInstructionsOpen(false)}
+                  className="text-muted-foreground hover:text-foreground ml-2 leading-none"
+                >
+                  <span className="text-[13px]">×</span>
+                </button>
+              </div>
+              <ul className="text-[10px] text-muted-foreground space-y-0.5 font-medium leading-relaxed">
+                <li>· Polígono (topo dir.) para novas quadras</li>
+                <li>· Clique na quadra para selecioná-la</li>
+                <li>· Aba "Não visitar" para restrições</li>
+              </ul>
+            </div>
+          ) : (
+            <button
+              onClick={() => setInstructionsOpen(true)}
+              className="w-7 h-7 rounded-full bg-card/95 backdrop-blur-sm shadow-lg border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-card transition-colors pointer-events-auto"
+            >
+              <span className="text-[11px] font-bold">?</span>
+            </button>
+          )}
         </div>
       )}
 
