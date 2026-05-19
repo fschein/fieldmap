@@ -106,7 +106,7 @@ export default function DashboardLayout({
         {!isSetupPage && <GlobalHeader />}
         {showSidebar && <Sidebar />}
         <main className={cn(
-          showSidebar ? "md:ml-64" : "",
+          showSidebar ? "md:ml-56" : "",
           showBottomNav && "pb-16 md:pb-0"
         )}>
           <div className={cn(
