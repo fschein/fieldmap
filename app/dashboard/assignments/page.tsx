@@ -25,7 +25,7 @@ import {
   Download, History, AlertTriangle, Plus, User, Calendar, Clock,
   CheckSquare, Filter, MapPin
 } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, fmtTerritoryNumber } from "@/lib/utils"
 
 type SortOption = "number" | "days_desc" | "days_asc" | "assigned_desc" | "assigned_asc" | "last_completed_asc" | "last_completed_desc"
 type StatusFilter = "all" | "active" | "available" | "overdue" | "completed"
@@ -369,9 +369,38 @@ export default function AssignmentsPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-[1.375rem] font-semibold tracking-tight text-foreground">Designações</h1>
-            <p className="text-xs text-muted-foreground font-medium mt-1">
-              {inFieldTotal} em campo · {counts.overdue > 0 && <span className="text-red-500 font-bold">{counts.overdue} atrasados · </span>}{counts.available} devolvidos · {counts.completed} livres
-            </p>
+            {counts.all > 0 && (
+              <div className="mt-2 space-y-1.5">
+                <div className="flex h-1.5 rounded-full overflow-hidden gap-px w-48">
+                  {inFieldTotal > 0 && (
+                    <div className="bg-primary rounded-full" style={{ width: `${(inFieldTotal / counts.all) * 100}%` }} />
+                  )}
+                  {counts.available > 0 && (
+                    <div className="bg-amber-400 rounded-full" style={{ width: `${(counts.available / counts.all) * 100}%` }} />
+                  )}
+                  {counts.completed > 0 && (
+                    <div className="bg-emerald-500 rounded-full" style={{ width: `${(counts.completed / counts.all) * 100}%` }} />
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[0.625rem] font-medium flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
+                    <span className="font-bold text-foreground">{inFieldTotal}</span>
+                    <span className="text-muted-foreground">em campo</span>
+                  </span>
+                  <span className="text-[0.625rem] font-medium flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+                    <span className="font-bold text-foreground">{counts.available}</span>
+                    <span className="text-muted-foreground">devolvidos</span>
+                  </span>
+                  <span className="text-[0.625rem] font-medium flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
+                    <span className="font-bold text-foreground">{counts.completed}</span>
+                    <span className="text-muted-foreground">livres</span>
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex gap-2">
             {canManage && (
@@ -570,12 +599,11 @@ export default function AssignmentsPage() {
                   >
                     <TableCell className="py-2.5 text-xs font-bold text-foreground whitespace-nowrap">
                       <span className="flex items-center gap-1.5">
-                        {t.groupColor ? (
-                          <span className="w-2 h-2 rounded-full print:hidden" style={{ backgroundColor: t.groupColor }} />
-                        ) : (
-                          <span className="w-2 h-2 rounded-full border border-dashed border-border print:hidden" />
-                        )}
-                        {t.number}
+                        <span
+                          className="w-1 h-4 rounded-full shrink-0 print:hidden"
+                          style={{ backgroundColor: t.groupColor || 'hsl(var(--border))' }}
+                        />
+                        {fmtTerritoryNumber(t.number)}
                       </span>
                     </TableCell>
                     <TableCell className="py-2.5 text-sm font-medium text-foreground whitespace-nowrap">
@@ -607,12 +635,14 @@ export default function AssignmentsPage() {
                       )}
                     </TableCell>
                     <TableCell className="py-2.5 whitespace-nowrap">
-                      <span className={`
-                        text-[0.625rem] px-2 py-0.5 rounded-full uppercase font-medium border
-                        ${STATUS_CLASS[t.status] || 'bg-slate-100 text-slate-500'}
-                      `}>
-                        {STATUS_LABELS[t.status] || t.status}
-                      </span>
+                      {(statusFilter === 'all' || (statusFilter === 'active' && t.status === 'overdue')) && (
+                        <span className={`
+                          text-[0.625rem] px-2 py-0.5 rounded-full uppercase font-medium border
+                          ${STATUS_CLASS[t.status] || 'bg-slate-100 text-slate-500'}
+                        `}>
+                          {STATUS_LABELS[t.status] || t.status}
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="py-2.5 text-center font-bold text-foreground border-l border-border print:border-slate-300">
                       {t.completionsInPeriod} {t.completionsInPeriod === 1 ? 'vez' : 'vezes'}
@@ -665,15 +695,17 @@ export default function AssignmentsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2 mb-0.5">
                     <p className="font-bold text-sm text-foreground truncate">{t.name}</p>
-                    <Badge
-                      variant="outline"
-                      className={cn("text-[0.5625rem] px-1.5 py-0 h-4 uppercase flex-shrink-0 font-black", STATUS_CLASS[t.status])}
-                    >
-                      {STATUS_LABELS[t.status]}
-                    </Badge>
+                    {(statusFilter === 'all' || (statusFilter === 'active' && t.status === 'overdue')) && (
+                      <Badge
+                        variant="outline"
+                        className={cn("text-[0.5625rem] px-1.5 py-0 h-4 uppercase flex-shrink-0 font-black", STATUS_CLASS[t.status])}
+                      >
+                        {STATUS_LABELS[t.status]}
+                      </Badge>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span className="font-mono opacity-60">#{t.number}</span>
+                    <span className="font-mono opacity-60">{fmtTerritoryNumber(t.number)}</span>
                     {t.activePublisher ? (
                       <span className="flex items-center gap-1 min-w-0">
                         <User className="w-3 h-3 flex-shrink-0" />
