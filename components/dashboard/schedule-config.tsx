@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, Trash2, Users, Clock, CalendarDays, ChevronRight } from "lucide-react"
+import { Plus, Trash2, Users, Clock, CalendarDays, ChevronRight, Pencil } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -36,6 +36,10 @@ export function ScheduleConfig() {
   const [newArr, setNewArr] = useState({
     weekday: "1", start_time: "09:00", label: "Saída de Campo",
   })
+
+  // Edit dialog
+  const [isEditing, setIsEditing] = useState(false)
+  const [editArr, setEditArr] = useState<any>(null)
 
   // Leaders dialog
   const [isAssigning, setIsAssigning] = useState(false)
@@ -82,6 +86,21 @@ export function ScheduleConfig() {
     })
     if (error) toast.error("Erro ao criar arranjo")
     else { toast.success("Arranjo criado"); setIsAdding(false); fetchData() }
+  }
+
+  function openEdit(arr: any) {
+    setEditArr({ ...arr, weekday: String(arr.weekday), start_time: arr.start_time.substring(0, 5) })
+    setIsEditing(true)
+  }
+
+  async function handleUpdate() {
+    const { error } = await supabase.from("schedule_arrangements").update({
+      weekday: parseInt(editArr.weekday),
+      start_time: editArr.start_time,
+      label: editArr.label,
+    }).eq("id", editArr.id)
+    if (error) toast.error("Erro ao atualizar arranjo")
+    else { toast.success("Arranjo atualizado"); setIsEditing(false); fetchData() }
   }
 
   async function handleDelete(id: string) {
@@ -147,6 +166,7 @@ export function ScheduleConfig() {
             <ArrangementCard
               key={arr.id}
               arr={arr}
+              onEdit={() => openEdit(arr)}
               onDelete={() => handleDelete(arr.id)}
               onManageLeaders={() => fetchLeadersForArr(arr)}
             />
@@ -214,6 +234,74 @@ export function ScheduleConfig() {
               Cancelar
             </Button>
             <Button onClick={handleAdd} className="h-9 text-sm">
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit dialog ── */}
+      <Dialog open={isEditing} onOpenChange={setIsEditing}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold">Editar arranjo</DialogTitle>
+            <DialogDescription className="text-[0.8125rem]">
+              Altere o dia, horário ou descrição do arranjo.
+            </DialogDescription>
+          </DialogHeader>
+
+          {editArr && (
+            <div className="space-y-3 py-2">
+              <div className="space-y-1.5">
+                <Label className="text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Dia da semana
+                </Label>
+                <Select
+                  value={editArr.weekday}
+                  onValueChange={(val) => setEditArr({ ...editArr, weekday: val })}
+                >
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WEEKDAYS.map((day, idx) => (
+                      <SelectItem key={idx} value={idx.toString()} className="text-sm">{day}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Horário
+                </Label>
+                <Input
+                  type="time"
+                  value={editArr.start_time}
+                  onChange={(e) => setEditArr({ ...editArr, start_time: e.target.value })}
+                  className="h-9 text-sm"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-[0.6875rem] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Descrição
+                </Label>
+                <Input
+                  placeholder="Ex: Saída de Campo, Meio de Semana"
+                  value={editArr.label}
+                  onChange={(e) => setEditArr({ ...editArr, label: e.target.value })}
+                  className="h-9 text-sm"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" onClick={() => setIsEditing(false)} className="h-9 text-sm">
+              Cancelar
+            </Button>
+            <Button onClick={handleUpdate} className="h-9 text-sm">
               Salvar
             </Button>
           </DialogFooter>
@@ -345,9 +433,10 @@ export function ScheduleConfig() {
 // ─── ArrangementCard ──────────────────────────────────────────────────────────
 
 function ArrangementCard({
-  arr, onDelete, onManageLeaders,
+  arr, onEdit, onDelete, onManageLeaders,
 }: {
   arr: any
+  onEdit: () => void
   onDelete: () => void
   onManageLeaders: () => void
 }) {
@@ -371,15 +460,20 @@ function ArrangementCard({
             Grupo
           </span>
         )}
-        <button
-          onClick={onDelete}
-          className={cn(
-            "w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/8 transition-colors shrink-0",
-            isGroup ? "" : "ml-auto"
-          )}
-        >
-          <Trash2 className="w-3 h-3" />
-        </button>
+        <div className={cn("flex items-center gap-1 shrink-0", isGroup ? "" : "ml-auto")}>
+          <button
+            onClick={onEdit}
+            className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <Pencil className="w-3 h-3" />
+          </button>
+          <button
+            onClick={onDelete}
+            className="w-6 h-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/8 transition-colors"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </div>
       </div>
 
       {/* Body */}
