@@ -6,18 +6,9 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { createTimeoutSignal } from "@/lib/utils/api-utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { cn, fmtTerritoryNumber } from "@/lib/utils"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle
-} from "@/components/ui/dialog"
-import { Switch } from "@/components/ui/switch"
 import { AssignmentCreateModal } from "@/components/dashboard/assignment-create-modal"
+import { TerritoryFormModal } from "@/components/dashboard/territory-form-modal"
 import {
   Plus,
   Map,
@@ -40,6 +31,7 @@ interface TerritoryWithDetails {
   number: string
   name: string
   type: string
+  subtype?: string | null
   color: string
   status?: string
   description?: string
@@ -247,12 +239,6 @@ export function AdminTerritoriesView() {
   // Edit Territory Dialog
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editingTerritory, setEditingTerritory] = useState<TerritoryWithDetails | null>(null)
-  const [editName, setEditName] = useState("")
-  const [editNumber, setEditNumber] = useState("")
-  const [editColor, setEditColor] = useState("")
-  const [editGroupId, setEditGroupId] = useState<string | null>(null)
-  const [editInactive, setEditInactive] = useState(false)
-  const [editSaving, setEditSaving] = useState(false)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -323,61 +309,11 @@ export function AdminTerritoriesView() {
 
   const handleOpenEdit = (territory: TerritoryWithDetails) => {
     setEditingTerritory(territory)
-    setEditName(territory.name)
-    setEditNumber(territory.number)
-    setEditColor(territory.color || "#044454")
-    setEditGroupId(territory.group?.id || null)
-    setEditInactive(territory.status === 'inactive')
     setEditDialogOpen(true)
-  }
-
-  const handleSaveEdit = async () => {
-    setEditSaving(true)
-    const newStatus = editInactive ? 'inactive' : 'available'
-
-    try {
-      if (editingTerritory) {
-        // UPDATE
-        const { error } = await supabase
-          .from("territories")
-          .update({
-            name: editName,
-            number: editNumber,
-            group_id: editGroupId,
-            status: newStatus,
-            assigned_to: editInactive ? null : editingTerritory.assigned_to,
-          })
-          .eq("id", editingTerritory.id)
-        if (error) throw error
-      } else {
-        // INSERT
-        const { error } = await supabase
-          .from("territories")
-          .insert({
-            name: editName,
-            number: editNumber,
-            group_id: editGroupId,
-            status: 'available',
-            color: '#044454'
-          })
-        if (error) throw error
-      }
-      setEditDialogOpen(false)
-      loadData()
-    } catch (e: any) {
-      alert("Erro ao salvar: " + e.message)
-    } finally {
-      setEditSaving(false)
-    }
   }
 
   const handleOpenCreate = () => {
     setEditingTerritory(null)
-    setEditName("")
-    setEditNumber("")
-    setEditColor("#044454")
-    setEditGroupId(null)
-    setEditInactive(false)
     setEditDialogOpen(true)
   }
 
@@ -393,7 +329,7 @@ export function AdminTerritoriesView() {
 
     return (
       <div
-        onClick={() => router.push(`/dashboard/territories/${territory.id}/map`)}
+        onClick={() => router.push(`/dashboard/territories/${territory.id}/${territory.type === 'condominium' ? 'condominium' : 'map'}`)}
         className="bg-card p-4 rounded-xl border shadow-sm transition-all active:scale-[0.98] cursor-pointer hover:shadow-md flex items-center gap-3 overflow-hidden"
       >
         <div className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: barColor }} />
@@ -577,90 +513,13 @@ export function AdminTerritoriesView() {
         onSuccess={loadData}
       />
 
-      {/* Modal de Edição de Território */}
-      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="sm:max-w-[450px]">
-          <DialogHeader>
-            <DialogTitle>{editingTerritory ? `Editar Território ${editNumber}` : "Novo Território"}</DialogTitle>
-            <DialogDescription>
-              {editingTerritory
-                ? "Ajuste as informações básicas e o grupo responsável."
-                : "Cadastre um novo território para começar a mapear."}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-1">
-              <Label>Número</Label>
-              <Input value={editNumber} onChange={e => setEditNumber(e.target.value)} />
-            </div>
-
-            <div className="space-y-1">
-              <Label>Nome/Referência</Label>
-              <Input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Ex: Quadra do Mercado" />
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-primary font-bold">Grupo Responsável (Dom.)</Label>
-              <div className="p-3 border rounded-lg bg-primary/5 border-primary/20 space-y-3">
-                <p className="text-[0.6875rem] text-primary leading-tight font-medium">
-                  No domingo, o território será atribuído automaticamente a este grupo.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditGroupId(null)}
-                    className={cn(
-                      "px-3 py-1.5 rounded-full text-xs font-bold transition-all border",
-                      !editGroupId
-                        ? "bg-card border-border text-foreground shadow-sm"
-                        : "bg-muted/50 border-transparent text-muted-foreground hover:bg-muted"
-                    )}
-                  >
-                    Nenhum
-                  </button>
-                  {groups.map(g => (
-                    <button
-                      key={g.id}
-                      type="button"
-                      onClick={() => setEditGroupId(g.id)}
-                      className={cn(
-                        "px-3 py-1.5 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5",
-                        editGroupId === g.id
-                          ? "bg-background shadow-sm ring-1 ring-offset-1"
-                          : "opacity-60 grayscale hover:grayscale-0 hover:opacity-100"
-                      )}
-                      style={{
-                        borderColor: editGroupId === g.id ? g.color : "transparent",
-                        color: editGroupId === g.id ? g.color : "inherit",
-                        backgroundColor: editGroupId === g.id ? `${g.color}10` : ""
-                      }}
-                    >
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: g.color }} />
-                      {g.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between p-3 border rounded-md bg-muted/30">
-              <div className="space-y-0.5">
-                <Label className="text-sm font-medium">Território Ativo</Label>
-                <p className="text-xs text-muted-foreground">Desative para ocultar das listas de designação.</p>
-              </div>
-              <Switch checked={!editInactive} onCheckedChange={(val: boolean) => setEditInactive(!val)} />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
-            <Button onClick={handleSaveEdit} disabled={editSaving}>
-              {editSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar Alterações"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TerritoryFormModal
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        territory={editingTerritory}
+        groups={groups}
+        onSuccess={loadData}
+      />
     </div>
   )
 }

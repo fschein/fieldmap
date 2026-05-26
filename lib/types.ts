@@ -1,5 +1,5 @@
 export type UserRole = "admin" | "dirigente" | "publicador" | "supervisor"
-export type TerritoryType = "residencial" | "comercial"
+export type TerritoryType = "residencial" | "comercial" | "condominium"
 export type AssignmentStatus = "active" | "completed" | "returned"
 export type SubdivisionStatus = "available" | "assigned" | "completed"
 
@@ -59,6 +59,7 @@ export interface Territory {
   number: string
   name: string
   type: TerritoryType
+  subtype?: string | null
   color: string
   description: string | null
   group_id: string | null

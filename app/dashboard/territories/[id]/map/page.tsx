@@ -4,6 +4,7 @@
 "use client"
 
 import { useEffect, useState, use } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import dynamic from "next/dynamic"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
@@ -59,6 +60,7 @@ export default function TerritoryMapPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = use(params)
+  const router = useRouter()
   const [territory, setTerritory] = useState<TerritoryWithSubdivisions | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -105,6 +107,10 @@ export default function TerritoryMapPage({
     if (data) {
       setTerritory(data as TerritoryWithSubdivisions)
       setTerritoryForm({ name: data.name || "", number: data.number || "", color: data.color || "#044454" })
+      if ((data as any).type === "condominium") {
+        router.replace(`/dashboard/territories/${id}/condominium`)
+        return
+      }
     }
     setLoading(false)
   }
