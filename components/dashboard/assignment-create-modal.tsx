@@ -132,6 +132,7 @@ export function AssignmentCreateModal({
 
       if (terrRes.data && activeAssignmentsRes.data) {
         const activeAssigs = activeAssignmentsRes.data || []
+        const now = new Date().getTime()
         const mapped: Territory[] = terrRes.data.map((t: any) => {
           let urgencyDays = 0
           if (t.last_completed_at) {
