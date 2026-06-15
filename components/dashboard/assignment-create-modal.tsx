@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { getLocalTodayStr, toLocalISOString } from "@/lib/date-utils"
+import { differenceInDays, parseISO } from "date-fns"
 import {
   Dialog,
   DialogContent,
@@ -132,12 +133,9 @@ export function AssignmentCreateModal({
       if (terrRes.data && activeAssignmentsRes.data) {
         const activeAssigs = activeAssignmentsRes.data || []
         const mapped: Territory[] = terrRes.data.map((t: any) => {
-          const now = new Date().getTime()
           let urgencyDays = 0
           if (t.last_completed_at) {
-            urgencyDays = Math.floor(
-              (now - new Date(t.last_completed_at).getTime()) / (1000 * 60 * 60 * 24)
-            )
+            urgencyDays = differenceInDays(new Date(), parseISO(t.last_completed_at))
           } else {
             urgencyDays = 9999
           }
@@ -243,11 +241,14 @@ export function AssignmentCreateModal({
 
       const terrUpdate: any = {}
       if (isCompleted) {
+        terrUpdate.status = "completed"
         terrUpdate.assigned_to = null
         terrUpdate.last_completed_at = endISO
       } else if (!isGroupAssign) {
+        terrUpdate.status = "assigned"
         terrUpdate.assigned_to = selectedPublisherId
       } else {
+        terrUpdate.status = "assigned"
         terrUpdate.assigned_to = null
       }
 

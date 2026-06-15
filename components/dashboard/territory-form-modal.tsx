@@ -16,6 +16,7 @@ import {
   DialogTitle
 } from "@/components/ui/dialog"
 import { Loader2, Trash2, AlertTriangle, ArrowLeft } from "lucide-react"
+import { IconCheck } from "@tabler/icons-react"
 import { toast } from "sonner"
 
 // ============================================================================
@@ -403,46 +404,47 @@ export function TerritoryFormModal({ open, onOpenChange, territory, groups, onSu
 
         {/* Grupo */}
         <div className="space-y-1">
-          <Label className="text-primary font-bold">Grupo Responsável (Dom.)</Label>
-          <div className="p-3 border rounded-lg bg-primary/5 border-primary/20 space-y-3">
-            <p className="text-[0.6875rem] text-primary leading-tight font-medium">
-              No domingo, o território será atribuído automaticamente a este grupo.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => setGroupId(null)}
-                className={cn(
-                  "px-3 py-1.5 rounded-full text-xs font-bold transition-all border",
-                  !groupId
-                    ? "bg-card border-border text-foreground shadow-sm"
-                    : "bg-muted/50 border-transparent text-muted-foreground hover:bg-muted"
-                )}
-              >
-                Nenhum
-              </button>
-              {groups.map(g => (
-                <button
+          <Label className="text-primary font-bold">Grupo</Label>
+          <div className="space-y-1.5">
+            {/* Nenhum */}
+            <div
+              role="button"
+              onClick={() => setGroupId(null)}
+              className="flex items-center gap-[10px] cursor-pointer rounded-md transition-all"
+              style={{
+                padding: "9px 12px",
+                border: !groupId ? "1.5px solid var(--color-border-tertiary, hsl(var(--border)))" : "0.5px solid var(--color-border-tertiary, hsl(var(--border)))",
+                background: "var(--color-background-primary, hsl(var(--card)))",
+              }}
+            >
+              <span className="w-2 h-2 rounded-full border border-muted-foreground/40 shrink-0" />
+              <span className="flex-1 text-sm text-muted-foreground">Nenhum</span>
+              {!groupId && <IconCheck size={14} className="text-muted-foreground shrink-0" />}
+            </div>
+
+            {/* Grupos */}
+            {groups.map(g => {
+              const selected = groupId === g.id
+              return (
+                <div
                   key={g.id}
-                  type="button"
+                  role="button"
                   onClick={() => setGroupId(g.id)}
-                  className={cn(
-                    "px-3 py-1.5 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5",
-                    groupId === g.id
-                      ? "bg-background shadow-sm ring-1 ring-offset-1"
-                      : "opacity-60 grayscale hover:grayscale-0 hover:opacity-100"
-                  )}
+                  className="flex items-center gap-[10px] cursor-pointer rounded-md transition-all"
                   style={{
-                    borderColor: groupId === g.id ? g.color : "transparent",
-                    color: groupId === g.id ? g.color : "inherit",
-                    backgroundColor: groupId === g.id ? `${g.color}10` : ""
+                    padding: "9px 12px",
+                    border: selected ? `1.5px solid ${g.color}` : "0.5px solid var(--color-border-tertiary, hsl(var(--border)))",
+                    background: selected ? `${g.color}14` : "var(--color-background-primary, hsl(var(--card)))",
                   }}
                 >
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: g.color }} />
-                  {g.name}
-                </button>
-              ))}
-            </div>
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
+                  <span className="flex-1 text-sm font-medium" style={{ color: selected ? g.color : "inherit" }}>
+                    {g.name}
+                  </span>
+                  {selected && <IconCheck size={14} style={{ color: g.color }} className="shrink-0" />}
+                </div>
+              )
+            })}
           </div>
         </div>
 

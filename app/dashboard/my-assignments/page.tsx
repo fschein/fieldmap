@@ -6,7 +6,8 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { createTimeoutSignal } from "@/lib/utils/api-utils"
 import { useAuth } from "@/hooks/use-auth"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, MapPin, ChevronRight } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Loader2, MapPin, ChevronRight, Plus } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { TerritoryWithSubdivisions, Subdivision } from "@/lib/types"
 import { toast } from "sonner"
@@ -14,6 +15,7 @@ import { cn, fmtTerritoryNumber } from "@/lib/utils"
 import { format, parseISO, isToday, isTomorrow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { ClipboardList, CalendarDays, Calendar } from "lucide-react"
+import { RequestTerritoryModal } from "@/components/dashboard/request-territory-modal"
 
 interface AssignmentRecord {
   id: string
@@ -48,6 +50,7 @@ export default function MyAssignmentsPage() {
   const [cooldown, setCooldown] = useState(0)
   const [nextSchedule, setNextSchedule] = useState<any>(null)
   const [fetchingSchedule, setFetchingSchedule] = useState(true)
+  const [requestModalOpen, setRequestModalOpen] = useState(false)
   const router = useRouter()
 
   const fetchMyAssignments = useCallback(async () => {
@@ -250,6 +253,17 @@ export default function MyAssignmentsPage() {
           <div className="py-14 flex flex-col items-center justify-center space-y-3 bg-card rounded-xl border border-dashed border-border">
             <MapPin className="h-7 w-7 text-muted-foreground/50" />
             <p className="text-xs text-muted-foreground">Nenhum território designado</p>
+            {!!user && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setRequestModalOpen(true)}
+                className="mt-1"
+              >
+                <Plus className="h-4 w-4 mr-1.5" />
+                Pedir território
+              </Button>
+            )}
           </div>
         ) : (
           <div className="space-y-2">
@@ -326,6 +340,12 @@ export default function MyAssignmentsPage() {
           </div>
         )}
       </div>
+
+      <RequestTerritoryModal
+        open={requestModalOpen}
+        onOpenChange={setRequestModalOpen}
+        onSuccess={fetchMyAssignments}
+      />
     </div>
   )
 }
