@@ -255,10 +255,9 @@ export default function MyAssignmentsPage() {
             <p className="text-xs text-muted-foreground">Nenhum território designado</p>
             {!!user && (
               <Button
-                variant="outline"
                 size="sm"
                 onClick={() => setRequestModalOpen(true)}
-                className="mt-1"
+                className="mt-1 bg-[#063d4a] hover:bg-[#063d4a]/90 text-white border-0"
               >
                 <Plus className="h-4 w-4 mr-1.5" />
                 Pedir território
