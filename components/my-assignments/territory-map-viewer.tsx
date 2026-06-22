@@ -4,7 +4,9 @@ import { useEffect, useRef, useState, useCallback } from "react"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import { TerritoryWithSubdivisions, Subdivision } from "@/lib/types"
-import { MapPinOff, Map as MapIcon, Navigation, Compass } from "lucide-react"
+import { MapPinOff, Compass } from "lucide-react"
+import { IconSatellite, IconMap, IconCrosshair, IconArrowsMaximize } from "@tabler/icons-react"
+import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 
 interface TerritoryMapViewerProps {
@@ -31,7 +33,12 @@ export default function TerritoryMapViewer({
   const userMarkerRef = useRef<L.Marker | null>(null)
   const userRadiusRef = useRef<L.Circle | null>(null)
   const polygonsRef = useRef<L.FeatureGroup | null>(null)
+  const osmLayerRef = useRef<L.TileLayer | null>(null)
+  const satLayerRef = useRef<L.TileLayer | null>(null)
   const [needsCompassPermission, setNeedsCompassPermission] = useState(false)
+  const [isSatellite, setIsSatellite] = useState(false)
+  const [isLocating, setIsLocating] = useState(false)
+  const [isCenteredOnUser, setIsCenteredOnUser] = useState(false)
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
@@ -47,12 +54,21 @@ export default function TerritoryMapViewer({
     // Remover a bandeira da Ucrânia do prefixo padrão do Leaflet
     map.attributionControl.setPrefix('<a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a>')
 
-    // Adicionar camada de tiles com filtro para dark mode
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    // Camada OSM (padrão)
+    const osmLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: '© OpenStreetMap contributors',
       maxZoom: 19,
-      className: 'map-tiles-theme' // Filtro via CSS
-    }).addTo(map)
+      className: 'map-tiles-theme',
+    })
+    osmLayer.addTo(map)
+    osmLayerRef.current = osmLayer
+
+    // Camada satélite Esri (sem API key)
+    satLayerRef.current = L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+      { attribution: 'Tiles © Esri', maxZoom: 19 }
+    )
+
 
     mapRef.current = map
 
@@ -319,6 +335,49 @@ export default function TerritoryMapViewer({
     }
   }, [setupOrientationListeners])
 
+  const handleToggleLayer = useCallback(() => {
+    const map = mapRef.current
+    if (!map || !osmLayerRef.current || !satLayerRef.current) return
+    if (isSatellite) {
+      map.removeLayer(satLayerRef.current)
+      osmLayerRef.current.addTo(map)
+      setIsSatellite(false)
+    } else {
+      map.removeLayer(osmLayerRef.current)
+      satLayerRef.current.addTo(map)
+      setIsSatellite(true)
+    }
+  }, [isSatellite])
+
+  const handleLocateToggle = useCallback(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    if (isCenteredOnUser) {
+      if (polygonsRef.current) {
+        map.fitBounds(polygonsRef.current.getBounds(), { padding: [50, 50] })
+      }
+      setIsCenteredOnUser(false)
+      return
+    }
+
+    if (userMarkerRef.current) {
+      map.setView(userMarkerRef.current.getLatLng(), 17)
+      setIsCenteredOnUser(true)
+    } else if (!isLocating) {
+      setIsLocating(true)
+      map.once('locationfound', () => {
+        setIsLocating(false)
+        setIsCenteredOnUser(true)
+      })
+      map.once('locationerror', () => {
+        setIsLocating(false)
+        toast.error("Não foi possível obter sua localização")
+      })
+      map.locate({ setView: true, maxZoom: 17 })
+    }
+  }, [isCenteredOnUser, isLocating])
+
   return (
     <div className="relative w-full h-full min-h-[500px] overflow-hidden">
       <div
@@ -387,47 +446,36 @@ export default function TerritoryMapViewer({
       )}
 
       {!pinMode && (
-        <div className="absolute right-4 bottom-4 flex flex-col gap-2 z-[900]">
-          <Button
-            size="icon"
-            variant="secondary"
-            className="h-11 w-11 bg-card shadow-xl border border-border rounded-full hover:bg-accent text-foreground"
-            onClick={() => {
-              if (mapRef.current && polygonsRef.current) {
-                mapRef.current.fitBounds(polygonsRef.current.getBounds(), { padding: [50, 50] })
-              }
-            }}
+        <div className="absolute right-4 bottom-8 flex flex-col gap-2 z-[900]">
+          <button
+            onClick={handleToggleLayer}
+            className="flex items-center justify-center"
+            style={{ width: 44, height: 44, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.2)', border: 'none', cursor: 'pointer' }}
+            title={isSatellite ? "Mapa" : "Satélite"}
           >
-            <MapIcon className="h-5 w-5" />
-          </Button>
-          <Button
-            size="icon"
-            variant="secondary"
-            className="h-11 w-11 bg-card shadow-xl border border-border rounded-full hover:bg-accent text-foreground"
-            onClick={() => {
-              if (mapRef.current && userMarkerRef.current) {
-                mapRef.current.setView(userMarkerRef.current.getLatLng(), 17)
-              } else if ('geolocation' in navigator) {
-                navigator.geolocation.getCurrentPosition((pos) => {
-                  if (mapRef.current) {
-                    mapRef.current.setView([pos.coords.latitude, pos.coords.longitude], 17)
-                  }
-                })
-              }
-            }}
+            {isSatellite
+              ? <IconMap size={20} color="#333" />
+              : <IconSatellite size={20} color="#333" />}
+          </button>
+          <button
+            onClick={handleLocateToggle}
+            className="flex items-center justify-center"
+            style={{ width: 44, height: 44, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.2)', border: 'none', cursor: 'pointer', opacity: isLocating ? 0.5 : 1, transition: 'opacity 0.2s' }}
+            title={isCenteredOnUser ? "Ver território" : "Minha localização"}
           >
-            <Navigation className="h-5 w-5" />
-          </Button>
+            {isCenteredOnUser
+              ? <IconArrowsMaximize size={20} color="#333" />
+              : <IconCrosshair size={20} color="#333" />}
+          </button>
           {needsCompassPermission && (
-            <Button
-              size="icon"
-              variant="secondary"
-              className="h-11 w-11 bg-card shadow-xl border border-border rounded-full hover:bg-accent text-foreground"
+            <button
               onClick={handleRequestCompassPermission}
+              className="flex items-center justify-center"
+              style={{ width: 44, height: 44, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.2)', border: 'none', cursor: 'pointer' }}
               title="Ativar bússola"
             >
-              <Compass className="h-5 w-5" />
-            </Button>
+              <Compass size={20} color="#333" />
+            </button>
           )}
         </div>
       )}
