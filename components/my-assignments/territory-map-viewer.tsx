@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import { TerritoryWithSubdivisions, Subdivision } from "@/lib/types"
-import { MapPinOff, Crosshair, Map as MapIcon, Navigation } from "lucide-react"
+import { MapPinOff, Map as MapIcon, Navigation, Compass } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface TerritoryMapViewerProps {
@@ -31,6 +31,7 @@ export default function TerritoryMapViewer({
   const userMarkerRef = useRef<L.Marker | null>(null)
   const userRadiusRef = useRef<L.Circle | null>(null)
   const polygonsRef = useRef<L.FeatureGroup | null>(null)
+  const [needsCompassPermission, setNeedsCompassPermission] = useState(false)
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
@@ -218,6 +219,16 @@ export default function TerritoryMapViewer({
     const map = mapRef.current
     let watchId: number
 
+    const locationIcon = L.divIcon({
+      className: 'user-location-marker',
+      html: `<div class="location-wrapper">
+        <div class="heading-cone" style="opacity:0"></div>
+        <div class="pulse-dot"></div>
+      </div>`,
+      iconSize: [40, 40],
+      iconAnchor: [20, 20],
+    })
+
     if ('geolocation' in navigator) {
       watchId = navigator.geolocation.watchPosition(
         (position) => {
@@ -225,15 +236,8 @@ export default function TerritoryMapViewer({
           const lng = position.coords.longitude
           const accuracy = position.coords.accuracy
 
-          const blueDotIcon = L.divIcon({
-            className: 'user-location-marker',
-            html: '<div class="pulse-dot"></div>',
-            iconSize: [16, 16],
-            iconAnchor: [8, 8]
-          })
-
           if (!userMarkerRef.current) {
-            userMarkerRef.current = L.marker([lat, lng], { icon: blueDotIcon, zIndexOffset: 1000 }).addTo(map)
+            userMarkerRef.current = L.marker([lat, lng], { icon: locationIcon, zIndexOffset: 1000 }).addTo(map)
             userRadiusRef.current = L.circle([lat, lng], {
               radius: accuracy,
               color: '#3b82f6',
@@ -260,6 +264,60 @@ export default function TerritoryMapViewer({
       }
     }
   }, [])
+
+  const applyHeading = useCallback((heading: number) => {
+    const el = userMarkerRef.current?.getElement()
+    if (!el) return
+    const cone = el.querySelector('.heading-cone') as HTMLElement | null
+    if (!cone) return
+    cone.style.transform = `rotate(${heading}deg)`
+    cone.style.opacity = '1'
+  }, [])
+
+  const setupOrientationListeners = useCallback(() => {
+    const handler = (e: DeviceOrientationEvent) => {
+      let heading: number | null = null
+      // iOS fornece webkitCompassHeading (0=norte, sentido horário)
+      if (typeof (e as any).webkitCompassHeading === 'number') {
+        heading = (e as any).webkitCompassHeading
+      } else if (e.alpha !== null) {
+        // Android com evento absolute: converte de anti-horário para horário
+        heading = (360 - e.alpha) % 360
+      }
+      if (heading !== null) applyHeading(heading)
+    }
+
+    // deviceorientationabsolute é preferido no Android (orientação real em relação ao norte)
+    window.addEventListener('deviceorientationabsolute', handler as EventListener)
+    window.addEventListener('deviceorientation', handler as EventListener)
+
+    return () => {
+      window.removeEventListener('deviceorientationabsolute', handler as EventListener)
+      window.removeEventListener('deviceorientation', handler as EventListener)
+    }
+  }, [applyHeading])
+
+  // Bússola do device para direção do cone
+  useEffect(() => {
+    // iOS 13+ exige permissão explícita via gesto do usuário
+    if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
+      setNeedsCompassPermission(true)
+      return
+    }
+    return setupOrientationListeners()
+  }, [setupOrientationListeners])
+
+  const handleRequestCompassPermission = useCallback(async () => {
+    try {
+      const result = await (DeviceOrientationEvent as any).requestPermission()
+      if (result === 'granted') {
+        setNeedsCompassPermission(false)
+        setupOrientationListeners()
+      }
+    } catch {
+      setNeedsCompassPermission(false)
+    }
+  }, [setupOrientationListeners])
 
   return (
     <div className="relative w-full h-full min-h-[500px] overflow-hidden">
@@ -360,6 +418,17 @@ export default function TerritoryMapViewer({
           >
             <Navigation className="h-5 w-5" />
           </Button>
+          {needsCompassPermission && (
+            <Button
+              size="icon"
+              variant="secondary"
+              className="h-11 w-11 bg-card shadow-xl border border-border rounded-full hover:bg-accent text-foreground"
+              onClick={handleRequestCompassPermission}
+              title="Ativar bússola"
+            >
+              <Compass className="h-5 w-5" />
+            </Button>
+          )}
         </div>
       )}
 
@@ -404,14 +473,47 @@ export default function TerritoryMapViewer({
           display: none !important;
         }
 
+        .location-wrapper {
+          position: relative;
+          width: 40px;
+          height: 40px;
+        }
+
+        .heading-cone {
+          position: absolute;
+          inset: 0;
+          transform-origin: center center;
+          transition: transform 0.15s ease-out, opacity 0.3s ease;
+          pointer-events: none;
+        }
+
+        .heading-cone::before {
+          content: '';
+          position: absolute;
+          /* base do triângulo alinhada ao centro, ponta aponta para cima (norte) */
+          bottom: 50%;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 0;
+          height: 0;
+          border-left: 7px solid transparent;
+          border-right: 7px solid transparent;
+          border-bottom: 17px solid rgba(59, 130, 246, 0.7);
+          filter: drop-shadow(0 0 3px rgba(59,130,246,0.4));
+        }
+
         .pulse-dot {
+          position: absolute;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
           width: 14px;
           height: 14px;
           background-color: hsl(var(--primary));
           border-radius: 50%;
           border: 2px solid hsl(var(--background));
-          box-shadow: 0 0 0 rgba(var(--primary), 0.4);
           animation: pulse 2s infinite;
+          z-index: 1;
         }
         @keyframes pulse {
           0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7); }
