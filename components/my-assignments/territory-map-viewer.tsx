@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import { TerritoryWithSubdivisions, Subdivision } from "@/lib/types"
-import { MapPinOff, Compass } from "lucide-react"
+import { MapPinOff } from "lucide-react"
 import { IconSatellite, IconMap, IconCrosshair, IconArrowsMaximize } from "@tabler/icons-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
@@ -17,6 +17,15 @@ interface TerritoryMapViewerProps {
   onPinConfirm?: (latlng: L.LatLng) => void
   onPinCancel?: () => void
   animatingSubdivisionId?: string | null
+}
+
+const SMOOTH = 0.15
+
+function smoothAngle(current: number, target: number): number {
+  let diff = target - current
+  if (diff > 180) diff -= 360
+  if (diff < -180) diff += 360
+  return current + diff * SMOOTH
 }
 
 export default function TerritoryMapViewer({
@@ -35,6 +44,7 @@ export default function TerritoryMapViewer({
   const polygonsRef = useRef<L.FeatureGroup | null>(null)
   const osmLayerRef = useRef<L.TileLayer | null>(null)
   const satLayerRef = useRef<L.TileLayer | null>(null)
+  const currentHeadingRef = useRef(0)
   const [needsCompassPermission, setNeedsCompassPermission] = useState(false)
   const [isSatellite, setIsSatellite] = useState(false)
   const [isLocating, setIsLocating] = useState(false)
@@ -238,11 +248,15 @@ export default function TerritoryMapViewer({
     const locationIcon = L.divIcon({
       className: 'user-location-marker',
       html: `<div class="location-wrapper">
-        <div class="heading-cone" style="opacity:0"></div>
-        <div class="pulse-dot"></div>
+        <div class="heading-cone" style="opacity:0">
+          <svg width="20" height="28" viewBox="0 0 20 28" xmlns="http://www.w3.org/2000/svg">
+            <polygon points="10,0 20,28 0,28" fill="#378ADD" fill-opacity="0.85"/>
+          </svg>
+        </div>
+        <div class="location-dot"></div>
       </div>`,
-      iconSize: [40, 40],
-      iconAnchor: [20, 20],
+      iconSize: [40, 42],
+      iconAnchor: [20, 35],
     })
 
     if ('geolocation' in navigator) {
@@ -281,24 +295,26 @@ export default function TerritoryMapViewer({
     }
   }, [])
 
-  const applyHeading = useCallback((heading: number) => {
+  const applyHeading = useCallback((rawHeading: number) => {
+    const prev = currentHeadingRef.current
+    const smoothed = smoothAngle(prev, rawHeading)
+    currentHeadingRef.current = smoothed
+    if (Math.abs(smoothed - prev) < 1) return
     const el = userMarkerRef.current?.getElement()
     if (!el) return
     const cone = el.querySelector('.heading-cone') as HTMLElement | null
     if (!cone) return
-    cone.style.transform = `rotate(${heading}deg)`
+    cone.style.transform = `rotate(${smoothed}deg)`
     cone.style.opacity = '1'
   }, [])
 
   const setupOrientationListeners = useCallback(() => {
     const handler = (e: DeviceOrientationEvent) => {
       let heading: number | null = null
-      // iOS fornece webkitCompassHeading (0=norte, sentido horário)
       if (typeof (e as any).webkitCompassHeading === 'number') {
         heading = (e as any).webkitCompassHeading
       } else if (e.alpha !== null) {
-        // Android com evento absolute: converte de anti-horário para horário
-        heading = (360 - e.alpha) % 360
+        heading = e.alpha
       }
       if (heading !== null) applyHeading(heading)
     }
@@ -323,18 +339,6 @@ export default function TerritoryMapViewer({
     return setupOrientationListeners()
   }, [setupOrientationListeners])
 
-  const handleRequestCompassPermission = useCallback(async () => {
-    try {
-      const result = await (DeviceOrientationEvent as any).requestPermission()
-      if (result === 'granted') {
-        setNeedsCompassPermission(false)
-        setupOrientationListeners()
-      }
-    } catch {
-      setNeedsCompassPermission(false)
-    }
-  }, [setupOrientationListeners])
-
   const handleToggleLayer = useCallback(() => {
     const map = mapRef.current
     if (!map || !osmLayerRef.current || !satLayerRef.current) return
@@ -349,9 +353,21 @@ export default function TerritoryMapViewer({
     }
   }, [isSatellite])
 
-  const handleLocateToggle = useCallback(() => {
+  const handleLocateToggle = useCallback(async () => {
     const map = mapRef.current
     if (!map) return
+
+    if (needsCompassPermission) {
+      try {
+        const result = await (DeviceOrientationEvent as any).requestPermission()
+        if (result === 'granted') {
+          setNeedsCompassPermission(false)
+          setupOrientationListeners()
+        }
+      } catch {
+        setNeedsCompassPermission(false)
+      }
+    }
 
     if (isCenteredOnUser) {
       if (polygonsRef.current) {
@@ -376,7 +392,7 @@ export default function TerritoryMapViewer({
       })
       map.locate({ setView: true, maxZoom: 17 })
     }
-  }, [isCenteredOnUser, isLocating])
+  }, [isCenteredOnUser, isLocating, needsCompassPermission, setupOrientationListeners])
 
   return (
     <div className="relative w-full h-full min-h-[500px] overflow-hidden">
@@ -467,16 +483,6 @@ export default function TerritoryMapViewer({
               ? <IconArrowsMaximize size={20} color="#333" />
               : <IconCrosshair size={20} color="#333" />}
           </button>
-          {needsCompassPermission && (
-            <button
-              onClick={handleRequestCompassPermission}
-              className="flex items-center justify-center"
-              style={{ width: 44, height: 44, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 4px rgba(0,0,0,0.2)', border: 'none', cursor: 'pointer' }}
-              title="Ativar bússola"
-            >
-              <Compass size={20} color="#333" />
-            </button>
-          )}
         </div>
       )}
 
@@ -524,49 +530,31 @@ export default function TerritoryMapViewer({
         .location-wrapper {
           position: relative;
           width: 40px;
-          height: 40px;
+          height: 42px;
         }
 
         .heading-cone {
           position: absolute;
-          inset: 0;
-          transform-origin: center center;
-          transition: transform 0.15s ease-out, opacity 0.3s ease;
+          top: 0;
+          left: 10px;
+          width: 20px;
+          height: 35px;
+          transform-origin: center bottom;
+          transition: opacity 0.3s ease;
           pointer-events: none;
         }
 
-        .heading-cone::before {
-          content: '';
+        .location-dot {
           position: absolute;
-          /* base do triângulo alinhada ao centro, ponta aponta para cima (norte) */
-          bottom: 50%;
+          top: 28px;
           left: 50%;
           transform: translateX(-50%);
-          width: 0;
-          height: 0;
-          border-left: 7px solid transparent;
-          border-right: 7px solid transparent;
-          border-bottom: 17px solid rgba(59, 130, 246, 0.7);
-          filter: drop-shadow(0 0 3px rgba(59,130,246,0.4));
-        }
-
-        .pulse-dot {
-          position: absolute;
-          top: 50%;
-          left: 50%;
-          transform: translate(-50%, -50%);
           width: 14px;
           height: 14px;
-          background-color: hsl(var(--primary));
+          background-color: #378ADD;
           border-radius: 50%;
-          border: 2px solid hsl(var(--background));
-          animation: pulse 2s infinite;
+          border: 2px solid white;
           z-index: 1;
-        }
-        @keyframes pulse {
-          0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.7); }
-          70% { box-shadow: 0 0 0 10px rgba(37, 99, 235, 0); }
-          100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0); }
         }
       `}</style>
     </div>
