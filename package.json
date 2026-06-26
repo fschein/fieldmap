@@ -7,7 +7,13 @@
     "dev": "next dev",
     "lint": "eslint .",
     "start": "next start",
-    "setup": "node scripts/setup.js"
+    "setup": "node scripts/setup.js",
+    "supabase:init": "supabase init",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:status": "supabase status",
+    "supabase:psql": "supabase db psql",
+    "supabase:psql:remote": "supabase db psql --external"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
@@ -83,6 +89,12 @@
     "postcss": "^8.5",
     "tailwindcss": "^4.1.9",
     "tw-animate-css": "1.3.3",
-    "typescript": "^5"
+    "typescript": "^5",
+    "supabase": "^1.191.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "supabase"
+    ]
   }
 }

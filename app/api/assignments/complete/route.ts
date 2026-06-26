@@ -21,12 +21,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "territoryId, userId e action são obrigatórios" }, { status: 400 })
     }
 
-    // 0. Verifica se o território ainda está designado para este usuário
-    const { data: currentTerritory } = await supabaseAdmin
-      .from("territories")
-      .select("assigned_to")
-      .eq("id", territoryId)
-      .single()
+    // 0. Verifica se o território ainda está designado para este usuário e busca o campaign_id do assignment ativo
+    const [currentTerritoryRes, activeAssignmentRes] = await Promise.all([
+      supabaseAdmin
+        .from("territories")
+        .select("assigned_to")
+        .eq("id", territoryId)
+        .single(),
+      supabaseAdmin
+        .from("assignments")
+        .select("campaign_id")
+        .eq("territory_id", territoryId)
+        .eq("status", "active")
+        .eq("user_id", userId)
+        .maybeSingle()
+    ])
+
+    const currentTerritory = currentTerritoryRes.data
+    const campaignId = activeAssignmentRes.data?.campaign_id
 
     if (currentTerritory?.assigned_to !== userId) {
       return NextResponse.json({ error: "Este território não está designado para você." }, { status: 403 })
@@ -50,20 +62,20 @@ export async function POST(request: Request) {
 
     if (assignmentError) throw assignmentError
 
-    // 2. Atualiza o território
+    // 2. Atualiza o território (território com campanha concluída volta a ser disponível/available)
     const { error: territoryError } = await supabaseAdmin
       .from("territories")
       .update({
         assigned_to: null,
-        status: isComplete ? "completed" : "available",
+        status: (isComplete && !campaignId) ? "completed" : "available",
         ...(isComplete ? { last_completed_at: now } : {}),
       })
       .eq("id", territoryId)
 
     if (territoryError) throw territoryError
 
-    // 3. Reseta as quadras APENAS se for conclusão TOTAL
-    if (isComplete) {
+    // 3. Reseta as quadras APENAS se for conclusão TOTAL e não for campanha
+    if (isComplete && !campaignId) {
       const { error: subdivisionError } = await supabaseAdmin
         .from("subdivisions")
         .update({ completed: false, status: "available", updated_at: now })

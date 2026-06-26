@@ -8,7 +8,8 @@ import { useAuth } from "@/hooks/use-auth"
 import { useOfflineManager } from "@/hooks/use-offline-manager"
 import { TerritoryWithSubdivisions, Subdivision } from "@/lib/types"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Loader2, CheckCircle2, MapPin, MapPinOff, Navigation } from "lucide-react"
+import { IconArrowLeft } from "@tabler/icons-react"
+import { Loader2, CheckCircle2, MapPin, MapPinOff, Navigation } from "lucide-react"
 import { SubdivisionDrawer } from "@/components/my-assignments/subdivision-drawer"
 import { CompleteAssignmentDialog } from "@/components/my-assignments/complete-assignment-dialog"
 import { AddDoNotVisitDialog } from "@/components/my-assignments/add-do-not-visit-dialog"
@@ -87,7 +88,34 @@ export default function TerritoryMapPage() {
         return
       }
 
-      setTerritory({ ...data, canEdit } as any)
+      const activeAssignment = data.assignments?.find((a: any) => a.status === 'active')
+      const campaignId = activeAssignment?.campaign_id
+      let subdivisions = data.subdivisions || []
+
+      if (campaignId && subdivisions.length > 0) {
+        const { data: progressData, error: progressError } = await supabase
+          .from("subdivision_campaign_progress")
+          .select("*")
+          .eq("campaign_id", campaignId)
+          .in("subdivision_id", subdivisions.map((s: any) => s.id))
+        
+        if (!progressError && progressData) {
+          subdivisions = subdivisions.map((s: any) => {
+            const prog = progressData.find((p: any) => p.subdivision_id === s.id)
+            return {
+              ...s,
+              completed: prog ? prog.completed : false,
+              status: prog ? prog.status : "available",
+              notes: prog ? prog.notes : (s.notes || null),
+              completed_at: prog ? prog.updated_at : null
+            }
+          })
+        }
+      }
+
+      const mergedTerritory = { ...data, subdivisions, canEdit }
+      localStorage.setItem(`territory_cache_${territoryId}`, JSON.stringify(mergedTerritory))
+      setTerritory(mergedTerritory as any)
     } catch (error: any) {
       if (error.name === 'AbortError') {
         toast.error("Tempo esgotado ao carregar mapa.")
@@ -213,6 +241,9 @@ export default function TerritoryMapPage() {
     }
 
     try {
+      const activeAssignment = territory?.assignments?.find((a: any) => a.status === 'active')
+      const campaignId = activeAssignment?.campaign_id
+
       const updateData: any = {
         status: nextStatus,
         completed: nextCompleted,
@@ -231,12 +262,33 @@ export default function TerritoryMapPage() {
         updateData.completed_at = null
       }
 
-      const { error } = await supabase
-        .from("subdivisions")
-        .update(updateData)
-        .eq("id", selectedSubdivision.id)
+      if (campaignId) {
+        const campaignUpdateData: any = {
+          subdivision_id: selectedSubdivision.id,
+          campaign_id: campaignId,
+          status: nextStatus,
+          completed: nextCompleted,
+          updated_at: new Date().toISOString(),
+        }
+        
+        // Preserve campaign-specific notes if already present
+        if (selectedSubdivision.notes !== undefined) {
+          campaignUpdateData.notes = selectedSubdivision.notes
+        }
 
-      if (error) throw error
+        const { error } = await supabase
+          .from("subdivision_campaign_progress")
+          .upsert(campaignUpdateData, { onConflict: "subdivision_id,campaign_id" })
+
+        if (error) throw error
+      } else {
+        const { error } = await supabase
+          .from("subdivisions")
+          .update(updateData)
+          .eq("id", selectedSubdivision.id)
+
+        if (error) throw error
+      }
 
       if (isNowCompleting) {
         toast.success(`Quadra ${selectedSubdivision.name} concluída!`)
@@ -321,21 +373,44 @@ export default function TerritoryMapPage() {
     if (!selectedSubdivision || !user?.id || saving) return
     
     try {
-      const { error } = await supabase
-        .from("subdivisions")
-        .update({ notes })
-        .eq("id", selectedSubdivision.id)
+      const activeAssignment = territory?.assignments?.find((a: any) => a.status === 'active')
+      const campaignId = activeAssignment?.campaign_id
 
-      if (error) throw error
+      if (campaignId) {
+        const { error } = await supabase
+          .from("subdivision_campaign_progress")
+          .upsert({
+            subdivision_id: selectedSubdivision.id,
+            campaign_id: campaignId,
+            notes,
+            completed: selectedSubdivision.completed || false,
+            status: selectedSubdivision.status || "available",
+            updated_at: new Date().toISOString()
+          }, { onConflict: "subdivision_id,campaign_id" })
+
+        if (error) throw error
+      } else {
+        const { error } = await supabase
+          .from("subdivisions")
+          .update({ notes })
+          .eq("id", selectedSubdivision.id)
+
+        if (error) throw error
+      }
       
       // Atualizar estado local sem re-fetch total para ser mais rápido
       setTerritory(prev => {
         if (!prev) return prev
+        const updatedSubdivisions = prev.subdivisions?.map(s => 
+          s.id === selectedSubdivision.id ? { ...s, notes } : s
+        ) || []
+        
+        // Also update local cache
+        localStorage.setItem(`territory_cache_${territoryId}`, JSON.stringify({ ...prev, subdivisions: updatedSubdivisions }))
+        
         return {
           ...prev,
-          subdivisions: prev.subdivisions?.map(s => 
-            s.id === selectedSubdivision.id ? { ...s, notes } : s
-          ) || []
+          subdivisions: updatedSubdivisions
         }
       })
     } catch (error: any) {
@@ -345,120 +420,115 @@ export default function TerritoryMapPage() {
   }
 
   return (
-    <div className="flex flex-col bg-background overflow-hidden relative h-[calc(100dvh-4rem)] md:h-[100dvh]">
-      {/* Header Fixo Sólido (Mobile) / Flutuante (Desktop) */}
-      <div className="absolute top-0 left-0 right-0 h-16 z-[40] bg-card/95 backdrop-blur-sm shadow-sm flex items-center justify-between px-2 md:relative md:h-auto md:bg-transparent md:shadow-none md:px-4 md:pt-4">
-        <div className="flex items-center gap-2 overflow-hidden">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-10 w-10 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors"
-            onClick={() => router.push("/dashboard/my-assignments")}
-            title="Voltar"
-          >
-            <ArrowLeft className="h-6 w-6" />
-          </Button>
-          <div className="flex items-center gap-2 min-w-0 md:bg-card/95 md:backdrop-blur-sm md:px-3 md:py-1.5 md:rounded-full md:shadow-sm md:border md:border-border">
-            <div
-              className="w-3 h-3 rounded-full ring-2 ring-muted flex-shrink-0"
-              style={{ backgroundColor: territory.color }}
-            />
-            <h1 className="text-sm sm:text-base font-bold leading-tight truncate text-foreground">
-              Território {territory.number}
-            </h1>
-          </div>
+    <div className="flex flex-col bg-background overflow-hidden h-dvh">
+
+      {/* ── Barra do território ── */}
+      <div
+        className="relative shrink-0 flex items-center gap-3 px-4"
+        style={{ height: 44, background: '#fff', borderBottom: '0.5px solid #e8e8e8' }}
+      >
+        <button onClick={() => router.push("/dashboard/my-assignments")} className="shrink-0">
+          <IconArrowLeft size={20} color="#333" />
+        </button>
+
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <span
+            className="w-2 h-2 rounded-full shrink-0"
+            style={{ backgroundColor: territory.color }}
+          />
+          <span className="text-[15px] font-medium text-foreground truncate">
+            {territory.name}
+          </span>
         </div>
 
-        <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-          <div className="text-foreground font-bold md:bg-card/95 md:backdrop-blur-sm md:border md:border-border md:px-3 md:py-1.5 md:rounded-full text-sm md:shadow-sm">
-            {progress}%
-          </div>
+        <span
+          className="shrink-0 tabular-nums"
+          style={{ background: '#E6F1FB', color: '#0C447C', fontSize: 12, fontWeight: 500, borderRadius: 12, padding: '4px 10px' }}
+        >
+          {completedCount} / {totalCount}
+        </span>
+
+        {/* Barra de progresso — borda inferior */}
+        <div className="absolute bottom-0 left-0 right-0" style={{ height: 3, background: '#e8e8e8' }}>
+          <div style={{ height: '100%', width: `${progress}%`, background: '#378ADD', borderRadius: '0 2px 2px 0' }} />
         </div>
       </div>
 
-      <div className="flex flex-col flex-1 min-h-0 pt-16 md:pt-4 relative w-full">
-        {/* Mapa */}
-        <div className={`flex-1 min-h-0 border-y-0 md:border md:rounded-xl overflow-hidden shadow-sm relative z-0 ${pinMode ? 'border-destructive ring-inset ring-4 ring-destructive/30 cursor-crosshair' : 'border-border'}`}>
-          <TerritoryMapViewer
-            territory={territory}
-            onSubdivisionClick={handleSubdivisionClick}
-            pinMode={pinMode}
-            onPinConfirm={handlePinConfirm}
-            onPinCancel={handlePinCancel}
-          />
-          
-          {/* Animação de Conclusão Overlay */}
-          <style jsx global>{`
-            .subdivision-animating-${animatingSubdivisionId} {
-              transform-origin: center;
-              animation: completion-pop 0.8s ease-out;
-            }
-            @keyframes completion-pop {
-              0% { transform: scale(1); opacity: 0.7; }
-              40% { transform: scale(1.05); opacity: 1; filter: brightness(1.2); }
-              100% { transform: scale(1); opacity: 0.8; }
-            }
-          `}</style>
-        </div>
-
-        {/* Botões Bottom/Native Bar */}
-        <div className="flex gap-2 p-4 pb-6 md:pb-4 bg-card shadow-[0_-10px_30px_rgba(0,0,0,0.1)] z-[40] relative shrink-0">
-          <Button
-            variant="outline"
-            className={`flex-1 min-h-[48px] border-destructive/20 text-destructive hover:bg-destructive/10 font-bold rounded-xl ${pinMode ? 'bg-destructive/10 animate-pulse outline-none ring-2 ring-destructive' : ''}`}
-            onClick={handleAddDnvClick}
-            disabled={pinMode || !(territory as any).canEdit}
-          >
-            <MapPinOff className="h-4 w-4 mr-2" />
-            Não Visitar
-          </Button>
-          <Button
-            className={`flex-1 min-h-[48px] text-white font-bold shadow-sm rounded-xl ${isFullyCompleted
-                ? 'bg-emerald-600 hover:bg-emerald-700'
-                : 'bg-primary hover:bg-primary/90 active:scale-[0.98]'
-              }`}
-            onClick={() => setShowCompleteDialog(true)}
-            disabled={!(territory as any).canEdit && !isFullyCompleted} // Permite devolver mesmo em read-only? Não, user disse "NÃO pode: editar, adicionar nota, marcar concluído. Só o admin."
-            // Mas devolver é "encerrar". Acho que deve ser bloqueado também.
-          >
-            {isFullyCompleted ? 'Concluir' : 'Devolver'}
-          </Button>
-        </div>
-
-        {/* Drawer para Subdivisão Selecionada */}
-        {selectedSubdivision && (
-          <SubdivisionDrawer
-            open={drawerOpen}
-            onOpenChange={(val) => {
-              setDrawerOpen(val)
-              if (!val) setSelectedSubdivision(null)
-            }}
-            subdivision={selectedSubdivision}
-            onToggle={handleToggleSubdivision}
-            onSaveNotes={handleSaveNotes}
-            canEdit={(territory as any).canEdit}
-          />
-        )}
-
-        {/* Dialog para Devolução */}
-        <CompleteAssignmentDialog
-          open={showCompleteDialog}
-          onOpenChange={setShowCompleteDialog}
+      {/* ── Mapa ── */}
+      <div className={`flex-1 min-h-0 overflow-hidden relative z-0${pinMode ? ' cursor-crosshair' : ''}`}>
+        <TerritoryMapViewer
           territory={territory}
-          activeAssignmentDate={(territory as any).assignments?.find((a: any) => a.status === 'active')?.assigned_at}
-          onConfirm={handleConfirmCompletion}
+          onSubdivisionClick={handleSubdivisionClick}
+          pinMode={pinMode}
+          onPinConfirm={handlePinConfirm}
+          onPinCancel={handlePinCancel}
         />
-
-        {/* Dialog para Adicionar Não Visitar */}
-        <AddDoNotVisitDialog
-          open={dnvDialogOpen}
-          onOpenChange={setDnvDialogOpen}
-          territoryId={territory.id}
-          latitude={dnvCoords?.lat || null}
-          longitude={dnvCoords?.lng || null}
-          onSuccess={() => fetchTerritory()}
-        />
+        <style jsx global>{`
+          .subdivision-animating-${animatingSubdivisionId} {
+            transform-origin: center;
+            animation: completion-pop 0.8s ease-out;
+          }
+          @keyframes completion-pop {
+            0% { transform: scale(1); opacity: 0.7; }
+            40% { transform: scale(1.05); opacity: 1; filter: brightness(1.2); }
+            100% { transform: scale(1); opacity: 0.8; }
+          }
+        `}</style>
       </div>
+
+      {/* ── Botões inferiores ── */}
+      <div className="flex gap-2 p-4 pb-6 md:pb-4 bg-card shadow-[0_-10px_30px_rgba(0,0,0,0.1)] z-[40] shrink-0">
+        <Button
+          variant="outline"
+          className={`flex-1 min-h-[48px] border-destructive/20 text-destructive hover:bg-destructive/10 font-bold rounded-xl ${pinMode ? 'bg-destructive/10 animate-pulse outline-none ring-2 ring-destructive' : ''}`}
+          onClick={handleAddDnvClick}
+          disabled={pinMode || !(territory as any).canEdit}
+        >
+          <MapPinOff className="h-4 w-4 mr-2" />
+          Não Visitar
+        </Button>
+        <Button
+          className={`flex-1 min-h-[48px] text-white font-bold shadow-sm rounded-xl ${isFullyCompleted
+              ? 'bg-emerald-600 hover:bg-emerald-700'
+              : 'bg-primary hover:bg-primary/90 active:scale-[0.98]'
+            }`}
+          onClick={() => setShowCompleteDialog(true)}
+          disabled={!(territory as any).canEdit && !isFullyCompleted}
+        >
+          {isFullyCompleted ? 'Concluir' : 'Devolver'}
+        </Button>
+      </div>
+
+      {selectedSubdivision && (
+        <SubdivisionDrawer
+          open={drawerOpen}
+          onOpenChange={(val) => {
+            setDrawerOpen(val)
+            if (!val) setSelectedSubdivision(null)
+          }}
+          subdivision={selectedSubdivision}
+          onToggle={handleToggleSubdivision}
+          onSaveNotes={handleSaveNotes}
+          canEdit={(territory as any).canEdit}
+        />
+      )}
+
+      <CompleteAssignmentDialog
+        open={showCompleteDialog}
+        onOpenChange={setShowCompleteDialog}
+        territory={territory}
+        activeAssignmentDate={(territory as any).assignments?.find((a: any) => a.status === 'active')?.assigned_at}
+        onConfirm={handleConfirmCompletion}
+      />
+
+      <AddDoNotVisitDialog
+        open={dnvDialogOpen}
+        onOpenChange={setDnvDialogOpen}
+        territoryId={territory.id}
+        latitude={dnvCoords?.lat || null}
+        longitude={dnvCoords?.lng || null}
+        onSuccess={() => fetchTerritory()}
+      />
     </div>
   )
 }

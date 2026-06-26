@@ -33,7 +33,12 @@ import { error } from "console"
 
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
-  const [stats, setStats] = useState<Record<string, { total: number, completed: number }>>({})
+  const [stats, setStats] = useState<Record<string, { 
+    total: number, 
+    completed: number,
+    totalSubdivisions: number,
+    completedSubdivisions: number
+  }>>({})
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null)
@@ -59,32 +64,60 @@ export default function CampaignsPage() {
     if (campaignsData) {
       setCampaigns(campaignsData as Campaign[])
       
-      // Fetch total active territories (denominator for progress)
-      const { count: totalActive } = await supabase
-        .from("territories")
-        .select("*", { count: 'exact', head: true })
-        .neq("status", "inactive")
+      // Fetch assignments, subdivisions, campaign progress, and territories in parallel
+      const [assignmentsRes, progressRes, subdivisionsRes, territoriesRes] = await Promise.all([
+        supabase.from("assignments").select("territory_id, campaign_id, status"),
+        supabase.from("subdivision_campaign_progress").select("completed, campaign_id, subdivision_id"),
+        supabase.from("subdivisions").select("id, territory_id"),
+        supabase.from("territories").select("id, type").neq("status", "inactive")
+      ])
 
-      // Fetch COMPLETED assignments for unique territory count per campaign
-      const { data: completedAssignments } = await supabase
-        .from("assignments")
-        .select("territory_id, campaign_id")
-        .eq("status", "completed")
+      const allAssignments = assignmentsRes.data || []
+      const allProgress = progressRes.data || []
+      const allSubdivisions = subdivisionsRes.data || []
+      const allActiveTerritories = territoriesRes.data || []
 
-      const newStats: Record<string, { total: number, completed: number }> = {}
+      // Filtrar apenas territórios residenciais ativos (tipo nulo conta como residencial por padrão)
+      const residentialTerritories = allActiveTerritories.filter(
+        (t: any) => !t.type || t.type === "residencial"
+      )
+      const residentialIds = new Set(residentialTerritories.map((t: any) => t.id))
+      const totalActiveResidential = residentialIds.size
+
+      const newStats: Record<string, { 
+        total: number, 
+        completed: number,
+        totalSubdivisions: number,
+        completedSubdivisions: number
+      }> = {}
       
-      // Initialize stats for each campaign with the TOTAL active territories
       campaignsData.forEach((c: Campaign) => {
-        // Count unique territories completed in this campaign
+        const campaignAssignments = allAssignments.filter((a: any) => a.campaign_id === c.id)
+        
+        // Denominador: Total de territórios residenciais ativos cadastrados
+        const total = totalActiveResidential
+
+        // Numerador: Territórios residenciais concluídos nesta campanha
+        const completedAssignments = campaignAssignments.filter((a: any) => a.status === "completed")
         const uniqueCompleted = new Set(
           completedAssignments
-            ?.filter((a: any) => a.campaign_id === c.id)
             .map((a: any) => a.territory_id)
+            .filter((tid: string) => residentialIds.has(tid))
         ).size
 
+        // Total de quadras apenas dos territórios residenciais ativos
+        const campaignSubdivisions = allSubdivisions.filter((s: any) => residentialIds.has(s.territory_id))
+        const totalSubdivisions = campaignSubdivisions.length
+
+        // Quadras concluídas nesta campanha
+        const campaignProgress = allProgress.filter((p: any) => p.campaign_id === c.id && p.completed)
+        const completedSubdivisions = campaignProgress.length
+
         newStats[c.id] = { 
-          total: totalActive || 0, 
-          completed: uniqueCompleted 
+          total, 
+          completed: uniqueCompleted,
+          totalSubdivisions,
+          completedSubdivisions
         }
       })
       
@@ -99,8 +132,8 @@ export default function CampaignsPage() {
       setFormData({
         name: campaign.name,
         description: campaign.description || "",
-        start_date: campaign.start_date || "",
-        end_date: campaign.end_date || "",
+        start_date: campaign.start_date ? campaign.start_date.split("T")[0] : "",
+        end_date: campaign.end_date ? campaign.end_date.split("T")[0] : "",
       })
     } else {
       setEditingCampaign(null)
@@ -364,7 +397,7 @@ export default function CampaignsPage() {
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-1.5 text-muted-foreground">
                         <CheckSquare className="h-3.5 w-3.5" />
-                        <span>Progresso</span>
+                        <span>Territórios</span>
                       </div>
                       <span className="font-medium">
                         {stats[campaign.id].completed} de {stats[campaign.id].total}
@@ -374,9 +407,18 @@ export default function CampaignsPage() {
                       value={(stats[campaign.id].completed / stats[campaign.id].total) * 100} 
                       className="h-2"
                     />
-                    <p className="text-[0.625rem] text-right text-muted-foreground">
-                      {Math.round((stats[campaign.id].completed / stats[campaign.id].total) * 100)}% concluído
-                    </p>
+                    <div className="flex justify-between items-center text-[0.625rem] text-muted-foreground mt-1">
+                      {campaign.active && stats[campaign.id].totalSubdivisions > 0 ? (
+                        <span>
+                          Quadras: {stats[campaign.id].completedSubdivisions} de {stats[campaign.id].totalSubdivisions} ({Math.round((stats[campaign.id].completedSubdivisions / stats[campaign.id].totalSubdivisions) * 100)}%)
+                        </span>
+                      ) : (
+                        <span />
+                      )}
+                      <span>
+                        {Math.round((stats[campaign.id].completed / stats[campaign.id].total) * 100)}% concluído
+                      </span>
+                    </div>
                   </div>
                 )}
                 {(!stats[campaign.id] || stats[campaign.id].total === 0) && (

@@ -22,8 +22,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { IconArrowLeft } from "@tabler/icons-react"
 import {
-  ArrowLeft,
   Loader2,
   MapPin,
   Check,
@@ -98,6 +98,7 @@ export default function TerritoryMapPage({
         subdivisions(*),
         do_not_visits(*),
         campaign:campaigns(*),
+        assignments(*),
         assigned_to_user:profiles!territories_assigned_to_fkey(id, name, email)
       `)
       .eq("id", id)
@@ -105,7 +106,32 @@ export default function TerritoryMapPage({
       .single()
 
     if (data) {
-      setTerritory(data as TerritoryWithSubdivisions)
+      const activeAssignment = data.assignments?.find((a: any) => a.status === 'active')
+      const campaignId = activeAssignment?.campaign_id
+      let subdivisions = data.subdivisions || []
+
+      if (campaignId && subdivisions.length > 0) {
+        const { data: progressData, error: progressError } = await supabase
+          .from("subdivision_campaign_progress")
+          .select("*")
+          .eq("campaign_id", campaignId)
+          .in("subdivision_id", subdivisions.map((s: any) => s.id))
+        
+        if (!progressError && progressData) {
+          subdivisions = subdivisions.map((s: any) => {
+            const prog = progressData.find((p: any) => p.subdivision_id === s.id)
+            return {
+              ...s,
+              completed: prog ? prog.completed : false,
+              status: prog ? prog.status : "available",
+              notes: prog ? prog.notes : (s.notes || null),
+              completed_at: prog ? prog.updated_at : null
+            }
+          })
+        }
+      }
+
+      setTerritory({ ...data, subdivisions } as unknown as TerritoryWithSubdivisions)
       setTerritoryForm({ name: data.name || "", number: data.number || "", color: data.color || "#044454" })
       if ((data as any).type === "condominium") {
         router.replace(`/dashboard/territories/${id}/condominium`)
@@ -172,24 +198,71 @@ export default function TerritoryMapPage({
   const handleSaveEditSubdivision = async () => {
     if (!selectedSubdivision || !editSubdivisionName.trim()) return
     setSaving(true)
-    const { error } = await supabase.from("subdivisions")
-      .update({ name: editSubdivisionName, notes: editSubdivisionNotes })
+
+    const activeAssignment = (territory as any)?.assignments?.find((a: any) => a.status === 'active')
+    const campaignId = activeAssignment?.campaign_id
+
+    // Update name on subdivision itself (independent of campaign)
+    const { error: nameError } = await supabase.from("subdivisions")
+      .update({ name: editSubdivisionName })
       .eq("id", selectedSubdivision.id)
-    if (error) alert("Erro: " + error.message)
+
+    if (nameError) {
+      alert("Erro ao salvar nome da quadra: " + nameError.message)
+    } else {
+      if (campaignId) {
+        // Save notes to campaign progress
+        const { error: progressError } = await supabase.from("subdivision_campaign_progress")
+          .upsert({
+            subdivision_id: selectedSubdivision.id,
+            campaign_id: campaignId,
+            notes: editSubdivisionNotes,
+            completed: selectedSubdivision.completed || false,
+            status: selectedSubdivision.status || "available",
+            updated_at: new Date().toISOString()
+          }, { onConflict: "subdivision_id,campaign_id" })
+        if (progressError) alert("Erro ao salvar observações da campanha: " + progressError.message)
+      } else {
+        // Save notes to subdivision directly
+        const { error: notesError } = await supabase.from("subdivisions")
+          .update({ notes: editSubdivisionNotes })
+          .eq("id", selectedSubdivision.id)
+        if (notesError) alert("Erro ao salvar observações: " + notesError.message)
+      }
+    }
+
     setEditDialogOpen(false)
     setSaving(false)
     fetchTerritory()
   }
 
   const toggleSubdivisionStatus = async (subdivision: Subdivision) => {
+    const activeAssignment = (territory as any)?.assignments?.find((a: any) => a.status === 'active')
+    const campaignId = activeAssignment?.campaign_id
+
     const newCompleted = !subdivision.completed
-    await supabase.from("subdivisions")
-      .update({
-        completed: newCompleted,
-        status: newCompleted ? "completed" : "available",
-        completed_at: newCompleted ? new Date().toISOString() : null,
-      })
-      .eq("id", subdivision.id)
+    const nextStatus = newCompleted ? "completed" : "available"
+
+    if (campaignId) {
+      await supabase
+        .from("subdivision_campaign_progress")
+        .upsert({
+          subdivision_id: subdivision.id,
+          campaign_id: campaignId,
+          completed: newCompleted,
+          status: nextStatus,
+          notes: subdivision.notes || null,
+          updated_at: new Date().toISOString()
+        }, { onConflict: "subdivision_id,campaign_id" })
+    } else {
+      await supabase.from("subdivisions")
+        .update({
+          completed: newCompleted,
+          status: nextStatus,
+          completed_at: newCompleted ? new Date().toISOString() : null,
+        })
+        .eq("id", subdivision.id)
+    }
     fetchTerritory()
   }
 
@@ -299,7 +372,7 @@ export default function TerritoryMapPage({
     return (
       <div className="text-center py-12">
         <p className="text-muted-foreground mb-4">Território não encontrado</p>
-        <Button asChild><Link href="/dashboard/territories"><ArrowLeft className="mr-2 h-4 w-4" />Voltar</Link></Button>
+        <Button asChild><Link href="/dashboard/territories"><IconArrowLeft size={16} className="mr-2" />Voltar</Link></Button>
       </div>
     )
   }
@@ -316,69 +389,47 @@ export default function TerritoryMapPage({
      * Usamos dvh (dynamic viewport height) para mobile: considera a barra
      * do browser corretamente, eliminando o espaço em branco na parte inferior.
      */
-    <div className="flex flex-col h-[calc(100dvh-64px)] md:h-dvh">
+    <div className="flex flex-col h-dvh">
 
-      {/* ── Subheader da página do mapa ── */}
-      {/*
-       * Fica abaixo do GlobalHeader (que já ocupa os 64px do topo).
-       * Altura: 48px — compacto mas com alvo de toque adequado no mobile.
-       * Contém: voltar | dot+número+nome | lápis editar | [spacer] | progresso | painel-quadras
-       */}
-      <div className="h-12 border-b bg-card flex items-center gap-2 px-3 shrink-0 z-20">
+      {/* ── Barra do território ── */}
+      <div className="relative h-11 border-b bg-card flex items-center gap-3 px-4 shrink-0 z-20">
 
         {/* Voltar */}
-        <Button variant="ghost" size="sm" asChild className="h-8 w-8 p-0 shrink-0 text-muted-foreground">
-          <Link href="/dashboard/territories">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
+        <Link href="/dashboard/territories" className="shrink-0 text-foreground">
+          <IconArrowLeft size={20} />
+        </Link>
 
-        <div className="h-4 w-px bg-border shrink-0" />
-
-        {/* Número + nome */}
-        <div className="flex items-center gap-1.5 flex-1 min-w-0">
-          <span className="text-[11px] font-mono text-muted-foreground shrink-0">
-            {(() => { const s = String(territory.number); return /^\d+$/.test(s) ? `R-${s.padStart(2,'0')}` : s })()}
-          </span>
-          <span className="text-[13px] font-semibold text-foreground truncate">
+        {/* Dot + nome */}
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <span
+            className="w-2 h-2 rounded-full shrink-0"
+            style={{ backgroundColor: territory.color }}
+          />
+          <span className="text-[15px] font-medium text-foreground truncate">
             {territory.name}
           </span>
+        </div>
+
+        {/* Pill de progresso */}
+        <div className="flex items-center gap-2 shrink-0">
+          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />}
+          <span className="text-[12px] text-muted-foreground tabular-nums bg-muted rounded-xl px-[10px] py-1">
+            {stats.completed} / {stats.total}
+          </span>
           <button
-            onClick={() => setEditTerritoryDialogOpen(true)}
-            className="shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="md:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
+            onClick={() => setShowMobileSidebar(true)}
+            aria-label="Abrir painel de quadras"
           >
-            <Pencil className="h-3 w-3" />
+            <LayoutGrid className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Progresso compacto — sempre visível */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-[11px] font-medium text-foreground tabular-nums">
-            {stats.completed}/{stats.total} quadras
-          </span>
-          <div className="h-1.5 w-14 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-green-500 rounded-full transition-all duration-500"
-              style={{ width: `${stats.percentage}%` }}
-            />
-          </div>
-          <span className="text-[10px] text-muted-foreground tabular-nums hidden sm:inline">
-            {stats.percentage}%
-          </span>
-        </div>
-
-        {saving && (
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-primary shrink-0" />
-        )}
-
-        {/* Botão Painel de Quadras — mobile only, ícone de grid */}
-        <button
-          className="md:hidden shrink-0 w-9 h-9 flex items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
-          onClick={() => setShowMobileSidebar(true)}
-          aria-label="Abrir painel de quadras"
-        >
-          <LayoutGrid className="h-4 w-4" />
-        </button>
+        {/* Barra de progresso — borda inferior */}
+        <div
+          className="absolute bottom-0 left-0 h-[3px] bg-primary transition-all duration-500"
+          style={{ width: `${stats.percentage}%` }}
+        />
       </div>
 
       {/* ── Corpo: mapa + sidebar ── */}

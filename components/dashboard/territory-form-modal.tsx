@@ -128,6 +128,7 @@ export function TerritoryFormModal({ open, onOpenChange, territory, groups, onSu
   // Delete state
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState("")
 
   // Step 2 state
   const [step, setStep] = useState<1 | 2>(1)
@@ -143,6 +144,7 @@ export function TerritoryFormModal({ open, onOpenChange, territory, groups, onSu
     setCreatedTerritoryId(null)
     setBlocks([{ name: "", floors: 1, aptsPerFloor: 1 }])
     setShowDeleteConfirm(false)
+    setDeleteConfirmationText("")
 
     if (territory) {
       setType(getTypeFromTerritory(territory))
@@ -323,89 +325,103 @@ export function TerritoryFormModal({ open, onOpenChange, territory, groups, onSu
         </DialogDescription>
       </DialogHeader>
 
-      <div className="space-y-4 py-4">
-        {/* Tipo */}
-        <div className="space-y-1">
-          <Label>Tipo</Label>
-          <div className="flex rounded-lg border border-border overflow-hidden">
-            {(["residencial", "comercial", "condominium"] as TerritoryTypeOption[]).map((opt, i) => (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => handleTypeChange(opt)}
-                className={cn(
-                  "flex-1 py-2 text-xs font-bold transition-colors",
-                  i !== 0 && "border-l border-border",
-                  type === opt
-                    ? "bg-foreground text-background"
-                    : "bg-card text-muted-foreground hover:bg-muted/50"
-                )}
-              >
-                {opt === "residencial" ? "Residencial" : opt === "comercial" ? "Comercial" : "Condominial"}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Subtipo — only visible for condominium */}
-        {type === "condominium" && (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+        {/* Left Column: Basic Info */}
+        <div className="space-y-4">
+          {/* Tipo */}
           <div className="space-y-1">
-            <Label>Subtipo</Label>
+            <Label>Tipo</Label>
             <div className="flex rounded-lg border border-border overflow-hidden">
-              {(["building", "houses"] as SubtypeOption[]).map((opt, i) => (
+              {(["residencial", "comercial", "condominium"] as TerritoryTypeOption[]).map((opt, i) => (
                 <button
                   key={opt}
                   type="button"
-                  onClick={() => setSubtype(opt)}
+                  onClick={() => handleTypeChange(opt)}
                   className={cn(
                     "flex-1 py-2 text-xs font-bold transition-colors",
                     i !== 0 && "border-l border-border",
-                    subtype === opt
+                    type === opt
                       ? "bg-foreground text-background"
                       : "bg-card text-muted-foreground hover:bg-muted/50"
                   )}
                 >
-                  {opt === "building" ? "Predial" : "Casas"}
+                  {opt === "residencial" ? "Residencial" : opt === "comercial" ? "Comercial" : "Condominial"}
                 </button>
               ))}
             </div>
           </div>
-        )}
 
-        {/* Número */}
-        <div className="space-y-1">
-          <Label>Número</Label>
-          <div className="relative">
-            <Input
-              value={number}
-              onChange={e => setNumber(e.target.value)}
-              disabled={numberLoading}
-            />
-            {numberLoading && (
-              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+          {/* Subtipo — only visible for condominium */}
+          {type === "condominium" && (
+            <div className="space-y-1">
+              <Label>Subtipo</Label>
+              <div className="flex rounded-lg border border-border overflow-hidden">
+                {(["building", "houses"] as SubtypeOption[]).map((opt, i) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setSubtype(opt)}
+                    className={cn(
+                      "flex-1 py-2 text-xs font-bold transition-colors",
+                      i !== 0 && "border-l border-border",
+                      subtype === opt
+                        ? "bg-foreground text-background"
+                        : "bg-card text-muted-foreground hover:bg-muted/50"
+                    )}
+                  >
+                    {opt === "building" ? "Predial" : "Casas"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Número */}
+          <div className="space-y-1">
+            <Label>Número</Label>
+            <div className="relative">
+              <Input
+                value={number}
+                onChange={e => setNumber(e.target.value)}
+                disabled={numberLoading}
+              />
+              {numberLoading && (
+                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+              )}
+            </div>
+            {!isEdit && number && !numberLoading && (
+              <p className="text-xs text-muted-foreground">
+                Exibido como {fmtTerritoryNumber(number)}
+              </p>
             )}
           </div>
-          {!isEdit && number && !numberLoading && (
-            <p className="text-xs text-muted-foreground">
-              Exibido como {fmtTerritoryNumber(number)}
-            </p>
+
+          {/* Nome */}
+          <div className="space-y-1">
+            <Label>Nome/Referência</Label>
+            <Input
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="Ex: Quadra do Mercado"
+            />
+          </div>
+
+          {/* Território Ativo — edit only */}
+          {isEdit && (
+            <div className="flex items-center justify-between p-3 border rounded-md bg-muted/30">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-medium">Território Ativo</Label>
+                <p className="text-xs text-muted-foreground">Desative para ocultar das listas de designação.</p>
+              </div>
+              <Switch checked={!inactive} onCheckedChange={(val: boolean) => setInactive(!val)} />
+            </div>
           )}
         </div>
 
-        {/* Nome */}
-        <div className="space-y-1">
-          <Label>Nome/Referência</Label>
-          <Input
-            value={name}
-            onChange={e => setName(e.target.value)}
-            placeholder="Ex: Quadra do Mercado"
-          />
-        </div>
-
-        {/* Grupo */}
-        <div className="space-y-1">
+        {/* Right Column: Group Selection */}
+        <div className="space-y-2 flex flex-col justify-start">
           <Label className="text-primary font-bold">Grupo</Label>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
             {/* Nenhum */}
             <div
               role="button"
@@ -447,21 +463,10 @@ export function TerritoryFormModal({ open, onOpenChange, territory, groups, onSu
             })}
           </div>
         </div>
-
-        {/* Território Ativo — edit only */}
-        {isEdit && (
-          <div className="flex items-center justify-between p-3 border rounded-md bg-muted/30">
-            <div className="space-y-0.5">
-              <Label className="text-sm font-medium">Território Ativo</Label>
-              <p className="text-xs text-muted-foreground">Desative para ocultar das listas de designação.</p>
-            </div>
-            <Switch checked={!inactive} onCheckedChange={(val: boolean) => setInactive(!val)} />
-          </div>
-        )}
       </div>
 
       {showDeleteConfirm ? (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
           <div className="flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
             <div>
@@ -473,11 +478,26 @@ export function TerritoryFormModal({ open, onOpenChange, territory, groups, onSu
               </p>
             </div>
           </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs text-destructive font-bold">Digite <span className="underline">excluir</span> para confirmar:</Label>
+            <Input
+              value={deleteConfirmationText}
+              onChange={e => setDeleteConfirmationText(e.target.value)}
+              placeholder="excluir"
+              className="border-destructive/30 focus-visible:ring-destructive text-sm"
+              autoFocus
+            />
+          </div>
           <div className="flex gap-2 justify-end">
             <Button variant="outline" size="sm" onClick={() => setShowDeleteConfirm(false)}>
               Cancelar
             </Button>
-            <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
+            <Button 
+              variant="destructive" 
+              size="sm" 
+              onClick={handleDelete} 
+              disabled={deleting || deleteConfirmationText !== "excluir"}
+            >
               {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Excluir definitivamente"}
             </Button>
           </div>
@@ -623,7 +643,7 @@ export function TerritoryFormModal({ open, onOpenChange, territory, groups, onSu
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[450px]">
+      <DialogContent className="sm:max-w-[700px] max-h-[95vh] overflow-y-auto">
         {step === 1 ? renderStep1() : renderStep2()}
       </DialogContent>
     </Dialog>

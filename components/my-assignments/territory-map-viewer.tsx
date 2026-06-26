@@ -249,14 +249,20 @@ export default function TerritoryMapViewer({
       className: 'user-location-marker',
       html: `<div class="location-wrapper">
         <div class="heading-cone" style="opacity:0">
-          <svg width="20" height="28" viewBox="0 0 20 28" xmlns="http://www.w3.org/2000/svg">
-            <polygon points="10,0 20,28 0,28" fill="#378ADD" fill-opacity="0.85"/>
+          <svg width="24" height="32" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="coneGrad" x1="0.5" y1="0" x2="0.5" y2="1">
+                <stop offset="0%" stop-color="#378ADD" stop-opacity="0.95"/>
+                <stop offset="100%" stop-color="#378ADD" stop-opacity="0.2"/>
+              </linearGradient>
+            </defs>
+            <path d="M12,2 L22,30 Q12,24 2,30 Z" fill="url(#coneGrad)"/>
           </svg>
         </div>
         <div class="location-dot"></div>
       </div>`,
-      iconSize: [40, 42],
-      iconAnchor: [20, 35],
+      iconSize: [44, 46],
+      iconAnchor: [22, 38],
     })
 
     if ('geolocation' in navigator) {
@@ -299,7 +305,7 @@ export default function TerritoryMapViewer({
     const prev = currentHeadingRef.current
     const smoothed = smoothAngle(prev, rawHeading)
     currentHeadingRef.current = smoothed
-    if (Math.abs(smoothed - prev) < 1) return
+    if (Math.abs(smoothed - prev) < 2) return
     const el = userMarkerRef.current?.getElement()
     if (!el) return
     const cone = el.querySelector('.heading-cone') as HTMLElement | null
@@ -309,23 +315,31 @@ export default function TerritoryMapViewer({
   }, [])
 
   const setupOrientationListeners = useCallback(() => {
-    const handler = (e: DeviceOrientationEvent) => {
-      let heading: number | null = null
-      if (typeof (e as any).webkitCompassHeading === 'number') {
-        heading = (e as any).webkitCompassHeading
-      } else if (e.alpha !== null) {
-        heading = e.alpha
-      }
-      if (heading !== null) applyHeading(heading)
+    let usedAbsolute = false
+
+    const absoluteHandler = (e: DeviceOrientationEvent) => {
+      if (e.alpha === null) return
+      usedAbsolute = true
+      // deviceorientationabsolute: alpha é anti-horário a partir do Norte geográfico → inverter
+      applyHeading((360 - e.alpha) % 360)
     }
 
-    // deviceorientationabsolute é preferido no Android (orientação real em relação ao norte)
-    window.addEventListener('deviceorientationabsolute', handler as EventListener)
-    window.addEventListener('deviceorientation', handler as EventListener)
+    const relativeHandler = (e: DeviceOrientationEvent) => {
+      if (usedAbsolute) return // prefere absolute quando disponível
+      if (typeof (e as any).webkitCompassHeading === 'number') {
+        // iOS: já é horário a partir do Norte magnético
+        applyHeading((e as any).webkitCompassHeading)
+      } else if (e.alpha !== null) {
+        applyHeading((360 - e.alpha) % 360)
+      }
+    }
+
+    window.addEventListener('deviceorientationabsolute', absoluteHandler as EventListener)
+    window.addEventListener('deviceorientation', relativeHandler as EventListener)
 
     return () => {
-      window.removeEventListener('deviceorientationabsolute', handler as EventListener)
-      window.removeEventListener('deviceorientation', handler as EventListener)
+      window.removeEventListener('deviceorientationabsolute', absoluteHandler as EventListener)
+      window.removeEventListener('deviceorientation', relativeHandler as EventListener)
     }
   }, [applyHeading])
 
@@ -529,31 +543,33 @@ export default function TerritoryMapViewer({
 
         .location-wrapper {
           position: relative;
-          width: 40px;
-          height: 42px;
+          width: 44px;
+          height: 46px;
         }
 
         .heading-cone {
           position: absolute;
           top: 0;
           left: 10px;
-          width: 20px;
-          height: 35px;
+          width: 24px;
+          height: 38px;
           transform-origin: center bottom;
-          transition: opacity 0.3s ease;
+          transition: opacity 0.4s ease;
           pointer-events: none;
+          filter: drop-shadow(0 1px 3px rgba(55,138,221,0.4));
         }
 
         .location-dot {
           position: absolute;
-          top: 28px;
+          top: 31px;
           left: 50%;
           transform: translateX(-50%);
           width: 14px;
           height: 14px;
           background-color: #378ADD;
           border-radius: 50%;
-          border: 2px solid white;
+          border: 2.5px solid white;
+          box-shadow: 0 1px 4px rgba(55,138,221,0.5);
           z-index: 1;
         }
       `}</style>

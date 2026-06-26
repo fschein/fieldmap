@@ -87,6 +87,7 @@ export interface TerritoryWithSubdivisions extends Territory {
   subdivisions?: Subdivision[]
   campaign?: Campaign
   do_not_visits?: DoNotVisit[]
+  assignments?: any[]
   assigned_to_user?: {
     id: string
     name: string
