@@ -58,17 +58,32 @@ export function useRequestTerritory() {
     async (territoryId: string): Promise<void> => {
       if (!user?.id) throw new Error("Usuário não autenticado")
 
+      const today = new Date().toISOString().slice(0, 10)
+      const { data: campaigns } = await supabase
+        .from("campaigns")
+        .select("id, start_date, end_date")
+        .eq("active", true)
+
+      const activeCampaign = (campaigns ?? []).find((c: { id: string; start_date: string | null; end_date: string | null }) => {
+        if (!c.start_date) return false
+        if (today < c.start_date) return false
+        if (c.end_date && today > c.end_date) return false
+        return true
+      })
+      const campaignId = activeCampaign?.id ?? null
+
       const { error: assignError } = await supabase.from("assignments").insert({
         territory_id: territoryId,
         user_id: user.id,
         status: "active",
         assigned_at: new Date().toISOString(),
+        campaign_id: campaignId,
       })
       if (assignError) throw assignError
 
       const { error: updateError } = await supabase
         .from("territories")
-        .update({ assigned_to: user.id, status: "assigned" })
+        .update({ assigned_to: user.id, status: "assigned", campaign_id: campaignId })
         .eq("id", territoryId)
       if (updateError) throw updateError
     },
