@@ -176,13 +176,13 @@ export function AssignmentCreateModal({
         const campsData = campRes.data as any[]
         setCampaigns(campsData)
 
-        const today = new Date()
+        const todayStr = new Date().toISOString().slice(0, 10)
         const currentCampaign = campsData.find(c => {
           if (!c.start_date) return false
-          const start = new Date(c.start_date + "T00:00:00")
-          const end = c.end_date ? new Date(c.end_date + "T23:59:59") : null
-          return today >= start && (!end || today <= end)
-        })
+          if (todayStr < c.start_date) return false
+          if (c.end_date && todayStr > c.end_date) return false
+          return true
+        }) ?? campsData[0]
 
         if (currentCampaign) setSelectedCampaignId(currentCampaign.id)
       }
