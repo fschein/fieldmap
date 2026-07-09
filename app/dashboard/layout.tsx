@@ -100,12 +100,12 @@ export default function DashboardLayout({
   const isMapPage = isDetailMapPage || isOverviewMapPage
   const sidebarRoles = ["admin", "supervisor"]
   const showSidebar = !isSetupPage && profile?.role && sidebarRoles.includes(profile.role)
-  const showBottomNav = !isSetupPage && !isDetailMapPage && profile?.role && BOTTOM_NAV_ROLES.includes(profile.role)
+  const showBottomNav = !isSetupPage && !isMapPage && profile?.role && BOTTOM_NAV_ROLES.includes(profile.role)
   const showHeader = !isSetupPage && !isMapPage
 
   return (
     <SettingsProvider>
-      <div className="min-h-screen bg-background">
+      <div className={cn(isMapPage ? "h-dvh overflow-hidden bg-background" : "min-h-screen bg-background")}>
         {showHeader && <GlobalHeader />}
         {showSidebar && <Sidebar />}
         <main className={cn(
