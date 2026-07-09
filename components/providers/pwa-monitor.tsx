@@ -8,25 +8,48 @@ export function PWAMonitor() {
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return
 
+    let shown = false
+    const show = () => { if (!shown) { shown = true; setShowBanner(true) } }
+
+    // Backup: controllerchange cobre casos em que o SW já foi trocado antes do mount
     const hadController = !!navigator.serviceWorker.controller
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (hadController) show()
+    })
 
-    const handleControllerChange = () => {
-      if (hadController) setShowBanner(true)
-    }
+    navigator.serviceWorker.getRegistration().then((registration) => {
+      if (!registration) return
 
-    const handleVisibilityChange = () => {
+      // SW em waiting já existente (update anterior não aplicado)
+      if (registration.waiting && navigator.serviceWorker.controller) {
+        show()
+        return
+      }
+
+      // Caminho principal: updatefound → statechange → activated
+      // Dispara APÓS nosso registration.update(), sem race condition
+      registration.addEventListener("updatefound", () => {
+        const worker = registration.installing
+        if (!worker) return
+        worker.addEventListener("statechange", () => {
+          if (worker.state === "activated") show()
+        })
+      })
+
+      registration.update().catch(() => {})
+    })
+
+    const handleVisibility = () => {
       if (document.visibilityState === "visible") {
-        navigator.serviceWorker.ready.then((reg) => reg.update()).catch(() => {})
+        navigator.serviceWorker.getRegistration()
+          .then((reg) => reg?.update())
+          .catch(() => {})
       }
     }
-
-    navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange)
-    document.addEventListener("visibilitychange", handleVisibilityChange)
-    navigator.serviceWorker.ready.then((reg) => reg.update()).catch(() => {})
+    document.addEventListener("visibilitychange", handleVisibility)
 
     return () => {
-      navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange)
-      document.removeEventListener("visibilitychange", handleVisibilityChange)
+      document.removeEventListener("visibilitychange", handleVisibility)
     }
   }, [])
 
