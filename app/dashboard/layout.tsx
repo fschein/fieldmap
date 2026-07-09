@@ -101,11 +101,12 @@ export default function DashboardLayout({
   const sidebarRoles = ["admin", "supervisor"]
   const showSidebar = !isSetupPage && profile?.role && sidebarRoles.includes(profile.role)
   const showBottomNav = !isSetupPage && !isDetailMapPage && profile?.role && BOTTOM_NAV_ROLES.includes(profile.role)
+  const showHeader = !isSetupPage && !isMapPage
 
   return (
     <SettingsProvider>
       <div className="min-h-screen bg-background">
-        {!isSetupPage && !isMapPage && <GlobalHeader />}
+        {showHeader && <GlobalHeader />}
         {showSidebar && <Sidebar />}
         <main className={cn(
           showSidebar ? "md:ml-56" : "",

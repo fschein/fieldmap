@@ -114,7 +114,7 @@ export default function MapPage() {
   }
 
   return (
-    <div className="mt-16 md:mt-0 h-[calc(100dvh-4rem)] md:h-screen w-full overflow-hidden">
+    <div className="h-screen w-full overflow-hidden">
       <OverviewMap groups={groups} subdivisions={subdivisions} />
     </div>
   )
