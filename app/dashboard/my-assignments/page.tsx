@@ -7,7 +7,7 @@ import { createTimeoutSignal } from "@/lib/utils/api-utils"
 import { useAuth } from "@/hooks/use-auth"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Loader2, MapPin, ChevronRight, Plus } from "lucide-react"
+import { Loader2, MapPin, ChevronRight, Plus, ArrowRightLeft } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { TerritoryWithSubdivisions, Subdivision } from "@/lib/types"
 import { toast } from "sonner"
@@ -16,6 +16,7 @@ import { format, parseISO, isToday, isTomorrow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { ClipboardList, CalendarDays, Calendar } from "lucide-react"
 import { RequestTerritoryModal } from "@/components/dashboard/request-territory-modal"
+import { TransferTerritoryModal } from "@/components/dashboard/transfer-territory-modal"
 
 interface AssignmentRecord {
   id: string
@@ -51,6 +52,13 @@ export default function MyAssignmentsPage() {
   const [nextSchedule, setNextSchedule] = useState<any>(null)
   const [fetchingSchedule, setFetchingSchedule] = useState(true)
   const [requestModalOpen, setRequestModalOpen] = useState(false)
+  const [transferTarget, setTransferTarget] = useState<{
+    territoryId: string
+    territoryNumber: string
+    territoryName: string | null
+    assignmentId: string
+    campaignId: string | null
+  } | null>(null)
   const router = useRouter()
 
   const fetchMyAssignments = useCallback(async () => {
@@ -139,13 +147,12 @@ export default function MyAssignmentsPage() {
     if (!user?.id || !profile?.name || requesting || cooldown > 0) return
     setRequesting(true)
     try {
-      const { error } = await supabase.from("notifications").insert({
-        type: "request",
-        title: "Pedido de Território",
-        message: `${profile.name} está solicitando um novo território para trabalhar.`,
-        created_by: user.id,
+      const res = await fetch("/api/notifications/request-territory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id }),
       })
-      if (error) throw error
+      if (!res.ok) throw new Error("Erro ao notificar pedido")
       localStorage.setItem("last_territory_request", Date.now().toString())
       setCooldown(300)
       toast.success("Pedido enviado!")
@@ -291,48 +298,70 @@ export default function MyAssignmentsPage() {
                     : "bg-warning/10 text-warning"
 
               return (
-                <button
+                <div
                   key={t.id}
-                  onClick={() => router.push(`/dashboard/my-assignments/${t.id}/map`)}
                   className={cn(
-                    "w-full text-left bg-card rounded-xl border transition-all active:scale-[0.98] flex items-stretch overflow-hidden",
+                    "w-full bg-card rounded-xl border transition-all flex items-stretch overflow-hidden",
                     isOverdue ? "border-destructive/50" : "border-border hover:border-primary/30"
                   )}
                 >
-                  <div className="w-1 shrink-0 self-stretch my-2.5 ml-2.5 rounded-full" style={{ backgroundColor: t.color || "var(--primary)" }} />
-                  <div className="flex-1 px-3 py-2.5 space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-foreground flex-1 truncate">
-                      {fmtTerritoryNumber(t.number)}
-                      {t.name && <span className="font-normal text-muted-foreground"> · {t.name}</span>}
-                    </span>
-                    <span className={cn("text-[0.6875rem] font-medium px-2 py-0.5 rounded-full", badgeClass)}>
-                      {progress}%
-                    </span>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground/30 flex-shrink-0" />
-                  </div>
-
-
-
-                  <div className="h-1 rounded-full bg-muted overflow-hidden">
-                    <div className={cn("h-full rounded-full transition-all", progressColor)} style={{ width: `${progress}%` }} />
-                  </div>
-
-                  <div className="flex items-center gap-2 text-[0.6875rem] text-muted-foreground">
-                    <span>{days} dias</span>
-                    <span className="w-1 h-1 rounded-full bg-border inline-block" />
-                    <span>{done} de {total} quadras</span>
-                    {isOverdue && (
-                      <span className="text-red-500 font-medium bg-red-500/10 px-1.5 py-0.5 rounded-full">Em atraso</span>
-                    )}
-                    {campaignName && (
-                      <span className="ml-auto bg-muted border border-border px-1.5 py-0.5 rounded text-[0.625rem]">
-                        {campaignName}
+                  <button
+                    onClick={() => router.push(`/dashboard/my-assignments/${t.id}/map`)}
+                    className="flex-1 text-left flex items-stretch active:scale-[0.99] transition-transform"
+                  >
+                    <div className="w-1 shrink-0 self-stretch my-2.5 ml-2.5 rounded-full" style={{ backgroundColor: t.color || "var(--primary)" }} />
+                    <div className="flex-1 px-3 py-2.5 space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-foreground flex-1 truncate">
+                        {fmtTerritoryNumber(t.number)}
+                        {t.name && <span className="font-normal text-muted-foreground"> · {t.name}</span>}
                       </span>
-                    )}
-                  </div>
-                  </div>
-                </button>
+                      <span className={cn("text-[0.6875rem] font-medium px-2 py-0.5 rounded-full", badgeClass)}>
+                        {progress}%
+                      </span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground/30 flex-shrink-0" />
+                    </div>
+
+
+
+                    <div className="h-1 rounded-full bg-muted overflow-hidden">
+                      <div className={cn("h-full rounded-full transition-all", progressColor)} style={{ width: `${progress}%` }} />
+                    </div>
+
+                    <div className="flex items-center gap-2 text-[0.6875rem] text-muted-foreground">
+                      <span>{days} dias</span>
+                      <span className="w-1 h-1 rounded-full bg-border inline-block" />
+                      <span>{done} de {total} quadras</span>
+                      {isOverdue && (
+                        <span className="text-red-500 font-medium bg-red-500/10 px-1.5 py-0.5 rounded-full">Em atraso</span>
+                      )}
+                      {campaignName && (
+                        <span className="ml-auto bg-muted border border-border px-1.5 py-0.5 rounded text-[0.625rem]">
+                          {campaignName}
+                        </span>
+                      )}
+                    </div>
+                    </div>
+                  </button>
+                  {activeAssignment && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setTransferTarget({
+                          territoryId: t.id,
+                          territoryNumber: t.number,
+                          territoryName: t.name,
+                          assignmentId: activeAssignment.id,
+                          campaignId: activeAssignment.campaign_id,
+                        })
+                      }}
+                      className="shrink-0 flex items-center justify-center w-11 border-l border-border text-muted-foreground hover:text-primary hover:bg-muted/40 transition-colors"
+                      title="Transferir território"
+                    >
+                      <ArrowRightLeft className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
               )
             })}
           </div>
@@ -344,6 +373,19 @@ export default function MyAssignmentsPage() {
         onOpenChange={setRequestModalOpen}
         onSuccess={fetchMyAssignments}
       />
+
+      {transferTarget && (
+        <TransferTerritoryModal
+          open={!!transferTarget}
+          onOpenChange={(open) => !open && setTransferTarget(null)}
+          territoryId={transferTarget.territoryId}
+          territoryNumber={transferTarget.territoryNumber}
+          territoryName={transferTarget.territoryName}
+          assignmentId={transferTarget.assignmentId}
+          campaignId={transferTarget.campaignId}
+          onSuccess={fetchMyAssignments}
+        />
+      )}
     </div>
   )
 }

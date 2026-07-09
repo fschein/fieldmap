@@ -20,6 +20,9 @@ export type NotificationType =
   | "progress_60"            // dirigente passou de 60% do território
   | "request"                // publicador solicitou território
   | "idle"                   // (legado)
+  | "transferred"            // dirigente transferiu território para outro
+  | "schedule_checkin"       // ~2h após início da saída — lembrete de atualizar quadras
+  | "schedule_upcoming"      // ~24h antes da saída de campo
 
 export interface NotifyOptions {
   /** Supabase client com service role para contornar RLS */

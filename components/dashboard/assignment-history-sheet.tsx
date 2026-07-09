@@ -334,6 +334,7 @@ export function AssignmentHistorySheet({
                   {assignments.map((assignment) => {
                     const isActive = assignment.status === 'active'
                     const isCompleted = assignment.status === 'completed'
+                    const isTransferred = assignment.status === 'returned' && !!assignment.return_reason?.startsWith('Transferido')
                     const isEditing = editingId === assignment.id
 
                     return (
@@ -361,7 +362,7 @@ export function AssignmentHistorySheet({
                               <span className={`text-[0.625rem] px-1.5 py-0.5 rounded-full font-medium ${isActive ? 'bg-primary/20 text-primary' :
                                   isCompleted ? 'bg-emerald-500/10 text-emerald-500' : 'bg-muted text-muted-foreground'
                                 }`}>
-                                {isActive ? 'Em Campo' : isCompleted ? 'Concluído' : 'Devolvido'}
+                                {isActive ? 'Em Campo' : isCompleted ? 'Concluído' : isTransferred ? 'Transferido' : 'Devolvido'}
                               </span>
                               {canEdit && !isEditing && (
                                 <div className="flex items-center gap-1">

@@ -3,6 +3,7 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from "@/providers/auth-provider"
 import { PWAMonitor } from "@/components/providers/pwa-monitor"
+import { ServiceWorkerRegister } from "@/components/providers/sw-register"
 import { NoSelect } from "@/components/providers/no-select"
 import { Toaster } from "sonner"
 
@@ -42,6 +43,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <AuthProvider>
           <NoSelect />
+          <ServiceWorkerRegister />
           <PWAMonitor />
           {children}
           <Toaster position="top-center" richColors />

@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import { sendNotification, notifyAdmins } from "@/lib/notifications"
 
-const OVERDUE_DAYS = parseInt(process.env.OVERDUE_DAYS ?? "30", 10)
+const OVERDUE_DAYS = parseInt(process.env.OVERDUE_DAYS ?? "90", 10)
 const PROGRESS_THRESHOLD = 0.6 // 60%
 
 /**
@@ -16,7 +16,9 @@ const PROGRESS_THRESHOLD = 0.6 // 60%
  */
 export async function GET(req: Request) {
   const cronSecret = process.env.CRON_SECRET
+  const authHeader = req.headers.get("authorization")
   const provided =
+    authHeader?.replace(/^Bearer\s+/i, "") ??
     req.headers.get("x-cron-secret") ??
     new URL(req.url).searchParams.get("secret")
 
@@ -70,6 +72,19 @@ export async function GET(req: Request) {
       createdBy: assignment.user_id,
       territoryId: assignment.territory_id,
     })
+
+    if (assignment.user_id) {
+      await sendNotification({
+        supabase,
+        type: "overdue",
+        title: "Território Atrasado ⏰",
+        message: `Você está com o Território ${terrNumber}${terrName ? ` - ${terrName}` : ""} há ${daysInField} dias. Que tal dar uma força nele?`,
+        url: `/dashboard/my-assignments/${assignment.territory_id}/map`,
+        createdBy: assignment.user_id,
+        territoryId: assignment.territory_id,
+        targetUserId: assignment.user_id,
+      })
+    }
 
     results.overdue++
   }
