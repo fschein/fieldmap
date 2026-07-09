@@ -1,131 +1,16 @@
-"use client"
+import DashboardShell from "./dashboard-shell"
 
-import React, { useEffect, useState } from "react"
-import { useRouter, usePathname } from "next/navigation"
-import { useAuth } from "@/hooks/use-auth"
-import { Sidebar } from "@/components/dashboard/sidebar"
-import { Loader2 } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { getSupabaseBrowserClient } from "@/lib/supabase/client"
-import { PushSubscriptionManager } from "@/components/dashboard/push-subscription-manager"
-import { useUnreadNotifications } from "@/hooks/use-unread-notifications"
-import { BottomNav } from "@/components/layout/bottom-nav"
-import { SettingsProvider } from "@/providers/settings-provider"
-import { GlobalHeader } from "@/components/layout/global-header"
-
-const BOTTOM_NAV_ROLES = ["dirigente", "publicador", "supervisor", "admin"]
+// Todo o conteúdo do dashboard depende de autenticação e é buscado no cliente
+// (Supabase). Sem isso, o Next.js trata essas páginas como estáticas e a
+// Vercel as serve via cache de CDN (ISR) — o que significa que deploys novos
+// podem demorar a aparecer para quem já visitou a página antes, mesmo depois
+// de limpar o cache do navegador.
+export const dynamic = "force-dynamic"
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const { loading, user, profile, isReady } = useAuth()
-  const router = useRouter()
-  const pathname = usePathname()
-  const [shouldRender, setShouldRender] = useState(false)
-  const unreadCount = useUnreadNotifications()
-
-  useEffect(() => {
-    // Aguarda até que a autenticação esteja pronta
-    if (!isReady) return
-
-    // Se não há usuário e já está pronto, redireciona
-    if (!user) {
-      router.replace("/login")
-      return
-    }
-
-    // REDIRECIONAMENTO PARA TROCA DE SENHA OBRIGATÓRIA
-    // Se o perfil carregou e deve trocar a senha, mas não está na página de setup
-    if (profile?.must_change_password && pathname !== "/dashboard/setup-password") {
-      router.replace("/dashboard/setup-password")
-      return
-    }
-
-    // Se NÃO precisa trocar a senha mas está na página de setup, sai de lá
-    if (profile && !profile.must_change_password && pathname === "/dashboard/setup-password") {
-      router.replace("/dashboard/my-assignments")
-      return
-    }
-
-    // Se há usuário, pode renderizar
-    setShouldRender(true)
-
-    // Atualiza o last_seen_at uma vez por sessão/dia
-    const updateLastSeen = async () => {
-      if (!user?.id) return
-
-      const lastSeenUpdate = sessionStorage.getItem(`last_seen_${user.id}`)
-      const today = new Date().toDateString()
-
-      if (lastSeenUpdate === today) return
-
-      const supabase = getSupabaseBrowserClient()
-      await supabase
-        .from("profiles")
-        .update({ last_seen_at: new Date().toISOString() })
-        .eq("id", user.id)
-
-      sessionStorage.setItem(`last_seen_${user.id}`, today)
-    }
-
-    updateLastSeen()
-  }, [isReady, user, profile, pathname, router])
-
-  // Estado de carregamento inicial
-  if (!isReady || loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-muted/30">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground">Carregando...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Não renderiza até confirmar que tem usuário
-  if (!shouldRender || !user) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-muted/30">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
-
-  const isSetupPage = pathname === "/dashboard/setup-password"
-  const isDetailMapPage = pathname.includes("/map") && pathname !== "/dashboard/map"
-  const isOverviewMapPage = pathname === "/dashboard/map"
-  const isMapPage = isDetailMapPage || isOverviewMapPage
-  const sidebarRoles = ["admin", "supervisor"]
-  const showSidebar = !isSetupPage && profile?.role && sidebarRoles.includes(profile.role)
-  const showBottomNav = !isSetupPage && !isMapPage && profile?.role && BOTTOM_NAV_ROLES.includes(profile.role)
-  const showHeader = !isSetupPage && !isMapPage
-
-  return (
-    <SettingsProvider>
-      <div className={cn(isMapPage ? "h-dvh overflow-hidden bg-background" : "min-h-screen bg-background")}>
-        {showHeader && <GlobalHeader />}
-        {showSidebar && <Sidebar />}
-        <main className={cn(
-          showSidebar ? "md:ml-56" : "",
-          showBottomNav && !isOverviewMapPage && "pb-16 md:pb-0"
-        )}>
-          <div className={cn(
-            "container mx-auto p-2 pt-20 md:pt-6",
-            isSetupPage && "pt-6",
-            isMapPage && "p-0"
-          )}>
-            {children}
-          </div>
-        </main>
-
-        {/* Bottom Nav visível apenas para Dirigentes e Publicadores no mobile, e se não for página de setup/mapa */}
-        {showBottomNav && (
-          <BottomNav unreadCount={unreadCount} />
-        )}
-      </div>
-    </SettingsProvider>
-  )
+  return <DashboardShell>{children}</DashboardShell>
 }

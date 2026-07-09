@@ -7,7 +7,7 @@ import { createTimeoutSignal } from "@/lib/utils/api-utils"
 import { useAuth } from "@/hooks/use-auth"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Loader2, MapPin, ChevronRight, Plus, ArrowRightLeft } from "lucide-react"
+import { Loader2, MapPin, ChevronRight, Plus, ArrowRightLeft, X } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { TerritoryWithSubdivisions, Subdivision } from "@/lib/types"
 import { toast } from "sonner"
@@ -52,6 +52,7 @@ export default function MyAssignmentsPage() {
   const [nextSchedule, setNextSchedule] = useState<any>(null)
   const [fetchingSchedule, setFetchingSchedule] = useState(true)
   const [requestModalOpen, setRequestModalOpen] = useState(false)
+  const [showTransferHint, setShowTransferHint] = useState(false)
   const [transferTarget, setTransferTarget] = useState<{
     territoryId: string
     territoryNumber: string
@@ -111,6 +112,17 @@ export default function MyAssignmentsPage() {
       setLoading(false)
     }
   }, [user?.id])
+
+  useEffect(() => {
+    if (localStorage.getItem("transfer_hint_dismissed") !== "true") {
+      setShowTransferHint(true)
+    }
+  }, [])
+
+  const dismissTransferHint = () => {
+    localStorage.setItem("transfer_hint_dismissed", "true")
+    setShowTransferHint(false)
+  }
 
   useEffect(() => {
     if (isReady) {
@@ -248,6 +260,18 @@ export default function MyAssignmentsPage() {
             </p>
           </div>
         </div>
+
+        {showTransferHint && territories.length > 0 && (
+          <div className="flex items-start gap-2.5 px-3 py-2.5 bg-primary/5 border border-primary/20 rounded-xl">
+            <ArrowRightLeft className="h-4 w-4 text-primary shrink-0 mt-0.5" />
+            <p className="text-xs text-foreground flex-1">
+              Precisa passar um território pra outra pessoa? Usa o botão de transferência no card, em vez de mandar print — assim o histórico e as quadras ficam certos.
+            </p>
+            <button onClick={dismissTransferHint} className="text-muted-foreground hover:text-foreground shrink-0">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
 
         <div className="flex items-center justify-between">
           <p className="text-[0.625rem] font-black uppercase tracking-widest text-muted-foreground">

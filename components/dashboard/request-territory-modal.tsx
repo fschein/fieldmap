@@ -10,6 +10,7 @@ import { toast } from "sonner"
 import { cn, fmtTerritoryNumber } from "@/lib/utils"
 import { Territory, Group } from "@/lib/types"
 import { useRequestTerritory, UrgentGroupSuggestion } from "@/hooks/use-request-territory"
+import { useAuth } from "@/hooks/use-auth"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { differenceInDays, parseISO } from "date-fns"
 
@@ -41,6 +42,7 @@ export function RequestTerritoryModal({
   onSuccess,
 }: RequestTerritoryModalProps) {
   const { fetchGroups, fetchAvailableTerritory, findMostUrgentGroup, requestTerritory } = useRequestTerritory()
+  const { user } = useAuth()
 
   const [step, setStep] = useState<Step>("select-group")
   const [groups, setGroups] = useState<Group[]>([])
@@ -134,19 +136,30 @@ export function RequestTerritoryModal({
   }, [fetchAvailableTerritory, campaignMode, activeCampaign])
 
   const handleConfirm = useCallback(async () => {
-    if (!territory) return
+    if (!territory || !user?.id) return
     setConfirming(true)
     try {
       await requestTerritory(territory.id)
       toast.success("Território designado com sucesso!")
       onOpenChange(false)
       onSuccess()
+
+      fetch("/api/notifications/request-territory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          territoryId: territory.id,
+          territoryNumber: territory.number,
+          territoryName: territory.name,
+        }),
+      }).catch(() => {})
     } catch {
       toast.error("Erro ao confirmar designação.")
     } finally {
       setConfirming(false)
     }
-  }, [territory, requestTerritory, onOpenChange, onSuccess])
+  }, [territory, requestTerritory, onOpenChange, onSuccess, user?.id])
 
   const handleBack = useCallback(() => {
     setStep("select-group")

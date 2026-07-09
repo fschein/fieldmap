@@ -15,7 +15,7 @@ export async function POST(request: Request) {
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
-    const { userId } = await request.json()
+    const { userId, territoryId, territoryNumber, territoryName } = await request.json()
     if (!userId) {
       return NextResponse.json({ error: "userId é obrigatório" }, { status: 400 })
     }
@@ -28,12 +28,17 @@ export async function POST(request: Request) {
 
     const userName = profile?.name || profile?.email || "Um publicador"
 
+    const message = territoryNumber
+      ? `${userName} pediu e recebeu automaticamente o Território ${territoryNumber}${territoryName ? ` - ${territoryName}` : ""}.`
+      : `${userName} está solicitando um novo território para trabalhar.`
+
     await notifyAdmins(supabaseAdmin, {
       type: "request",
       title: "Pedido de Território",
-      message: `${userName} está solicitando um novo território para trabalhar.`,
-      url: "/dashboard/assignments",
+      message,
+      url: territoryId ? `/dashboard/territories/${territoryId}` : "/dashboard/assignments",
       createdBy: userId,
+      territoryId: territoryId ?? undefined,
     })
 
     return NextResponse.json({ success: true })
