@@ -46,6 +46,7 @@ export function RequestTerritoryModal({
   const [groups, setGroups] = useState<Group[]>([])
   const [loadingGroups, setLoadingGroups] = useState(false)
   const [selectedGroupId, setSelectedGroupId] = useState("")
+  const [selectedIsCommercial, setSelectedIsCommercial] = useState(false)
   const [loadingGroupId, setLoadingGroupId] = useState<string | null>(null)
   const [territory, setTerritory] = useState<Territory | null>(null)
   const [noTerritory, setNoTerritory] = useState(false)
@@ -58,6 +59,7 @@ export function RequestTerritoryModal({
     if (!open) return
     setStep("select-group")
     setSelectedGroupId("")
+    setSelectedIsCommercial(false)
     setTerritory(null)
     setNoTerritory(false)
     setNoCampaignTerritory(false)
@@ -91,18 +93,21 @@ export function RequestTerritoryModal({
     setLoadingGroups(true)
   }, [open, fetchGroups])
 
-  const handleGroupSelect = useCallback(async (groupId: string) => {
-    setSelectedGroupId(groupId)
-    setLoadingGroupId(groupId)
+  const handleSelect = useCallback(async (opts: { groupId?: string; commercial?: boolean }) => {
+    const key = opts.commercial ? "comercial" : (opts.groupId ?? "")
+    setSelectedGroupId(key)
+    setSelectedIsCommercial(!!opts.commercial)
+    setLoadingGroupId(key)
     setNoTerritory(false)
     setNoCampaignTerritory(false)
     try {
-      const result = await fetchAvailableTerritory(
-        groupId,
-        campaignMode && activeCampaign
-          ? { id: activeCampaign.id, startDate: activeCampaign.startDate }
-          : null
-      )
+      const campaign = campaignMode && activeCampaign
+        ? { id: activeCampaign.id, startDate: activeCampaign.startDate }
+        : null
+      const selector = opts.commercial
+        ? { territoryType: "comercial" as const }
+        : { groupId: opts.groupId! }
+      const result = await fetchAvailableTerritory(selector, campaign)
       setTerritory(result)
       if (result === null) {
         if (campaignMode) setNoCampaignTerritory(true)
@@ -139,6 +144,7 @@ export function RequestTerritoryModal({
   }, [])
 
   const selectedGroup = groups.find((g) => g.id === selectedGroupId)
+  const COMMERCIAL_KEY = "comercial"
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -173,14 +179,14 @@ export function RequestTerritoryModal({
               {loadingGroups ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground py-4">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Carregando regiões…
+                  Carregando…
                 </div>
               ) : (
                 <div className="flex flex-col gap-1.5">
                   {groups.map((g) => (
                     <button
                       key={g.id}
-                      onClick={() => handleGroupSelect(g.id)}
+                      onClick={() => handleSelect({ groupId: g.id })}
                       disabled={loadingGroupId !== null}
                       className={cn(
                         "flex items-center gap-3 w-full px-3 py-2.5 rounded-lg border text-sm font-medium text-left transition-colors",
@@ -199,6 +205,25 @@ export function RequestTerritoryModal({
                       Região {g.name}
                     </button>
                   ))}
+
+                  <div className="h-px bg-border my-0.5" />
+
+                  <button
+                    onClick={() => handleSelect({ commercial: true })}
+                    disabled={loadingGroupId !== null}
+                    className={cn(
+                      "flex items-center gap-3 w-full px-3 py-2.5 rounded-lg border text-sm font-medium text-left transition-colors",
+                      "bg-card hover:bg-muted/60 border-border",
+                      "disabled:opacity-50 disabled:cursor-not-allowed"
+                    )}
+                  >
+                    {loadingGroupId === COMMERCIAL_KEY ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0 text-muted-foreground" />
+                    ) : (
+                      <span className="inline-block h-3 w-3 rounded-full shrink-0 bg-amber-500" />
+                    )}
+                    Comercial
+                  </button>
                 </div>
               )}
             </div>
@@ -231,7 +256,7 @@ export function RequestTerritoryModal({
                 <div className="flex items-center gap-3">
                   <div
                     className="h-8 w-1 rounded-full shrink-0"
-                    style={{ backgroundColor: selectedGroup?.color || territory.color || "var(--primary)" }}
+                    style={{ backgroundColor: selectedIsCommercial ? "#f59e0b" : (selectedGroup?.color || territory.color || "var(--primary)") }}
                   />
                   <div>
                     <p className="font-semibold text-foreground text-base leading-tight">

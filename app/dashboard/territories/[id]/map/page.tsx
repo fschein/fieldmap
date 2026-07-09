@@ -251,7 +251,7 @@ export default function TerritoryMapPage({
           campaign_id: campaignId,
           completed: newCompleted,
           status: nextStatus,
-          notes: subdivision.notes || null,
+          notes: newCompleted ? null : (subdivision.notes || null),
           updated_at: new Date().toISOString()
         }, { onConflict: "subdivision_id,campaign_id" })
     } else {
@@ -260,6 +260,7 @@ export default function TerritoryMapPage({
           completed: newCompleted,
           status: nextStatus,
           completed_at: newCompleted ? new Date().toISOString() : null,
+          ...(newCompleted && { notes: null }),
         })
         .eq("id", subdivision.id)
     }

@@ -257,6 +257,7 @@ export default function TerritoryMapPage() {
         const now = new Date()
         base.setHours(now.getHours(), now.getMinutes(), now.getSeconds())
         updateData.completed_at = base.toISOString()
+        updateData.notes = null
       } else {
         // Reopen: clear completion timestamp
         updateData.completed_at = null
@@ -271,10 +272,8 @@ export default function TerritoryMapPage() {
           updated_at: new Date().toISOString(),
         }
         
-        // Preserve campaign-specific notes if already present
-        if (selectedSubdivision.notes !== undefined) {
-          campaignUpdateData.notes = selectedSubdivision.notes
-        }
+        // Clear notes on completion; preserve on reopen
+        campaignUpdateData.notes = isNowCompleting ? null : (selectedSubdivision.notes ?? null)
 
         const { error } = await supabase
           .from("subdivision_campaign_progress")

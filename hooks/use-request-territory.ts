@@ -16,15 +16,19 @@ export function useRequestTerritory() {
   }, [])
 
   const fetchAvailableTerritory = useCallback(async (
-    groupId: string,
+    selector: { groupId: string; territoryType?: never } | { territoryType: string; groupId?: never },
     campaign?: { id: string; startDate: string } | null
   ): Promise<Territory | null> => {
-    const { data, error } = await supabase
+    let query = supabase
       .from("territories")
       .select("*, assignments(id, completed_at)")
-      .eq("group_id", groupId)
       .in("status", ["available", "completed"])
       .is("assigned_to", null)
+
+    if (selector.groupId) query = query.eq("group_id", selector.groupId)
+    else if (selector.territoryType) query = query.eq("type", selector.territoryType)
+
+    const { data, error } = await query
 
     if (error || !data?.length) return null
 

@@ -183,7 +183,7 @@ export default function DashboardPage() {
           territories ( name, number )
         `)
         .order("assigned_at", { ascending: false })
-        .limit(100)
+        .limit(500)
 
       if (!tData || !aData) return
 
@@ -246,6 +246,10 @@ export default function DashboardPage() {
         const totalTerritories = tData.filter((t: any) => t.status !== "inactive").length
         const subsLookup = new Map<string, any[]>(tData.map((t: any) => [t.id, t.subdivisions ?? []]))
 
+        const completedCampIds = new Set(
+          (campAssignments ?? []).filter((a: any) => a.status === "completed").map((a: any) => a.territory_id)
+        )
+
         const completed = (campAssignments ?? [])
           .filter((a: any) => a.status === "completed")
           .map((a: any) => ({
@@ -257,27 +261,32 @@ export default function DashboardPage() {
           }))
           .sort((a: any, b: any) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
 
-        const inProgress = (campAssignments ?? [])
-          .filter((a: any) => a.status === "active")
-          .map((a: any) => {
-            const subs = subsLookup.get(a.territory_id) ?? []
+        // Em andamento: qualquer território com status 'assigned' que ainda não foi concluído
+        // na campanha — independentemente de ter campaign_id na assignment ativa
+        const activeTerritoryIds = new Set(
+          tData.filter((t: any) => t.status === "assigned").map((t: any) => t.id)
+        )
+        const inProgress = tData
+          .filter((t: any) => t.status === "assigned" && !completedCampIds.has(t.id))
+          .map((t: any) => {
+            const subs = subsLookup.get(t.id) ?? []
             const progress = subs.length > 0
               ? Math.round(subs.filter((s: any) => s.completed || s.status === "completed").length / subs.length * 100)
               : 0
+            const activeA = aData.find((a: any) => a.territory_id === t.id && a.status === "active")
             return {
-              territoryId: a.territory_id,
-              number: a.territories?.number || "",
-              name: a.territories?.name || "",
-              color: a.territories?.color || "",
-              assignee: lookup.get(a.user_id) || lookup.get(a.group_id) || "?",
-              daysInField: Math.ceil((new Date().getTime() - new Date(a.assigned_at).getTime()) / (1000 * 60 * 60 * 24)),
+              territoryId: t.id,
+              number: t.number || "",
+              name: t.name || "",
+              color: t.color || "",
+              assignee: activeA ? (lookup.get(activeA.user_id) || lookup.get(activeA.group_id) || "?") : "?",
+              daysInField: activeA ? Math.ceil((new Date().getTime() - new Date(activeA.assigned_at).getTime()) / (1000 * 60 * 60 * 24)) : 0,
               progress,
             }
           })
 
-        const coveredIds = new Set((campAssignments ?? []).map((a: any) => a.territory_id))
         const notStarted = tData
-          .filter((t: any) => t.status !== "inactive" && !coveredIds.has(t.id))
+          .filter((t: any) => t.status !== "inactive" && !completedCampIds.has(t.id) && !activeTerritoryIds.has(t.id))
           .map((t: any) => ({ territoryId: t.id, number: t.number, name: t.name, color: t.color }))
           .sort((a: any, b: any) => (a.number || "").localeCompare(b.number || "", undefined, { numeric: true }))
 
