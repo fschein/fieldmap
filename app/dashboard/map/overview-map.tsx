@@ -1,10 +1,12 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import { GroupInfo, SubdivisionFlat } from "./page"
 import { cn } from "@/lib/utils"
+import { ArrowLeft } from "lucide-react"
 
 interface Props {
   groups: GroupInfo[]
@@ -52,6 +54,7 @@ function heatColor(count: number, maxCount: number): string {
 }
 
 export default function OverviewMap({ groups, subdivisions }: Props) {
+  const router = useRouter()
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
   const layersRef = useRef<L.FeatureGroup | null>(null)
@@ -170,6 +173,14 @@ export default function OverviewMap({ groups, subdivisions }: Props) {
 
       {/* Top bar — única linha, sem sobreposição */}
       <div className="absolute top-3 left-3 right-3 z-[1000] flex items-center gap-2">
+
+        {/* Back button */}
+        <button
+          onClick={() => router.back()}
+          className="flex items-center justify-center rounded-xl bg-card border border-border shadow-md p-2 shrink-0"
+        >
+          <ArrowLeft className="h-4 w-4 text-foreground" />
+        </button>
 
         {/* Filter toggle */}
         <button
