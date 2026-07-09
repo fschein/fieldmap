@@ -250,16 +250,22 @@ export default function DashboardPage() {
           (campAssignments ?? []).filter((a: any) => a.status === "completed").map((a: any) => a.territory_id)
         )
 
-        const completed = (campAssignments ?? [])
+        const completedMap = new Map<string, any>()
+        ;(campAssignments ?? [])
           .filter((a: any) => a.status === "completed")
-          .map((a: any) => ({
-            territoryId: a.territory_id,
-            number: a.territories?.number || "",
-            name: a.territories?.name || "",
-            color: a.territories?.color || "",
-            completedAt: a.completed_at,
-          }))
-          .sort((a: any, b: any) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
+          .sort((a: any, b: any) => new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime())
+          .forEach((a: any) => {
+            if (!completedMap.has(a.territory_id)) {
+              completedMap.set(a.territory_id, {
+                territoryId: a.territory_id,
+                number: a.territories?.number || "",
+                name: a.territories?.name || "",
+                color: a.territories?.color || "",
+                completedAt: a.completed_at,
+              })
+            }
+          })
+        const completed = Array.from(completedMap.values())
 
         // Em andamento: qualquer território com status 'assigned' que ainda não foi concluído
         // na campanha — independentemente de ter campaign_id na assignment ativa
