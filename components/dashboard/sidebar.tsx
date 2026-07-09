@@ -18,6 +18,7 @@ import {
   IconUsersGroup,
   IconUserCircle,
   IconLogout,
+  IconMapPins,
 } from "@tabler/icons-react"
 import { Menu, X } from "lucide-react"
 import { useState, useCallback } from "react"
@@ -44,6 +45,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { title: "Dashboard", href: "/dashboard", icon: IconLayoutDashboard, roles: ["admin", "supervisor"] },
       { title: "Territórios", href: "/dashboard/territories", icon: IconMap2, roles: ["admin", "supervisor"] },
+      { title: "Mapa Geral", href: "/dashboard/map", icon: IconMapPins, roles: ["admin", "supervisor"] },
     ],
   },
   {
