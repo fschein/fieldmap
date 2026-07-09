@@ -15,7 +15,10 @@ export function useRequestTerritory() {
     return (data as Group[]) ?? []
   }, [])
 
-  const fetchAvailableTerritory = useCallback(async (groupId: string): Promise<Territory | null> => {
+  const fetchAvailableTerritory = useCallback(async (
+    groupId: string,
+    campaign?: { id: string; startDate: string } | null
+  ): Promise<Territory | null> => {
     const { data, error } = await supabase
       .from("territories")
       .select("*, assignments(id, completed_at)")
@@ -25,11 +28,26 @@ export function useRequestTerritory() {
 
     if (error || !data?.length) return null
 
+    let candidates = data as any[]
+
+    if (campaign) {
+      const { data: covered } = await supabase
+        .from("assignments")
+        .select("territory_id")
+        .eq("campaign_id", campaign.id)
+        .in("status", ["completed", "active"])
+
+      const coveredIds = new Set((covered ?? []).map((a: { territory_id: string }) => a.territory_id))
+      candidates = candidates.filter((t) => !coveredIds.has(t.id))
+    }
+
+    if (!candidates.length) return null
+
     const sixMonthsAgo = new Date()
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
     const sixMonthsAgoStr = sixMonthsAgo.toISOString()
 
-    const withCounts = (data as any[]).map((t) => ({
+    const withCounts = candidates.map((t) => ({
       ...t,
       recentCompletions: ((t.assignments ?? []) as { completed_at: string | null }[]).filter(
         (a) => a.completed_at && a.completed_at >= sixMonthsAgoStr
@@ -37,16 +55,12 @@ export function useRequestTerritory() {
     }))
 
     withCounts.sort((a, b) => {
-      // 1. Nunca trabalhado primeiro
       if (a.last_completed_at === null && b.last_completed_at !== null) return -1
       if (a.last_completed_at !== null && b.last_completed_at === null) return 1
-      // 2. Mais antigo primeiro
       if (a.last_completed_at && b.last_completed_at) {
-        const diff =
-          new Date(a.last_completed_at).getTime() - new Date(b.last_completed_at).getTime()
+        const diff = new Date(a.last_completed_at).getTime() - new Date(b.last_completed_at).getTime()
         if (diff !== 0) return diff
       }
-      // 3. Menos repetições recentes primeiro
       return a.recentCompletions - b.recentCompletions
     })
 

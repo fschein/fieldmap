@@ -127,6 +127,16 @@ interface RecentActivity {
   date: string
 }
 
+interface CampaignProgress {
+  id: string
+  name: string
+  startDate: string
+  totalTerritories: number
+  completed: { territoryId: string; number: string; name: string; color: string; completedAt: string }[]
+  inProgress: { territoryId: string; number: string; name: string; color: string; assignee: string; daysInField: number; progress: number }[]
+  notStarted: { territoryId: string; number: string; name: string; color: string }[]
+}
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -138,6 +148,7 @@ export default function DashboardPage() {
   const [territories, setTerritories] = useState<TerritoryWithStats[]>([])
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [namesLookup, setNamesLookup] = useState<Map<string, string>>(new Map())
+  const [campaignProgress, setCampaignProgress] = useState<CampaignProgress | null>(null)
   const [loading, setLoading] = useState(true)
   const supabase = getSupabaseBrowserClient()
   const router = useRouter()
@@ -211,6 +222,76 @@ export default function DashboardPage() {
       }))
       setRecentActivity(acts)
 
+      // 4. Campanha ativa
+      setCampaignProgress(null)
+      const today = new Date().toISOString().slice(0, 10)
+      const { data: campaignsData } = await supabase
+        .from("campaigns")
+        .select("id, name, start_date, end_date")
+        .eq("active", true)
+
+      const activeCamp = (campaignsData ?? []).find((c: any) => {
+        if (!c.start_date || today < c.start_date) return false
+        if (c.end_date && today > c.end_date) return false
+        return true
+      })
+
+      if (activeCamp) {
+        const { data: campAssignments } = await supabase
+          .from("assignments")
+          .select("territory_id, status, completed_at, assigned_at, user_id, group_id, territories(number, name, color)")
+          .eq("campaign_id", activeCamp.id)
+          .in("status", ["completed", "active"])
+
+        const totalTerritories = tData.filter((t: any) => t.status !== "inactive").length
+        const subsLookup = new Map<string, any[]>(tData.map((t: any) => [t.id, t.subdivisions ?? []]))
+
+        const completed = (campAssignments ?? [])
+          .filter((a: any) => a.status === "completed")
+          .map((a: any) => ({
+            territoryId: a.territory_id,
+            number: a.territories?.number || "",
+            name: a.territories?.name || "",
+            color: a.territories?.color || "",
+            completedAt: a.completed_at,
+          }))
+          .sort((a: any, b: any) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
+
+        const inProgress = (campAssignments ?? [])
+          .filter((a: any) => a.status === "active")
+          .map((a: any) => {
+            const subs = subsLookup.get(a.territory_id) ?? []
+            const progress = subs.length > 0
+              ? Math.round(subs.filter((s: any) => s.completed || s.status === "completed").length / subs.length * 100)
+              : 0
+            return {
+              territoryId: a.territory_id,
+              number: a.territories?.number || "",
+              name: a.territories?.name || "",
+              color: a.territories?.color || "",
+              assignee: lookup.get(a.user_id) || lookup.get(a.group_id) || "?",
+              daysInField: Math.ceil((new Date().getTime() - new Date(a.assigned_at).getTime()) / (1000 * 60 * 60 * 24)),
+              progress,
+            }
+          })
+
+        const coveredIds = new Set((campAssignments ?? []).map((a: any) => a.territory_id))
+        const notStarted = tData
+          .filter((t: any) => t.status !== "inactive" && !coveredIds.has(t.id))
+          .map((t: any) => ({ territoryId: t.id, number: t.number, name: t.name, color: t.color }))
+          .sort((a: any, b: any) => (a.number || "").localeCompare(b.number || "", undefined, { numeric: true }))
+
+        setCampaignProgress({
+          id: activeCamp.id,
+          name: activeCamp.name,
+          startDate: activeCamp.start_date,
+          totalTerritories,
+          completed,
+          inProgress,
+          notStarted,
+        })
+      }
+
     } catch (e) { console.error(e) } finally { setLoading(false) }
   }
 
@@ -263,6 +344,118 @@ export default function DashboardPage() {
             danger={stats.overdueAssignments > 0}
           />
         </div>
+      )}
+
+      {/* ── Section: Campanha ── */}
+      {campaignProgress && (
+        <SectionCard>
+          <div className="px-4 pt-3 pb-3">
+            <div className="flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5 text-primary" />
+              <h2 className="text-[0.8125rem] font-semibold text-foreground">{campaignProgress.name}</h2>
+              <span className="ml-auto text-[0.875rem] font-black px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 shrink-0">
+                {campaignProgress.completed.length}/{campaignProgress.totalTerritories}
+              </span>
+            </div>
+            <p className="text-[0.6875rem] text-muted-foreground mt-0.5">
+              {"Desde "}
+              {(() => {
+                const parts = campaignProgress.startDate.slice(0, 10).split("-")
+                const months = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"]
+                return parts.length === 3 ? `${parts[2]}/${months[parseInt(parts[1]) - 1]}` : campaignProgress.startDate
+              })()}
+              {" · "}
+              {Math.round((campaignProgress.completed.length / (campaignProgress.totalTerritories || 1)) * 100)}% concluído
+            </p>
+            <div className="mt-2.5 h-[3px] w-full bg-muted/60 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all duration-700 rounded-full"
+                style={{ width: `${Math.round((campaignProgress.completed.length / (campaignProgress.totalTerritories || 1)) * 100)}%` }}
+              />
+            </div>
+          </div>
+
+          {(campaignProgress.inProgress.length > 0 || campaignProgress.notStarted.length > 0) && (
+            <>
+              <Divider />
+              <div className="px-4 py-1.5 bg-muted/30 flex items-center gap-3">
+                <span className="text-[0.625rem] font-black uppercase tracking-wider text-muted-foreground">
+                  Em andamento · {campaignProgress.inProgress.length}
+                </span>
+                {campaignProgress.notStarted.length > 0 && (
+                  <span className="text-[0.625rem] font-black uppercase tracking-wider text-muted-foreground/50">
+                    Não iniciado · {campaignProgress.notStarted.length}
+                  </span>
+                )}
+              </div>
+              <div className="divide-y divide-border/30">
+                {campaignProgress.inProgress.map((t) => (
+                  <div key={t.territoryId} className="flex items-stretch hover:bg-muted/5 transition-colors overflow-hidden">
+                    <div className="w-1 shrink-0 my-3 ml-4 rounded-full" style={{ backgroundColor: t.color || "hsl(var(--primary))" }} />
+                    <div className="flex-1 px-3 py-3 flex flex-col gap-2 min-w-0">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex flex-col min-w-0">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-[0.625rem] font-mono font-semibold text-muted-foreground shrink-0">{fmtTerritoryNumber(t.number)}</span>
+                            <h4 className="text-[0.8125rem] font-bold text-foreground truncate">{t.name}</h4>
+                          </div>
+                          <span className="text-[0.6875rem] text-muted-foreground/80 uppercase tracking-wide truncate">{t.assignee}</span>
+                        </div>
+                        <span className="text-[0.6875rem] font-bold text-muted-foreground/60 shrink-0 whitespace-nowrap">
+                          {t.daysInField}d · {t.progress}%
+                        </span>
+                      </div>
+                      <div className="h-[2px] w-full bg-muted/60 rounded-full overflow-hidden">
+                        <div className="h-full bg-primary/60 transition-all duration-700" style={{ width: `${t.progress}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {campaignProgress.notStarted.map((t) => (
+                  <div key={t.territoryId} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/5 transition-colors opacity-60">
+                    <div className="w-1 h-7 rounded-full shrink-0" style={{ backgroundColor: t.color || "hsl(var(--primary))" }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[0.625rem] font-mono font-semibold text-muted-foreground shrink-0">{fmtTerritoryNumber(t.number)}</span>
+                        <h4 className="text-[0.8125rem] font-bold text-foreground truncate">{t.name}</h4>
+                      </div>
+                    </div>
+                    <span className="text-[0.5625rem] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border/60 shrink-0">
+                      Não iniciado
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          {campaignProgress.completed.length > 0 && (
+            <>
+              <Divider />
+              <div className="px-4 py-1.5 bg-emerald-500/5">
+                <span className="text-[0.625rem] font-black uppercase tracking-wider text-emerald-600">
+                  Concluídos · {campaignProgress.completed.length}
+                </span>
+              </div>
+              <div className="divide-y divide-border/30">
+                {campaignProgress.completed.map((t) => (
+                  <div key={t.territoryId} className="flex items-center gap-3 px-4 py-3 hover:bg-muted/5 transition-colors">
+                    <div className="w-1 h-7 rounded-full shrink-0 bg-emerald-500" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[0.625rem] font-mono font-semibold text-muted-foreground shrink-0">{fmtTerritoryNumber(t.number)}</span>
+                        <h4 className="text-[0.8125rem] font-bold text-foreground truncate">{t.name}</h4>
+                      </div>
+                    </div>
+                    <span className="text-[0.625rem] font-bold text-muted-foreground/40 uppercase whitespace-nowrap">
+                      {new Date(t.completedAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", "")}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </SectionCard>
       )}
 
       {/* ── Section: Em campo ── */}

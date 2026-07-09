@@ -121,7 +121,8 @@ export async function exportScheduleToPDF(schedules: Schedule[], currentMonth: D
 
   // ── 2. Page header (first page) ─────────────────────────────────────────────
 
-  let curY = drawPageHeader(doc, currentMonth)
+  const headerImg = await loadHeaderImage()
+  let curY = drawPageHeader(doc, headerImg)
 
   // ── 3. Arrangement blocks ───────────────────────────────────────────────────
 
@@ -132,75 +133,47 @@ export async function exportScheduleToPDF(schedules: Schedule[], currentMonth: D
     // Page break if not enough room
     if (curY + needed > PAGE_H - 20 && i > 0) {
       doc.addPage()
-      curY = drawContinuationHeader(doc, currentMonth)
+      curY = drawContinuationHeader(doc, headerImg)
     }
 
     curY = drawArrangementBlock(doc, block, curY)
     curY += 6 // gap between blocks
   }
 
-  // ── 4. Footer on every page ─────────────────────────────────────────────────
+  // ── 4. Save ──────────────────────────────────────────────────────────────────
 
-  const totalPages = (doc as any).internal.getNumberOfPages()
-  for (let p = 1; p <= totalPages; p++) {
-    doc.setPage(p)
-    drawFooter(doc, p, totalPages)
-  }
+  doc.save("Serviço de campo.pdf")
+}
 
-  // ── 5. Save ─────────────────────────────────────────────────────────────────
+// ─── Image loader ─────────────────────────────────────────────────────────────
 
-  doc.save(`escala-${format(currentMonth, "yyyy-MM")}.pdf`)
+async function loadHeaderImage(): Promise<string> {
+  const response = await fetch("/header_campo.png")
+  const blob = await response.blob()
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
 }
 
 // ─── Section renderers ────────────────────────────────────────────────────────
 
-function drawPageHeader(doc: jsPDF, month: Date): number {
-  let y = MARGIN
+// Original image: 1507×87px → at COL_W (182mm): height = 87/1507 × 182 ≈ 10.5mm
+const HEADER_IMG_H    = (87 / 1507) * COL_W         // ~10.5mm — first page
+const HEADER_IMG_H_SM = (87 / 1507) * COL_W * 0.65  // ~6.8mm — continuation pages
+const HEADER_TOP_GAP  = 8   // mm from top of page
+const HEADER_TOP_GAP_SM = 5
 
-  // Thin brand bar at very top
-  doc.setFillColor(BRAND[0], BRAND[1], BRAND[2])
-  doc.rect(0, 0, PAGE_W, 4, "F")
-
-  y = 12
-
-  // Generic Title
-  setFont(doc, "bold", 18)
-  setColor(doc, BRAND)
-  doc.text("ESCALA DE SERVIÇO", MARGIN, y)
-
-  // Month label
-  const monthLabel = format(month, "MMMM 'de' yyyy", { locale: ptBR })
-  const monthCapitalized = monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
-  setFont(doc, "bold", 13)
-  setColor(doc, DARK)
-  doc.text(monthCapitalized, PAGE_W - MARGIN, y, { align: "right" })
-
-  y += 6
-  hRule(doc, y, BRAND, 0.6)
-  y += 5
-
-  // Legend removed as requested
-
-  return y
+function drawPageHeader(doc: jsPDF, headerImg: string): number {
+  doc.addImage(headerImg, "PNG", MARGIN, HEADER_TOP_GAP, COL_W, HEADER_IMG_H)
+  return HEADER_TOP_GAP + HEADER_IMG_H + 6
 }
 
-function drawContinuationHeader(doc: jsPDF, month: Date): number {
-  doc.setFillColor(BRAND[0], BRAND[1], BRAND[2])
-  doc.rect(0, 0, PAGE_W, 4, "F")
-
-  let y = 10
-  setFont(doc, "bold", 9)
-  setColor(doc, BRAND)
-  doc.text("ESCALA DE SERVIÇO", MARGIN, y)
-
-  const monthLabel = format(month, "MMMM yyyy", { locale: ptBR })
-  setFont(doc, "normal", 8)
-  setColor(doc, MUTED)
-  doc.text(monthLabel, PAGE_W - MARGIN, y, { align: "right" })
-
-  y += 3
-  hRule(doc, y, BORDER)
-  return y + 5
+function drawContinuationHeader(doc: jsPDF, headerImg: string): number {
+  doc.addImage(headerImg, "PNG", MARGIN, HEADER_TOP_GAP_SM, COL_W, HEADER_IMG_H_SM)
+  return HEADER_TOP_GAP_SM + HEADER_IMG_H_SM + 5
 }
 
 function estimateBlockHeight(block: ArrangementBlock): number {
@@ -280,19 +253,3 @@ function drawArrangementBlock(doc: jsPDF, block: ArrangementBlock, startY: numbe
   return finalY + 1
 }
 
-function drawFooter(doc: jsPDF, page: number, total: number) {
-  const y = PAGE_H - 7
-  setFont(doc, "normal", 6.5)
-  setColor(doc, MUTED)
-  doc.text(
-    `Gerado em ${format(new Date(), "dd/MM/yyyy HH:mm")}`,
-    MARGIN,
-    y
-  )
-  doc.text(
-    `${page} / ${total}`,
-    PAGE_W - MARGIN,
-    y,
-    { align: "right" }
-  )
-}

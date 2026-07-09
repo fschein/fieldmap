@@ -210,12 +210,11 @@ export function ScheduleGenerator({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={format(new Date(), "yyyy-MM")}>
-              {format(new Date(), "MMMM yyyy", { locale: ptBR })}
-            </SelectItem>
-            <SelectItem value={format(addMonths(new Date(), 1), "yyyy-MM")}>
-              {format(addMonths(new Date(), 1), "MMMM yyyy", { locale: ptBR })}
-            </SelectItem>
+            {[0, 1, 2].map((offset) => (
+              <SelectItem key={offset} value={format(addMonths(new Date(), offset), "yyyy-MM")}>
+                {format(addMonths(new Date(), offset), "MMMM yyyy", { locale: ptBR })}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
 

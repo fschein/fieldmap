@@ -362,13 +362,13 @@ export default function UsersPage() {
 
       {/* ── Modal Criar/Editar ── */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <form onSubmit={handleSubmit}>
-            <DialogHeader>
+        <DialogContent className="flex flex-col max-h-[90dvh] overflow-hidden p-0 gap-0">
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+            <DialogHeader className="px-6 pt-5 pb-2 shrink-0">
               <DialogTitle>{editingUser ? "Editar Usuário" : "Novo Usuário"}</DialogTitle>
               <DialogDescription>Ajuste as permissões e dados do perfil.</DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+            <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-6 py-3 grid gap-3 content-start">
               <div className="grid grid-cols-3 gap-4">
                 <div className="col-span-2 space-y-1">
                   <Label htmlFor="name" className="text-xs">Nome Completo</Label>
@@ -425,7 +425,7 @@ export default function UsersPage() {
               </div>
 
               {editingUser && (
-                <div className="flex items-center justify-between p-3 border rounded-md bg-muted/30">
+                <div className="flex items-center justify-between p-2.5 border rounded-md bg-muted/30">
                   <div className="space-y-0.5">
                     <Label className="text-sm font-medium">Status do Usuário</Label>
                     <p className="text-xs text-muted-foreground">
@@ -434,26 +434,26 @@ export default function UsersPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[0.625rem] font-bold text-muted-foreground uppercase tracking-wider">{formData.isActive ? "Ativo" : "Inativo"}</span>
-                    <Switch 
-                      checked={formData.isActive} 
-                      onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })} 
+                    <Switch
+                      checked={formData.isActive}
+                      onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
                     />
                   </div>
                 </div>
               )}
 
               {editingUser && (
-                <div className="bg-primary/5 p-3 rounded-md border border-primary/20 flex items-center justify-between">
+                <div className="bg-primary/5 p-2.5 rounded-md border border-primary/20 flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label className="text-xs text-primary font-bold flex items-center gap-1.5">
                       <Lock className="h-3 w-3" /> Segurança
                     </Label>
                     <p className="text-[0.625rem] text-primary/70">Redefinir acesso do usuário.</p>
                   </div>
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
                     className="h-8 text-[0.6875rem] border-primary/30 text-primary hover:bg-primary/10"
                     onClick={() => handleOpenResetDialog(editingUser)}
                   >
@@ -463,7 +463,7 @@ export default function UsersPage() {
               )}
 
               {!editingUser && (
-                <div className="space-y-1 bg-yellow-500/10 p-3 rounded-md border border-yellow-500/20">
+                <div className="space-y-1 bg-yellow-500/10 p-2.5 rounded-md border border-yellow-500/20">
                   <Label className="text-xs text-foreground font-bold italic">Senha Temporária</Label>
                   <div className="flex items-center gap-2">
                     <Input readOnly value={formData.password} className="bg-card font-mono text-sm border-border" />
@@ -478,7 +478,7 @@ export default function UsersPage() {
                 </div>
               )}
             </div>
-            <DialogFooter>
+            <DialogFooter className="px-6 py-3 border-t shrink-0">
               <Button type="submit" disabled={isSubmitting} className="w-full">
                 {isSubmitting && <Loader2 className="animate-spin h-4 w-4 mr-2" />}
                 {editingUser ? "Salvar Alterações" : "Criar Usuário"}
