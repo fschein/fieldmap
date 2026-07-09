@@ -96,7 +96,8 @@ export default function DashboardLayout({
 
   const isSetupPage = pathname === "/dashboard/setup-password"
   const isDetailMapPage = pathname.includes("/map") && pathname !== "/dashboard/map"
-  const isMapPage = isDetailMapPage
+  const isOverviewMapPage = pathname === "/dashboard/map"
+  const isMapPage = isDetailMapPage || isOverviewMapPage
   const sidebarRoles = ["admin", "supervisor"]
   const showSidebar = !isSetupPage && profile?.role && sidebarRoles.includes(profile.role)
   const showBottomNav = !isSetupPage && !isDetailMapPage && profile?.role && BOTTOM_NAV_ROLES.includes(profile.role)
@@ -108,7 +109,7 @@ export default function DashboardLayout({
         {showSidebar && <Sidebar />}
         <main className={cn(
           showSidebar ? "md:ml-56" : "",
-          showBottomNav && "pb-16 md:pb-0"
+          showBottomNav && !isOverviewMapPage && "pb-16 md:pb-0"
         )}>
           <div className={cn(
             "container mx-auto p-2 pt-20 md:pt-6",
