@@ -157,10 +157,12 @@ export function RequestTerritoryModal({
                   id="campaign-mode"
                   checked={campaignMode}
                   onCheckedChange={(v: boolean) => setCampaignMode(v)}
+                  className="shrink-0"
                 />
-                <Label htmlFor="campaign-mode" className="cursor-pointer text-sm font-medium leading-none">
-                  Para campanha <span className="text-primary">"{activeCampaign.name}"</span>
-                </Label>
+                <div className="flex flex-col min-w-0">
+                  <label htmlFor="campaign-mode" className="cursor-pointer text-sm font-medium whitespace-nowrap">Para campanha</label>
+                  <span className="text-xs text-primary font-semibold truncate">{activeCampaign.name}</span>
+                </div>
               </div>
             )}
 

@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import {
   Loader2, User, Calendar, CheckCircle,
-  PlusCircle, RotateCcw, PlayCircle, Pencil, Save, X, Trash2
+  PlusCircle, RotateCcw, PlayCircle, Pencil, Save, X, Trash2, Megaphone
 } from "lucide-react"
 import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
@@ -35,6 +35,8 @@ interface Assignment {
   territory_id: string
   profiles: { name: string } | null
   groups: { name: string } | null
+  campaign_id: string | null
+  campaigns: { name: string } | null
   notes: string | null
   return_reason: string | null
 }
@@ -66,6 +68,7 @@ export function AssignmentHistorySheet({
   const [territory, setTerritory] = useState<TerritoryDetails | null>(null)
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [publishers, setPublishers] = useState<Profile[]>([])
+  const [campaigns, setCampaigns] = useState<{ id: string; name: string }[]>([])
 
   const canEdit = isAdmin || isDirigente
 
@@ -76,6 +79,7 @@ export function AssignmentHistorySheet({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editStart, setEditStart] = useState("")
   const [editEnd, setEditEnd] = useState("")
+  const [editCampaignId, setEditCampaignId] = useState("")
   const [savingEdit, setSavingEdit] = useState(false)
 
   useEffect(() => {
@@ -101,15 +105,22 @@ export function AssignmentHistorySheet({
         .from("assignments")
         .select(`
           id, status, assigned_at, completed_at, returned_at, user_id, group_id, territory_id,
-          notes, return_reason,
+          campaign_id, notes, return_reason,
           profiles!assignments_user_id_fkey(name),
-          groups:groups(name)
+          groups:groups(name),
+          campaigns:campaigns(name)
         `)
         .eq("territory_id", territoryId)
         .order("assigned_at", { ascending: false })
 
       if (error) throw error
       setAssignments(aData || [])
+
+      const { data: campData } = await supabase
+        .from("campaigns")
+        .select("id, name")
+        .order("name")
+      setCampaigns(campData || [])
     } catch (error: any) {
       toast.error("Falha ao carregar o histórico.")
     } finally {
@@ -154,12 +165,14 @@ export function AssignmentHistorySheet({
     setEditingId(a.id)
     setEditStart(toDateInput(a.assigned_at))
     setEditEnd(toDateInput(a.completed_at || a.returned_at || ""))
+    setEditCampaignId(a.campaign_id || "")
   }
 
   const cancelEditing = () => {
     setEditingId(null)
     setEditStart("")
     setEditEnd("")
+    setEditCampaignId("")
   }
 
   const handleSaveEdit = async (assignment: Assignment) => {
@@ -169,7 +182,7 @@ export function AssignmentHistorySheet({
       const startISO = new Date(`${editStart}T12:00:00Z`).toISOString()
       const endISO = editEnd ? new Date(`${editEnd}T12:00:00Z`).toISOString() : null
 
-      const update: any = { assigned_at: startISO }
+      const update: any = { assigned_at: startISO, campaign_id: editCampaignId || null }
       if (assignment.status === 'completed') update.completed_at = endISO
       if (assignment.status === 'returned') update.returned_at = endISO
 
@@ -338,8 +351,10 @@ export function AssignmentHistorySheet({
                               {assignment.group_id && (
                                 <Badge variant="secondary" className="h-4 px-1 text-[0.5rem] font-black bg-muted text-muted-foreground shrink-0">GRUPO</Badge>
                               )}
-                              {assignment.assigned_at && new Date(assignment.assigned_at).getDay() === 0 && (
-                                <span className="text-xs shrink-0" title="Domingo">☀️</span>
+                              {assignment.campaign_id && (
+                                <span title={assignment.campaigns?.name ?? "Campanha"} className="shrink-0 text-primary/70">
+                                  <Megaphone className="w-3 h-3" />
+                                </span>
                               )}
                             </span>
                             <div className="flex items-center gap-1.5">
@@ -410,24 +425,39 @@ export function AssignmentHistorySheet({
                                     type="date"
                                     value={editStart}
                                     onChange={(e) => setEditStart(e.target.value)}
-                                    className="h-8 text-xs"
+                                    className="h-8 text-xs dark:[color-scheme:dark]"
                                     max={new Date().toISOString().split("T")[0]}
                                   />
                                 </div>
                                 <div className="space-y-1">
-                                  <Label className="text-[0.625rem] text-slate-500 uppercase font-semibold">
-                                    Fim {isActive && <span className="text-slate-400">(opcional)</span>}
+                                  <Label className="text-[0.625rem] text-muted-foreground uppercase font-semibold">
+                                    Fim {isActive && <span className="opacity-50">(opcional)</span>}
                                   </Label>
                                   <Input
                                     type="date"
                                     value={editEnd}
                                     onChange={(e) => setEditEnd(e.target.value)}
-                                    className="h-8 text-xs"
+                                    className="h-8 text-xs dark:[color-scheme:dark]"
                                     min={editStart}
                                     max={new Date().toISOString().split("T")[0]}
                                   />
                                 </div>
                               </div>
+                              {campaigns.length > 0 && (
+                                <div className="space-y-1">
+                                  <Label className="text-[0.625rem] text-muted-foreground uppercase font-semibold">Campanha</Label>
+                                  <select
+                                    className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs shadow-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none text-foreground"
+                                    value={editCampaignId}
+                                    onChange={(e) => setEditCampaignId(e.target.value)}
+                                  >
+                                    <option value="">Nenhuma</option>
+                                    {campaigns.map((c) => (
+                                      <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
                               <div className="flex gap-1.5">
                                 <Button size="sm" className="flex-1 h-7 text-xs" onClick={() => handleSaveEdit(assignment)} disabled={savingEdit}>
                                   {savingEdit ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Save className="w-3 h-3 mr-1" />}
