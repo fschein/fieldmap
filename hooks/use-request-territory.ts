@@ -7,6 +7,20 @@ import { useAuth } from "@/hooks/use-auth"
 
 const supabase = getSupabaseBrowserClient()
 
+const MIN_REST_DAYS = 15
+const URGENT_THRESHOLD_DAYS = 60
+
+export interface FetchAvailableResult {
+  territory: Territory | null
+  blockedByRecency: boolean
+}
+
+export interface UrgentGroupSuggestion {
+  groupId: string
+  groupName: string
+  days: number
+}
+
 export function useRequestTerritory() {
   const { user } = useAuth()
 
@@ -18,7 +32,7 @@ export function useRequestTerritory() {
   const fetchAvailableTerritory = useCallback(async (
     selector: { groupId: string; territoryType?: never } | { territoryType: string; groupId?: never },
     campaign?: { id: string; startDate: string } | null
-  ): Promise<Territory | null> => {
+  ): Promise<FetchAvailableResult> => {
     let query = supabase
       .from("territories")
       .select("*, assignments(id, completed_at)")
@@ -30,7 +44,7 @@ export function useRequestTerritory() {
 
     const { data, error } = await query
 
-    if (error || !data?.length) return null
+    if (error || !data?.length) return { territory: null, blockedByRecency: false }
 
     let candidates = data as any[]
 
@@ -45,7 +59,31 @@ export function useRequestTerritory() {
       candidates = candidates.filter((t) => !coveredIds.has(t.id))
     }
 
-    if (!candidates.length) return null
+    if (!candidates.length) return { territory: null, blockedByRecency: false }
+
+    // Verificar se existe algum território urgente (> URGENT_THRESHOLD_DAYS) em qualquer lugar
+    const urgentCutoff = new Date(Date.now() - URGENT_THRESHOLD_DAYS * 86400000).toISOString()
+    const { data: urgentCheck } = await supabase
+      .from("territories")
+      .select("id")
+      .in("status", ["available", "completed"])
+      .is("assigned_to", null)
+      .or(`last_completed_at.is.null,last_completed_at.lt.${urgentCutoff}`)
+      .limit(1)
+
+    const hasUrgent = (urgentCheck?.length ?? 0) > 0
+
+    // Se há territórios urgentes, filtrar candidatos muito recentes
+    if (hasUrgent) {
+      const restCutoff = new Date(Date.now() - MIN_REST_DAYS * 86400000).toISOString()
+      const rested = candidates.filter(
+        (t) => !t.last_completed_at || t.last_completed_at < restCutoff
+      )
+      if (rested.length === 0) return { territory: null, blockedByRecency: true }
+      candidates = rested
+    }
+
+    if (!candidates.length) return { territory: null, blockedByRecency }
 
     const sixMonthsAgo = new Date()
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
@@ -69,7 +107,28 @@ export function useRequestTerritory() {
     })
 
     const { assignments: _a, recentCompletions: _r, ...territory } = withCounts[0]
-    return territory as Territory
+    return { territory: territory as Territory, blockedByRecency: false }
+  }, [])
+
+  const findMostUrgentGroup = useCallback(async (): Promise<UrgentGroupSuggestion | null> => {
+    const { data } = await supabase
+      .from("territories")
+      .select("id, group_id, last_completed_at, groups(name)")
+      .in("status", ["available", "completed"])
+      .is("assigned_to", null)
+      .not("group_id", "is", null)
+      .order("last_completed_at", { ascending: true, nullsFirst: true })
+      .limit(1)
+
+    if (!data?.length) return null
+    const t = data[0] as any
+    if (!t.group_id) return null
+
+    const days = t.last_completed_at
+      ? Math.floor((Date.now() - new Date(t.last_completed_at).getTime()) / 86400000)
+      : 9999
+
+    return { groupId: t.group_id, groupName: t.groups?.name ?? "?", days }
   }, [])
 
   const requestTerritory = useCallback(
@@ -108,5 +167,5 @@ export function useRequestTerritory() {
     [user?.id]
   )
 
-  return { fetchGroups, fetchAvailableTerritory, requestTerritory }
+  return { fetchGroups, fetchAvailableTerritory, findMostUrgentGroup, requestTerritory }
 }

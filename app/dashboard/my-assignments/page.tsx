@@ -250,14 +250,13 @@ export default function MyAssignmentsPage() {
         </div>
 
         {territories.length === 0 ? (
-          <div className="py-14 flex flex-col items-center justify-center space-y-3 bg-card rounded-xl border border-dashed border-border">
-            <MapPin className="h-7 w-7 text-muted-foreground/50" />
+          <div className="flex items-center justify-between gap-3 px-4 py-3 bg-card rounded-xl border border-dashed border-border">
             <p className="text-xs text-muted-foreground">Nenhum território designado</p>
             {!!user && (
               <Button
                 size="sm"
                 onClick={() => setRequestModalOpen(true)}
-                className="mt-1 bg-[#063d4a] hover:bg-[#063d4a]/90 text-white border-0"
+                className="bg-[#063d4a] hover:bg-[#063d4a]/90 text-white border-0 shrink-0"
               >
                 <Plus className="h-4 w-4 mr-1.5" />
                 Pedir território

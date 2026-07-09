@@ -23,6 +23,7 @@ export function BottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
     ]
 
     const adminMoreItems = [
+      { label: "Mapa Geral", href: "/dashboard/map", icon: Map },
       { label: "Grupos", href: "/dashboard/groups", icon: Component },
       { label: "Campanhas", href: "/dashboard/campaigns", icon: Calendar },
       { label: "Gestão de Escalas", href: "/dashboard/schedule", icon: ClipboardList },
@@ -129,6 +130,7 @@ export function BottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
 
   if (isSupervisor) {
     navItems.push({ label: "Dashboard", href: "/dashboard", icon: LayoutDashboard })
+    navItems.push({ label: "Mapa", href: "/dashboard/map", icon: Map })
   }
 
   navItems.push({ label: "Perfil", href: "/dashboard/profile", icon: User })

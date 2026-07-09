@@ -5,11 +5,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Loader2, MapPin, CheckCircle2 } from "lucide-react"
+import { Loader2, MapPin, CheckCircle2, ArrowRight } from "lucide-react"
 import { toast } from "sonner"
 import { cn, fmtTerritoryNumber } from "@/lib/utils"
 import { Territory, Group } from "@/lib/types"
-import { useRequestTerritory } from "@/hooks/use-request-territory"
+import { useRequestTerritory, UrgentGroupSuggestion } from "@/hooks/use-request-territory"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { differenceInDays, parseISO } from "date-fns"
 
@@ -40,7 +40,7 @@ export function RequestTerritoryModal({
   onOpenChange,
   onSuccess,
 }: RequestTerritoryModalProps) {
-  const { fetchGroups, fetchAvailableTerritory, requestTerritory } = useRequestTerritory()
+  const { fetchGroups, fetchAvailableTerritory, findMostUrgentGroup, requestTerritory } = useRequestTerritory()
 
   const [step, setStep] = useState<Step>("select-group")
   const [groups, setGroups] = useState<Group[]>([])
@@ -52,6 +52,8 @@ export function RequestTerritoryModal({
   const [noTerritory, setNoTerritory] = useState(false)
   const [noCampaignTerritory, setNoCampaignTerritory] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  const [tooRecent, setTooRecent] = useState(false)
+  const [urgentSuggestion, setUrgentSuggestion] = useState<UrgentGroupSuggestion | null>(null)
   const [activeCampaign, setActiveCampaign] = useState<ActiveCampaign | null>(null)
   const [campaignMode, setCampaignMode] = useState(false)
 
@@ -63,6 +65,8 @@ export function RequestTerritoryModal({
     setTerritory(null)
     setNoTerritory(false)
     setNoCampaignTerritory(false)
+    setTooRecent(false)
+    setUrgentSuggestion(null)
 
     const today = new Date().toISOString().slice(0, 10)
 
@@ -100,6 +104,8 @@ export function RequestTerritoryModal({
     setLoadingGroupId(key)
     setNoTerritory(false)
     setNoCampaignTerritory(false)
+    setTooRecent(false)
+    setUrgentSuggestion(null)
     try {
       const campaign = campaignMode && activeCampaign
         ? { id: activeCampaign.id, startDate: activeCampaign.startDate }
@@ -107,11 +113,17 @@ export function RequestTerritoryModal({
       const selector = opts.commercial
         ? { territoryType: "comercial" as const }
         : { groupId: opts.groupId! }
-      const result = await fetchAvailableTerritory(selector, campaign)
+      const { territory: result, blockedByRecency } = await fetchAvailableTerritory(selector, campaign)
       setTerritory(result)
       if (result === null) {
-        if (campaignMode) setNoCampaignTerritory(true)
-        else setNoTerritory(true)
+        if (campaignMode) {
+          setNoCampaignTerritory(true)
+        } else if (blockedByRecency) {
+          setTooRecent(true)
+          findMostUrgentGroup().then(setUrgentSuggestion)
+        } else {
+          setNoTerritory(true)
+        }
       }
       setStep("confirm")
     } catch {
@@ -141,6 +153,8 @@ export function RequestTerritoryModal({
     setTerritory(null)
     setNoTerritory(false)
     setNoCampaignTerritory(false)
+    setTooRecent(false)
+    setUrgentSuggestion(null)
   }, [])
 
   const selectedGroup = groups.find((g) => g.id === selectedGroupId)
@@ -233,20 +247,45 @@ export function RequestTerritoryModal({
         {step === "confirm" && (
           <div className="space-y-5 pt-1">
             {noCampaignTerritory ? (
-              <div className="flex flex-col items-center gap-3 py-6 text-center">
-                <MapPin className="h-8 w-8 text-muted-foreground/40" />
-                <div className="space-y-1">
+              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-1">
+                <p className="text-sm font-medium text-foreground">
+                  Todos os territórios desta região já foram cobertos na campanha.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Escolha outra região ou desmarque o modo campanha.
+                </p>
+              </div>
+            ) : tooRecent ? (
+              <div className="space-y-2">
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
                   <p className="text-sm font-medium text-foreground">
-                    Todos os territórios desta região já foram cobertos na campanha.
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Escolha outra região ou desmarque o modo campanha.
+                    Territórios desta região foram trabalhados recentemente.
                   </p>
                 </div>
+                {urgentSuggestion && (
+                  <button
+                    onClick={() => handleSelect({ groupId: urgentSuggestion.groupId })}
+                    disabled={loadingGroupId !== null}
+                    className="w-full flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-left hover:bg-muted/60 transition-colors disabled:opacity-50"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-muted-foreground">Região com territórios mais urgentes</p>
+                      <p className="text-sm font-semibold text-foreground">
+                        {urgentSuggestion.groupName}
+                        <span className="font-normal text-muted-foreground ml-1">
+                          · {urgentSuggestion.days === 9999 ? "nunca trabalhado" : `${urgentSuggestion.days} dias`}
+                        </span>
+                      </p>
+                    </div>
+                    {loadingGroupId === urgentSuggestion.groupId
+                      ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
+                      : <ArrowRight className="h-4 w-4 text-emerald-500 shrink-0" />
+                    }
+                  </button>
+                )}
               </div>
             ) : noTerritory || !territory ? (
-              <div className="flex flex-col items-center gap-3 py-6 text-center">
-                <MapPin className="h-8 w-8 text-muted-foreground/40" />
+              <div className="rounded-lg border border-border bg-muted/30 p-4">
                 <p className="text-sm text-muted-foreground">
                   Nenhum território disponível nesta região no momento.
                 </p>
