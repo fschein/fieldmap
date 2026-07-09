@@ -95,10 +95,11 @@ export default function DashboardLayout({
   }
 
   const isSetupPage = pathname === "/dashboard/setup-password"
-  const isMapPage = pathname.includes("/map")
+  const isDetailMapPage = pathname.includes("/map") && pathname !== "/dashboard/map"
+  const isMapPage = isDetailMapPage
   const sidebarRoles = ["admin", "supervisor"]
   const showSidebar = !isSetupPage && profile?.role && sidebarRoles.includes(profile.role)
-  const showBottomNav = !isSetupPage && !isMapPage && profile?.role && BOTTOM_NAV_ROLES.includes(profile.role)
+  const showBottomNav = !isSetupPage && !isDetailMapPage && profile?.role && BOTTOM_NAV_ROLES.includes(profile.role)
 
   return (
     <SettingsProvider>

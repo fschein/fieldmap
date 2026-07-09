@@ -83,7 +83,7 @@ export function useRequestTerritory() {
       candidates = rested
     }
 
-    if (!candidates.length) return { territory: null, blockedByRecency }
+    if (!candidates.length) return { territory: null, blockedByRecency: false }
 
     const sixMonthsAgo = new Date()
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
