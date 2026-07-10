@@ -8,7 +8,6 @@ import { AssignmentCreateModal } from "@/components/dashboard/assignment-create-
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Table,
@@ -23,7 +22,7 @@ import { Progress } from "@/components/ui/progress"
 import {
   Loader2, Search, SlidersHorizontal, ArrowUpDown,
   Download, History, AlertTriangle, Plus, User, Calendar, Clock,
-  CheckSquare, Filter, MapPin
+  MapPin, Flag
 } from "lucide-react"
 import { cn, fmtTerritoryNumber } from "@/lib/utils"
 
@@ -63,46 +62,13 @@ const STATUS_CLASS: Record<string, string> = {
   overdue: "bg-red-50 text-red-700 border-red-200 font-bold dark:bg-red-500/10 dark:text-red-500 dark:border-red-500/20",
 }
 
-// Pills de filtro rápido para mobile
-const QUICK_FILTERS = [
+// Tabs de status na barra principal
+const STATUS_TABS = [
+  { id: "all" as StatusFilter, label: "Todos" },
   { id: "active" as StatusFilter, label: "Designados" },
   { id: "completed" as StatusFilter, label: "Livres" },
-  { id: "all" as StatusFilter, label: "Todos" },
-  { id: "overdue" as StatusFilter, label: "Atrasados" },
   { id: "available" as StatusFilter, label: "Devolvidos" },
 ]
-
-function FilterPill({ label, active, count, onClick, id }: any) {
-  const getStyles = () => {
-    if (!active) return "bg-card text-muted-foreground border-border hover:bg-muted/50"
-    
-    switch (id) {
-      case 'active': return "bg-foreground text-background border-foreground"
-      case 'completed': return "bg-green-100 text-green-800 border-green-200"
-      case 'overdue': return "bg-red-100 text-red-800 border-red-200"
-      case 'available': return "bg-amber-100 text-amber-800 border-amber-200"
-      default: return "bg-foreground text-background border-foreground"
-    }
-  }
-
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "shrink-0 h-10 px-4 rounded-full text-sm font-bold border transition-colors shadow-sm flex items-center gap-2",
-        getStyles()
-      )}
-    >
-      {label}
-      <span className={cn(
-        "text-[0.625rem] px-1.5 py-0.5 rounded-full font-black min-w-[18px]",
-        active ? "bg-black/10 text-inherit" : "bg-muted text-muted-foreground"
-      )}>
-        {count}
-      </span>
-    </button>
-  )
-}
 
 export default function AssignmentsPage() {
   const { isReady, isAdmin, isDirigente } = useAuth()
@@ -114,6 +80,7 @@ export default function AssignmentsPage() {
 
   const [rawTerritories, setRawTerritories] = useState<any[]>([])
   const [rawAssignments, setRawAssignments] = useState<any[]>([])
+  const [rawCampaignProgress, setRawCampaignProgress] = useState<{ subdivision_id: string; campaign_id: string; completed: boolean }[]>([])
 
   const [search, setSearch] = useState("")
   // Filtro padrão: Em Campo (active) — foco nas designações ativas
@@ -126,7 +93,6 @@ export default function AssignmentsPage() {
   const [selectedTerritoryId, setSelectedTerritoryId] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
-  const [showOnlyRemaining, setShowOnlyRemaining] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
 
   const fetchData = async () => {
@@ -135,7 +101,7 @@ export default function AssignmentsPage() {
 
       const { data: territories, error: terrErr } = await supabase
         .from("territories")
-        .select("id, name, number, color, status, campaign_id, assigned_to, subdivisions(completed), group:groups(color)")
+        .select("id, name, number, color, status, campaign_id, assigned_to, subdivisions(id, completed), group:groups(color)")
         .order("number", { ascending: true })
 
       if (terrErr) throw new Error(`Territories: ${terrErr.message}`)
@@ -149,7 +115,7 @@ export default function AssignmentsPage() {
 
       const { data: assignments, error: assErr } = await supabase
         .from("assignments")
-        .select(`id, status, assigned_at, completed_at, returned_at, territory_id, user_id, group_id`)
+        .select(`id, status, assigned_at, completed_at, returned_at, territory_id, user_id, group_id, campaign_id`)
         .order("assigned_at", { ascending: false })
 
       if (assErr) throw new Error(`Assignments: ${assErr.message}`)
@@ -161,6 +127,17 @@ export default function AssignmentsPage() {
         .order("name")
 
       if (campaignsData) setCampaigns(campaignsData)
+
+      if (campaignsData?.length) {
+        const { data: progressData } = await supabase
+          .from("subdivision_campaign_progress")
+          .select("subdivision_id, campaign_id, completed")
+          .in("campaign_id", campaignsData.map((c: any) => c.id))
+          .eq("completed", true)
+        setRawCampaignProgress(progressData ?? [])
+      } else {
+        setRawCampaignProgress([])
+      }
 
       const assignmentsWithProfiles = (assignments || []).map((a: any) => ({
         ...a,
@@ -281,6 +258,25 @@ export default function AssignmentsPage() {
     all: data.length,
   }), [data])
 
+  // Campanha ativa: mostra a strip de progresso automaticamente, sem depender do filtro selecionado.
+  // Por quadra concluída (mais preciso que por território — reflete trabalho parcial),
+  // sobre o total de quadras de territórios ativos (todos os tipos). Mesmo critério do Dashboard.
+  const activeCampaign = campaigns[0] ?? null
+  const activeSubdivisionIds = useMemo(() => new Set(
+    rawTerritories
+      .filter(t => t.status !== "inactive")
+      .flatMap(t => (t.subdivisions ?? []).map((s: any) => s.id))
+  ), [rawTerritories])
+  const campaignTotalSubdivisions = activeSubdivisionIds.size
+  const campaignCompletedSubdivisions = activeCampaign
+    ? rawCampaignProgress.filter(p => p.campaign_id === activeCampaign.id && activeSubdivisionIds.has(p.subdivision_id)).length
+    : 0
+  const campaignProgressPct = activeCampaign
+    ? Math.round((campaignCompletedSubdivisions / (campaignTotalSubdivisions || 1)) * 100)
+    : 0
+
+  const hasActiveFilter = periodFilter !== "all" || campaignFilter !== "all" || sortBy !== "number"
+
   const filtered = useMemo(() => {
     let result = [...data]
 
@@ -303,11 +299,7 @@ export default function AssignmentsPage() {
     }
 
     if (campaignFilter !== "all") {
-      if (showOnlyRemaining) {
-        result = result.filter(t => t.campaignId !== campaignFilter || (t.campaignId === campaignFilter && t.status !== 'available'))
-      } else {
-        result = result.filter(t => t.campaignId === campaignFilter)
-      }
+      result = result.filter(t => t.campaignId === campaignFilter)
     }
 
     result.sort((a, b) => {
@@ -339,7 +331,7 @@ export default function AssignmentsPage() {
     })
 
     return result
-  }, [data, search, statusFilter, sortBy, campaignFilter, showOnlyRemaining])
+  }, [data, search, statusFilter, sortBy, campaignFilter])
 
   const fmtDate = (d: string | null) => {
     if (!d) return "—"
@@ -429,126 +421,106 @@ export default function AssignmentsPage() {
             />
           </div>
 
-          {/* Filtros rápidos horizontalmente roláveis */}
-          <div className="flex items-center gap-2">
-            <div className="flex overflow-x-auto pb-2 gap-2 hide-scrollbar flex-1">
-              {QUICK_FILTERS.map(f => (
-                <FilterPill
-                  key={f.id}
-                  id={f.id}
-                  label={f.label}
-                  active={statusFilter === f.id}
-                  count={f.id === "active" ? counts.active + counts.overdue : f.id === "all" ? counts.all : counts[f.id as keyof typeof counts] || 0}
-                  onClick={() => setStatusFilter(f.id)}
-                />
-              ))}
-            </div>
-            <Button
-              variant={showFilters ? "default" : "outline"}
-              size="icon"
+          {/* Barra única: tabs de status + ícone de filtros */}
+          <div className={cn(
+            "flex rounded-xl border border-border bg-card overflow-hidden",
+            activeCampaign && "rounded-b-none"
+          )}>
+            {STATUS_TABS.map((tab, i) => {
+              const count = tab.id === "active" ? counts.active + counts.overdue
+                : tab.id === "all" ? counts.all
+                : counts[tab.id as keyof typeof counts] || 0
+              const active = statusFilter === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setStatusFilter(tab.id)}
+                  className={cn(
+                    "flex-1 flex items-center justify-center gap-1.5 px-2 py-3 text-xs font-semibold transition-colors whitespace-nowrap",
+                    i > 0 && "border-l border-border",
+                    active ? "bg-foreground text-background" : "text-muted-foreground hover:bg-muted/50"
+                  )}
+                >
+                  {tab.label}
+                  <span className={cn(
+                    "text-[0.625rem] px-1.5 py-0.5 rounded-full font-black min-w-[18px]",
+                    active ? "bg-background/20 text-inherit" : "bg-muted text-muted-foreground"
+                  )}>
+                    {count}
+                  </span>
+                </button>
+              )
+            })}
+            <button
+              onClick={() => setShowFilters(v => !v)}
               className={cn(
-                "h-10 w-10 shrink-0 rounded-full transition-all border shadow-sm",
-                showFilters ? "bg-foreground text-background" : "bg-card text-muted-foreground"
+                "shrink-0 flex items-center justify-center w-12 border-l border-border transition-colors",
+                showFilters || hasActiveFilter ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted/50"
               )}
-              onClick={() => setShowFilters(!showFilters)}
             >
               <SlidersHorizontal className="h-4 w-4" />
-            </Button>
+            </button>
           </div>
+
+          {/* Strip de progresso da campanha ativa — automático, sem precisar clicar em nada */}
+          {activeCampaign && (
+            <div className="flex items-center gap-3 px-3 py-2.5 border border-t-0 border-border bg-card rounded-b-xl">
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-foreground shrink-0">
+                <Flag className="h-3.5 w-3.5 text-primary" />
+                {activeCampaign.name}
+              </span>
+              <Progress value={campaignProgressPct} className="h-1.5 bg-muted flex-1" />
+              <span className="text-xs font-bold text-primary shrink-0">{campaignProgressPct}%</span>
+            </div>
+          )}
+
+          {/* Painel de filtros — período, campanha, ordenação */}
+          {showFilters && (
+            <div className="flex flex-col gap-2 p-3 bg-muted/30 rounded-2xl border border-border/50 animate-in fade-in slide-in-from-top-2 duration-200">
+              <Select value={periodFilter} onValueChange={(v: PeriodFilter) => setPeriodFilter(v)}>
+                <SelectTrigger className="w-full px-3 bg-card border-border rounded-xl">
+                  <Clock className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-muted-foreground" />
+                  <SelectValue placeholder="Período" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todo Histórico</SelectItem>
+                  <SelectItem value="12m">Último Ano</SelectItem>
+                  <SelectItem value="6m">Últimos 6 meses</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={campaignFilter} onValueChange={setCampaignFilter}>
+                <SelectTrigger className="w-full px-3 bg-card border-border rounded-xl">
+                  <Calendar className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-muted-foreground" />
+                  <SelectValue placeholder="Campanha" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas Campanhas</SelectItem>
+                  {campaigns.length > 0 ? (
+                    campaigns.map(c => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>Nenhuma campanha ativa</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              <Select value={sortBy} onValueChange={(v: SortOption) => setSortBy(v)}>
+                <SelectTrigger className="w-full px-3 bg-card border-border rounded-xl">
+                  <ArrowUpDown className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-muted-foreground" />
+                  <SelectValue placeholder="Ordenar por" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="number">Número</SelectItem>
+                  <SelectItem value="days_desc">+ Dias em campo</SelectItem>
+                  <SelectItem value="days_asc">- Dias em campo</SelectItem>
+                  <SelectItem value="assigned_desc">Entregues recente</SelectItem>
+                  <SelectItem value="last_completed_asc">+ Tempo sem fazer</SelectItem>
+                  <SelectItem value="last_completed_desc">- Tempo sem fazer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
-
-        {/* Campaign Progress Banner */}
-        {campaignFilter !== "all" && (
-          <Card className="bg-primary/5 border-primary/20 shadow-none border-dashed">
-            <CardContent className="p-4">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="flex-1 w-full space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="bg-primary/10 p-1.5 rounded-lg">
-                        <Calendar className="w-4 h-4 text-primary" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-foreground leading-tight">
-                          Campanha: {campaigns.find(c => c.id === campaignFilter)?.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">Acompanhamento de progresso</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-primary">
-                        {Math.round((data.filter(t => t.campaignId === campaignFilter && t.status === 'available').length / (data.length || 1)) * 100)}%
-                      </p>
-                      <p className="text-[0.625rem] text-muted-foreground font-medium uppercase tracking-wider">Concluído</p>
-                    </div>
-                  </div>
-                  <Progress
-                    value={(data.filter(t => t.campaignId === campaignFilter && t.status === 'available').length / (data.length || 1)) * 100}
-                    className="h-2 bg-muted"
-                  />
-                </div>
-                <div className="flex-shrink-0">
-                  <Button
-                    variant={showOnlyRemaining ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setShowOnlyRemaining(!showOnlyRemaining)}
-                    className={`gap-2 h-9 px-4 rounded-lg transition-all ${showOnlyRemaining ? 'shadow-md shadow-primary/20' : 'bg-card'}`}
-                  >
-                    {showOnlyRemaining ? <Filter className="w-3.5 h-3.5" /> : <CheckSquare className="w-3.5 h-3.5" />}
-                    {showOnlyRemaining ? "Mostrando faltantes" : "Filtrar por faltantes"}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Desktop Filter Bar (Secondary Selects) - Now collapsible on mobile */}
-        {showFilters && (
-          <div className="flex flex-wrap items-center gap-2.5 p-3 bg-muted/30 rounded-2xl border border-border/50 animate-in fade-in slide-in-from-top-2 duration-200">
-            <Select value={periodFilter} onValueChange={(v: PeriodFilter) => setPeriodFilter(v)}>
-              <SelectTrigger className="w-full sm:w-auto min-w-[160px] px-3 bg-card border-border rounded-xl">
-                <Clock className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-muted-foreground" />
-                <SelectValue placeholder="Período" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todo Histórico</SelectItem>
-                <SelectItem value="12m">Último Ano</SelectItem>
-                <SelectItem value="6m">Últimos 6 meses</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={campaignFilter} onValueChange={setCampaignFilter}>
-              <SelectTrigger className="w-full sm:w-auto min-w-[150px] px-3 bg-card border-border rounded-xl">
-                <Calendar className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-muted-foreground" />
-                <SelectValue placeholder="Campanha" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas Campanhas</SelectItem>
-                {campaigns.length > 0 ? (
-                  campaigns.map(c => (
-                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                  ))
-                ) : (
-                  <SelectItem value="none" disabled>Nenhuma campanha ativa</SelectItem>
-                )}
-              </SelectContent>
-            </Select>
-            <Select value={sortBy} onValueChange={(v: SortOption) => setSortBy(v)}>
-              <SelectTrigger className="w-full sm:w-auto min-w-[200px] px-3 bg-card border-border rounded-xl">
-                <ArrowUpDown className="w-3.5 h-3.5 mr-2 flex-shrink-0 text-muted-foreground" />
-                <SelectValue placeholder="Ordenar por" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="number">Número</SelectItem>
-                <SelectItem value="days_desc">+ Dias em campo</SelectItem>
-                <SelectItem value="days_asc">- Dias em campo</SelectItem>
-                <SelectItem value="assigned_desc">Entregues recente</SelectItem>
-                <SelectItem value="last_completed_asc">+ Tempo sem fazer</SelectItem>
-                <SelectItem value="last_completed_desc">- Tempo sem fazer</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        )}
       </div>
 
       {filtered.length === 0 ? (

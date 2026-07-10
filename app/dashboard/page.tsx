@@ -131,7 +131,10 @@ interface CampaignProgress {
   id: string
   name: string
   startDate: string
+  endDate: string | null
   totalTerritories: number
+  totalSubdivisions: number
+  completedSubdivisions: number
   completed: { territoryId: string; number: string; name: string; color: string; completedAt: string }[]
   inProgress: { territoryId: string; number: string; name: string; color: string; assignee: string; daysInField: number; progress: number }[]
   notStarted: { territoryId: string; number: string; name: string; color: string }[]
@@ -243,8 +246,24 @@ export default function DashboardPage() {
           .eq("campaign_id", activeCamp.id)
           .in("status", ["completed", "active"])
 
-        const totalTerritories = tData.filter((t: any) => t.status !== "inactive").length
+        const activeTData = tData.filter((t: any) => t.status !== "inactive")
+        const totalTerritories = activeTData.length
         const subsLookup = new Map<string, any[]>(tData.map((t: any) => [t.id, t.subdivisions ?? []]))
+
+        // Progresso por quadra dentro da campanha — mais preciso que por território,
+        // pois reflete trabalho parcial em vez de exigir 100% pra contar.
+        const activeSubdivisionIds = new Set(
+          activeTData.flatMap((t: any) => (t.subdivisions ?? []).map((s: any) => s.id))
+        )
+        const totalSubdivisions = activeSubdivisionIds.size
+        const { data: campSubProgress } = await supabase
+          .from("subdivision_campaign_progress")
+          .select("subdivision_id, completed")
+          .eq("campaign_id", activeCamp.id)
+          .eq("completed", true)
+        const completedSubdivisions = (campSubProgress ?? []).filter((p: any) =>
+          activeSubdivisionIds.has(p.subdivision_id)
+        ).length
 
         const completedCampIds = new Set(
           (campAssignments ?? []).filter((a: any) => a.status === "completed").map((a: any) => a.territory_id)
@@ -300,7 +319,10 @@ export default function DashboardPage() {
           id: activeCamp.id,
           name: activeCamp.name,
           startDate: activeCamp.start_date,
+          endDate: activeCamp.end_date ?? null,
           totalTerritories,
+          totalSubdivisions,
+          completedSubdivisions,
           completed,
           inProgress,
           notStarted,
@@ -368,24 +390,30 @@ export default function DashboardPage() {
             <div className="flex items-center gap-1.5">
               <TrendingUp className="w-3.5 h-3.5 text-primary" />
               <h2 className="text-[0.8125rem] font-semibold text-foreground">{campaignProgress.name}</h2>
-              <span className="ml-auto text-[0.875rem] font-black px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 shrink-0">
-                {campaignProgress.completed.length}/{campaignProgress.totalTerritories}
+              <span className="ml-auto flex items-center gap-1 text-[0.875rem] font-black px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 shrink-0">
+                {campaignProgress.completedSubdivisions}/{campaignProgress.totalSubdivisions}
+                <span className="text-[0.5625rem] font-bold uppercase tracking-wide opacity-70">quadras</span>
               </span>
             </div>
             <p className="text-[0.6875rem] text-muted-foreground mt-0.5">
-              {"Desde "}
               {(() => {
-                const parts = campaignProgress.startDate.slice(0, 10).split("-")
-                const months = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"]
-                return parts.length === 3 ? `${parts[2]}/${months[parseInt(parts[1]) - 1]}` : campaignProgress.startDate
+                const fmt = (d: string) => {
+                  const parts = d.slice(0, 10).split("-")
+                  return parts.length === 3 ? `${parts[2]}/${parts[1]}` : d
+                }
+                return campaignProgress.endDate
+                  ? `${fmt(campaignProgress.startDate)} a ${fmt(campaignProgress.endDate)}`
+                  : `Desde ${fmt(campaignProgress.startDate)}`
               })()}
               {" · "}
-              {Math.round((campaignProgress.completed.length / (campaignProgress.totalTerritories || 1)) * 100)}% concluído
+              {Math.round((campaignProgress.completedSubdivisions / (campaignProgress.totalSubdivisions || 1)) * 100)}% concluído
+              {" · "}
+              {campaignProgress.completed.length}/{campaignProgress.totalTerritories} territórios
             </p>
             <div className="mt-2.5 h-[3px] w-full bg-muted/60 rounded-full overflow-hidden">
               <div
                 className="h-full bg-primary transition-all duration-700 rounded-full"
-                style={{ width: `${Math.round((campaignProgress.completed.length / (campaignProgress.totalTerritories || 1)) * 100)}%` }}
+                style={{ width: `${Math.round((campaignProgress.completedSubdivisions / (campaignProgress.totalSubdivisions || 1)) * 100)}%` }}
               />
             </div>
           </div>

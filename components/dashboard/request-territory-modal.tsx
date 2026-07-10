@@ -154,8 +154,9 @@ export function RequestTerritoryModal({
           territoryName: territory.name,
         }),
       }).catch(() => {})
-    } catch {
-      toast.error("Erro ao confirmar designação.")
+    } catch (err: any) {
+      console.error("Erro ao confirmar designação:", err)
+      toast.error(err?.message ? `Erro ao confirmar designação: ${err.message}` : "Erro ao confirmar designação.")
     } finally {
       setConfirming(false)
     }

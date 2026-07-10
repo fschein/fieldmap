@@ -149,20 +149,30 @@ export function useRequestTerritory() {
       })
       const campaignId = activeCampaign?.id ?? null
 
-      const { error: assignError } = await supabase.from("assignments").insert({
-        territory_id: territoryId,
-        user_id: user.id,
-        status: "active",
-        assigned_at: new Date().toISOString(),
-        campaign_id: campaignId,
-      })
+      const { data: inserted, error: assignError } = await supabase
+        .from("assignments")
+        .insert({
+          territory_id: territoryId,
+          user_id: user.id,
+          status: "active",
+          assigned_at: new Date().toISOString(),
+          campaign_id: campaignId,
+        })
+        .select("id")
+        .single()
       if (assignError) throw assignError
 
       const { error: updateError } = await supabase
         .from("territories")
         .update({ assigned_to: user.id, status: "assigned", campaign_id: campaignId })
         .eq("id", territoryId)
-      if (updateError) throw updateError
+
+      if (updateError) {
+        // Desfaz a designação criada acima para não deixar estado inconsistente
+        // (assignment ativo sem o território realmente marcado como designado).
+        await supabase.from("assignments").delete().eq("id", inserted.id)
+        throw updateError
+      }
     },
     [user?.id]
   )

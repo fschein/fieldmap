@@ -77,36 +77,34 @@ export default function CampaignsPage() {
       const allSubdivisions = subdivisionsRes.data || []
       const allActiveTerritories = territoriesRes.data || []
 
-      // Filtrar apenas territórios residenciais ativos (tipo nulo conta como residencial por padrão)
-      const residentialTerritories = allActiveTerritories.filter(
-        (t: any) => !t.type || t.type === "residencial"
-      )
-      const residentialIds = new Set(residentialTerritories.map((t: any) => t.id))
-      const totalActiveResidential = residentialIds.size
+      // Todos os tipos de território ativos contam pro progresso da campanha
+      // (residencial, comercial e condomínio) — mesmo critério usado no Dashboard.
+      const activeIds = new Set(allActiveTerritories.map((t: any) => t.id))
+      const totalActive = activeIds.size
 
-      const newStats: Record<string, { 
-        total: number, 
+      const newStats: Record<string, {
+        total: number,
         completed: number,
         totalSubdivisions: number,
         completedSubdivisions: number
       }> = {}
-      
+
       campaignsData.forEach((c: Campaign) => {
         const campaignAssignments = allAssignments.filter((a: any) => a.campaign_id === c.id)
-        
-        // Denominador: Total de territórios residenciais ativos cadastrados
-        const total = totalActiveResidential
 
-        // Numerador: Territórios residenciais concluídos nesta campanha
+        // Denominador: Total de territórios ativos cadastrados (todos os tipos)
+        const total = totalActive
+
+        // Numerador: Territórios concluídos nesta campanha
         const completedAssignments = campaignAssignments.filter((a: any) => a.status === "completed")
         const uniqueCompleted = new Set(
           completedAssignments
             .map((a: any) => a.territory_id)
-            .filter((tid: string) => residentialIds.has(tid))
+            .filter((tid: string) => activeIds.has(tid))
         ).size
 
-        // Total de quadras apenas dos territórios residenciais ativos
-        const campaignSubdivisions = allSubdivisions.filter((s: any) => residentialIds.has(s.territory_id))
+        // Total de quadras de todos os territórios ativos
+        const campaignSubdivisions = allSubdivisions.filter((s: any) => activeIds.has(s.territory_id))
         const totalSubdivisions = campaignSubdivisions.length
 
         // Quadras concluídas nesta campanha
@@ -391,37 +389,33 @@ export default function CampaignsPage() {
                   </div>
                 </div>
 
-                {/* Progress Bar */}
-                {stats[campaign.id] && stats[campaign.id].total > 0 && (
+                {/* Progress Bar — por quadra concluída (mais preciso que por território) */}
+                {stats[campaign.id] && stats[campaign.id].totalSubdivisions > 0 && (
                   <div className="mt-6 space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-1.5 text-muted-foreground">
                         <CheckSquare className="h-3.5 w-3.5" />
-                        <span>Territórios</span>
+                        <span>Quadras</span>
                       </div>
                       <span className="font-medium">
-                        {stats[campaign.id].completed} de {stats[campaign.id].total}
+                        {stats[campaign.id].completedSubdivisions} de {stats[campaign.id].totalSubdivisions}
                       </span>
                     </div>
-                    <Progress 
-                      value={(stats[campaign.id].completed / stats[campaign.id].total) * 100} 
+                    <Progress
+                      value={(stats[campaign.id].completedSubdivisions / stats[campaign.id].totalSubdivisions) * 100}
                       className="h-2"
                     />
                     <div className="flex justify-between items-center text-[0.625rem] text-muted-foreground mt-1">
-                      {campaign.active && stats[campaign.id].totalSubdivisions > 0 ? (
-                        <span>
-                          Quadras: {stats[campaign.id].completedSubdivisions} de {stats[campaign.id].totalSubdivisions} ({Math.round((stats[campaign.id].completedSubdivisions / stats[campaign.id].totalSubdivisions) * 100)}%)
-                        </span>
-                      ) : (
-                        <span />
-                      )}
                       <span>
-                        {Math.round((stats[campaign.id].completed / stats[campaign.id].total) * 100)}% concluído
+                        Territórios: {stats[campaign.id].completed} de {stats[campaign.id].total}
+                      </span>
+                      <span>
+                        {Math.round((stats[campaign.id].completedSubdivisions / stats[campaign.id].totalSubdivisions) * 100)}% concluído
                       </span>
                     </div>
                   </div>
                 )}
-                {(!stats[campaign.id] || stats[campaign.id].total === 0) && (
+                {(!stats[campaign.id] || stats[campaign.id].totalSubdivisions === 0) && (
                   <div className="mt-6 pt-4 border-t text-center">
                     <p className="text-xs text-muted-foreground italic">Nenhum território vinculado</p>
                   </div>
