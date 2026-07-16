@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ArrowLeft, Plus, Map, Loader2, MoreVertical, Pencil, Trash2, UserPlus } from "lucide-react"
+import { ArrowLeft, Plus, Map, Loader2, MoreVertical, Pencil, Trash2, UserPlus, LayoutGrid, User } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +43,7 @@ interface Block {
   geometry: unknown
   order_index: number
   completed: boolean
+  status?: "available" | "assigned" | "completed"
 }
 
 interface DoNotVisit {
@@ -285,12 +286,17 @@ export default function TerritoryDetailPage({
     }
   }
 
-  const getStatusBadge = (completed: boolean) => {
-    return completed ? (
-      <Badge variant="secondary">Concluída</Badge>
-    ) : (
-      <Badge className="bg-green-500 hover:bg-green-600">Disponível</Badge>
-    )
+  const getQuadraStatus = (subdivisions: Block) => {
+    const status = subdivisions.status || (subdivisions.completed ? "completed" : "available")
+    const percent = subdivisions.completed || status === "completed" ? 100 : 0
+
+    if (status === "completed") {
+      return { label: "Concluída", badgeClassName: "bg-muted text-muted-foreground border-transparent", percent }
+    }
+    if (status === "assigned") {
+      return { label: "Em andamento", badgeClassName: "bg-primary/10 text-primary border-primary/20", percent }
+    }
+    return { label: "Disponível", badgeClassName: "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20", percent }
   }
 
   if (loading) {
@@ -315,49 +321,54 @@ export default function TerritoryDetailPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/dashboard/territories">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            {territory.group && (
-              <div
-                className="h-4 w-4 rounded-sm"
-                style={{ backgroundColor: territory.group.color }}
-              />
-            )}
-            <Badge variant="outline" className="font-mono">
-              {territory.number}
-            </Badge>
-            <h1 className="text-3xl font-bold">{territory.name}</h1>
-          </div>
-          <p className="text-muted-foreground mt-1">
-            {territory.group?.name || "Sem grupo"} | {territory.subdivisions?.length || 0} quadras
-            {territory.assigned_to_user && (
-              <> | Designado para: {territory.assigned_to_user.name}</>
-            )}
-          </p>
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Button variant="outline" size="icon" asChild className="h-8 w-8 shrink-0">
+            <Link href="/dashboard/territories">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          </Button>
+          <Badge variant="outline" className="font-mono shrink-0">
+            {territory.number}
+          </Badge>
+          <div className="flex-1" />
+          <Button asChild variant="outline" size="sm" className="shrink-0 text-muted-foreground">
+            <Link href={`/dashboard/territories/${id}/map`}>
+              <Map className="mr-2 h-4 w-4" />
+              Editar mapa
+            </Link>
+          </Button>
         </div>
-        <Button asChild variant="outline">
-          <Link href={`/dashboard/territories/${id}/map`}>
-            <Map className="mr-2 h-4 w-4" />
-            Editar Mapa
-          </Link>
-        </Button>
+
+        <div className="space-y-2">
+          <h1 className="text-lg font-medium break-words">{territory.name}</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs text-muted-foreground">
+              {territory.group && (
+                <span
+                  className="h-2 w-2 rounded-full shrink-0"
+                  style={{ backgroundColor: territory.group.color }}
+                />
+              )}
+              {territory.group?.name || "Sem grupo"}
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs text-muted-foreground">
+              <LayoutGrid className="h-3.5 w-3.5" />
+              {territory.subdivisions?.length || 0} quadras
+            </span>
+            {territory.assigned_to_user && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                <User className="h-3.5 w-3.5" />
+                {territory.assigned_to_user.name}
+              </span>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Quadras</h2>
+      <div>
+        <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-3">Quadras</h2>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => handleOpenDialog()}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nova Quadra
-            </Button>
-          </DialogTrigger>
           <DialogContent>
             <form onSubmit={handleSubmit}>
               <DialogHeader>
@@ -458,11 +469,11 @@ export default function TerritoryDetailPage({
         </DialogContent>
       </Dialog>
 
-      {!territory.subdivisions || territory.subdivisions.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Map className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-lg font-medium">Nenhuma quadra criada</p>
+      <div className="space-y-2">
+        {(!territory.subdivisions || territory.subdivisions.length === 0) && (
+          <div className="rounded-xl border p-8 text-center">
+            <Map className="h-10 w-10 text-muted-foreground mb-3 mx-auto" />
+            <p className="font-medium">Nenhuma quadra criada</p>
             <p className="text-sm text-muted-foreground mb-4">
               Use o editor de mapa para desenhar as quadras
             </p>
@@ -472,25 +483,24 @@ export default function TerritoryDetailPage({
                 Abrir Editor de Mapa
               </Link>
             </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {territory.subdivisions.map((subdivisions, index) => (
-            <Card key={subdivisions.id}>
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-lg">
-                      Quadra {territory.number}-{String.fromCharCode(65 + index)}
-                    </CardTitle>
-                    <CardDescription className="text-xs">
-                      Ordem: {subdivisions.order_index + 1}
-                    </CardDescription>
-                  </div>
+          </div>
+        )}
+
+        {territory.subdivisions?.map((subdivisions, index) => {
+          const status = getQuadraStatus(subdivisions)
+          return (
+            <div key={subdivisions.id} className="rounded-xl border p-4">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-medium">
+                  Quadra {territory.number}-{String.fromCharCode(65 + index)}
+                </p>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Badge variant="outline" className={status.badgeClassName}>
+                    {status.label}
+                  </Badge>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
                         <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -515,14 +525,31 @@ export default function TerritoryDetailPage({
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-              </CardHeader>
-              <CardContent>
-                {getStatusBadge(subdivisions.completed)}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                <div className="h-1 flex-1 rounded-full bg-muted overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-green-500 transition-all"
+                    style={{ width: `${status.percent}%` }}
+                  />
+                </div>
+                <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                  {status.percent}%
+                </span>
+              </div>
+            </div>
+          )
+        })}
+
+        <Button
+          variant="outline"
+          onClick={() => handleOpenDialog()}
+          className="w-full rounded-xl border-dashed bg-transparent text-muted-foreground hover:text-foreground justify-center"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Nova quadra
+        </Button>
+      </div>
 
       {/* Seção Não Visitar */}
       <div className="flex items-center justify-between mt-10 pt-6 border-t">

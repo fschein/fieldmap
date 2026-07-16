@@ -162,16 +162,17 @@ export function useRequestTerritory() {
         .single()
       if (assignError) throw assignError
 
-      const { error: updateError } = await supabase
+      const { data: updatedTerr, error: updateError } = await supabase
         .from("territories")
         .update({ assigned_to: user.id, status: "assigned", campaign_id: campaignId })
         .eq("id", territoryId)
+        .select("id")
 
-      if (updateError) {
+      if (updateError || !updatedTerr || updatedTerr.length === 0) {
         // Desfaz a designação criada acima para não deixar estado inconsistente
         // (assignment ativo sem o território realmente marcado como designado).
         await supabase.from("assignments").delete().eq("id", inserted.id)
-        throw updateError
+        throw updateError ?? new Error("Não foi possível atualizar o território (0 linhas afetadas).")
       }
     },
     [user?.id]

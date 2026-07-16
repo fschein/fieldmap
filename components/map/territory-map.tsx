@@ -299,18 +299,41 @@ export function TerritoryMap({
        * Usamos <style> injetado no componente.
        */}
       <style>{`
-        /* ── Toolbar icons ── */
+        /* ── Toolbar icons ──
+         * O ícone vira uma camada própria (::after com mask-image) por cima
+         * do botão, em vez de substituir o background-image do botão —
+         * assim o fundo do próprio botão (branco no claro / navy no escuro,
+         * já definido por .leaflet-bar a) continua intacto, e só o ícone
+         * (tingido via background-color no ::after) muda de cor por tema.
+         */
         .leaflet-draw-toolbar a {
-          background-image: url('/images/spritesheet.png') !important;
-          background-size: 300px 30px !important;
-          background-repeat: no-repeat !important;
+          background-image: none !important;
+          position: relative;
         }
-        .leaflet-draw-toolbar a.leaflet-draw-draw-polygon   { background-position: -31px -2px !important; }
-        .leaflet-draw-toolbar a.leaflet-draw-draw-rectangle { background-position: -62px -2px !important; }
-        .leaflet-draw-toolbar a.leaflet-draw-edit-edit      { background-position: -152px -2px !important; }
-        .leaflet-draw-toolbar a.leaflet-draw-edit-remove    { background-position: -182px -2px !important; }
+        .leaflet-draw-toolbar a::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background-color: #454545;
+          -webkit-mask-image: url('/images/spritesheet.png');
+          mask-image: url('/images/spritesheet.png');
+          -webkit-mask-size: 300px 30px;
+          mask-size: 300px 30px;
+          -webkit-mask-repeat: no-repeat;
+          mask-repeat: no-repeat;
+        }
+        .leaflet-draw-toolbar a.leaflet-draw-draw-polygon::after   { -webkit-mask-position: -31px -2px; mask-position: -31px -2px; }
+        .leaflet-draw-toolbar a.leaflet-draw-draw-rectangle::after { -webkit-mask-position: -62px -2px; mask-position: -62px -2px; }
+        .leaflet-draw-toolbar a.leaflet-draw-edit-edit::after      { -webkit-mask-position: -152px -2px; mask-position: -152px -2px; }
+        .leaflet-draw-toolbar a.leaflet-draw-edit-remove::after    { -webkit-mask-position: -182px -2px; mask-position: -182px -2px; }
         @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
-          .leaflet-draw-toolbar a { background-image: url('/images/spritesheet-2x.png') !important; }
+          .leaflet-draw-toolbar a::after {
+            -webkit-mask-image: url('/images/spritesheet-2x.png');
+            mask-image: url('/images/spritesheet-2x.png');
+          }
+        }
+        .dark .leaflet-draw-toolbar a::after {
+          background-color: #cbd5e1 !important;
         }
 
         /* ── Save / Cancel bar ── */

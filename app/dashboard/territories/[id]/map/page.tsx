@@ -333,10 +333,28 @@ export default function TerritoryMapPage({
     e.preventDefault()
     setSaving(true)
     try {
+      const numberChanged = !!territory && territory.number !== territoryForm.number
+
       const { error } = await supabase.from("territories")
         .update({ name: territoryForm.name, number: territoryForm.number, color: territoryForm.color })
         .eq("id", id)
       if (error) throw error
+
+      // Renomeia as quadras pra acompanhar o novo número do território
+      // (preserva a letra, só troca o prefixo numérico) — evita nomes defasados
+      // depois de renumerações/fusões de território.
+      if (numberChanged && territory?.subdivisions?.length) {
+        await Promise.all(
+          territory.subdivisions.map((sub) => {
+            const match = sub.name?.match(/^\d+(-.+)$/)
+            if (!match) return null
+            const newName = `${territoryForm.number}${match[1]}`
+            if (newName === sub.name) return null
+            return supabase.from("subdivisions").update({ name: newName }).eq("id", sub.id)
+          })
+        )
+      }
+
       setEditTerritoryDialogOpen(false)
       fetchTerritory()
     } catch (error: any) { alert("Erro: " + error.message) }

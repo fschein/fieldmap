@@ -228,15 +228,19 @@ export function AssignmentCreateModal({
           .eq("status", "active")
       }
 
-      const { error: assignErr } = await supabase.from("assignments").insert({
-        territory_id: selectedTerritoryId,
-        user_id: isGroupAssign ? null : selectedPublisherId,
-        group_id: isGroupAssign ? selectedGroupId : null,
-        campaign_id: selectedCampaignId || null,
-        status: isCompleted ? "completed" : "active",
-        assigned_at: startISO,
-        completed_at: endISO,
-      })
+      const { data: insertedAssign, error: assignErr } = await supabase
+        .from("assignments")
+        .insert({
+          territory_id: selectedTerritoryId,
+          user_id: isGroupAssign ? null : selectedPublisherId,
+          group_id: isGroupAssign ? selectedGroupId : null,
+          campaign_id: selectedCampaignId || null,
+          status: isCompleted ? "completed" : "active",
+          assigned_at: startISO,
+          completed_at: endISO,
+        })
+        .select("id")
+        .single()
 
       if (assignErr) throw assignErr
 
@@ -256,7 +260,18 @@ export function AssignmentCreateModal({
       if (selectedCampaignId) terrUpdate.campaign_id = selectedCampaignId
       else terrUpdate.campaign_id = null
 
-      await supabase.from("territories").update(terrUpdate).eq("id", selectedTerritoryId)
+      const { data: updatedTerr, error: terrErr } = await supabase
+        .from("territories")
+        .update(terrUpdate)
+        .eq("id", selectedTerritoryId)
+        .select("id")
+
+      if (terrErr || !updatedTerr || updatedTerr.length === 0) {
+        // Desfaz o assignment criado acima para não deixar o território
+        // com um assignment ativo sem refletir isso em territories (ficaria "Livre" na UI).
+        await supabase.from("assignments").delete().eq("id", insertedAssign.id)
+        throw terrErr ?? new Error("Não foi possível atualizar o território (0 linhas afetadas).")
+      }
 
       if (!isCompleted && !isGroupAssign) {
         // Dispara push + insere notificação in-app para o dirigente
