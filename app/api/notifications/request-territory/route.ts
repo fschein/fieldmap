@@ -1,9 +1,13 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import { notifyAdmins } from "@/lib/notifications"
+import { requireUser } from "@/lib/utils/api-auth"
 
 export async function POST(request: Request) {
   try {
+    const { user, error: authError } = await requireUser()
+    if (authError) return authError
+
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 
@@ -15,10 +19,8 @@ export async function POST(request: Request) {
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
-    const { userId, territoryId, territoryNumber, territoryName } = await request.json()
-    if (!userId) {
-      return NextResponse.json({ error: "userId é obrigatório" }, { status: 400 })
-    }
+    const { territoryId, territoryNumber, territoryName } = await request.json()
+    const userId = user.id
 
     const { data: profile } = await supabaseAdmin
       .from("profiles")

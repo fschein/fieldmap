@@ -1,9 +1,13 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import { notifyAdmins, sendNotification } from "@/lib/notifications"
+import { requireUser } from "@/lib/utils/api-auth"
 
 export async function POST(request: Request) {
   try {
+    const { user, error: authError } = await requireUser()
+    if (authError) return authError
+
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 
@@ -24,12 +28,24 @@ export async function POST(request: Request) {
       )
     }
 
+    if (user.id !== fromUserId) {
+      return NextResponse.json({ error: "Você só pode transferir territórios que estão com você." }, { status: 403 })
+    }
+
     const [fromProfileRes, toProfileRes, territoryRes, assignmentRes] = await Promise.all([
       supabaseAdmin.from("profiles").select("name, email").eq("id", fromUserId).single(),
       supabaseAdmin.from("profiles").select("name, email").eq("id", toUserId).single(),
-      supabaseAdmin.from("territories").select("number, name").eq("id", territoryId).single(),
-      supabaseAdmin.from("assignments").select("campaign_id").eq("id", assignmentId).single(),
+      supabaseAdmin.from("territories").select("number, name, assigned_to").eq("id", territoryId).single(),
+      supabaseAdmin.from("assignments").select("campaign_id").eq("id", assignmentId).eq("user_id", fromUserId).eq("status", "active").single(),
     ])
+
+    if (territoryRes.data?.assigned_to !== fromUserId) {
+      return NextResponse.json({ error: "Este território não está mais designado a você." }, { status: 409 })
+    }
+
+    if (assignmentRes.error || !assignmentRes.data) {
+      return NextResponse.json({ error: "Designação ativa não encontrada para este território." }, { status: 409 })
+    }
 
     const fromName = fromProfileRes.data?.name || fromProfileRes.data?.email || "Alguém"
     const toName = toProfileRes.data?.name || toProfileRes.data?.email || "outro publicador"

@@ -12,7 +12,7 @@ const PROGRESS_THRESHOLD = 0.6 // 60%
  * 1. Territórios atrasados → notifica admins
  * 2. Territórios com 60%+ das quadras concluídas → notifica admins (uma vez por designação)
  * 3. Territórios com 100% das quadras concluídas → notifica o dirigente
- * 4. Dirigentes sem território ativo → notifica admins
+ * 4. Dirigentes na escala do dia seguinte sem território ativo → notifica admins
  */
 export async function GET(req: Request) {
   const cronSecret = process.env.CRON_SECRET
@@ -158,30 +158,45 @@ export async function GET(req: Request) {
     }
   }
 
-  // ─── 3. Dirigentes sem nenhum território ativo ────────────────────────────
-  const { data: dirigentes } = await supabase
-    .from("profiles")
-    .select("id, name, email")
-    .eq("role", "dirigente")
+  // ─── 3. Dirigentes na escala de amanhã sem território ativo ───────────────
+  // Agora que existe o fluxo de "Pedir Território", só faz sentido alertar o
+  // admin sobre quem realmente vai precisar de um território em breve.
+  const tomorrowDate = new Date(Date.now() + 24 * 3600000).toISOString().slice(0, 10)
 
-  for (const dirigente of dirigentes ?? []) {
-    const { count } = await supabase
-      .from("territories")
-      .select("id", { count: "exact", head: true })
-      .eq("assigned_to", dirigente.id)
+  const { data: upcomingSchedules } = await supabase
+    .from("schedules")
+    .select("leader_id")
+    .eq("status", "published")
+    .eq("date", tomorrowDate)
+    .not("leader_id", "is", null)
 
-    if ((count ?? 0) === 0) {
-      const name = dirigente.name || dirigente.email || "Dirigente"
+  const scheduledLeaderIds = [...new Set((upcomingSchedules ?? []).map((s) => s.leader_id as string))]
 
-      await notifyAdmins(supabase, {
-        type: "idle_publisher",
-        title: "Dirigente Sem Território ⚠️",
-        message: `${name} está sem nenhum território designado.`,
-        url: "/dashboard/assignments",
-        createdBy: dirigente.id,
-      })
+  if (scheduledLeaderIds.length > 0) {
+    const { data: dirigentes } = await supabase
+      .from("profiles")
+      .select("id, name, email")
+      .in("id", scheduledLeaderIds)
 
-      results.idle_publisher++
+    for (const dirigente of dirigentes ?? []) {
+      const { count } = await supabase
+        .from("territories")
+        .select("id", { count: "exact", head: true })
+        .eq("assigned_to", dirigente.id)
+
+      if ((count ?? 0) === 0) {
+        const name = dirigente.name || dirigente.email || "Dirigente"
+
+        await notifyAdmins(supabase, {
+          type: "idle_publisher",
+          title: "Dirigente Sem Território ⚠️",
+          message: `${name} está na escala de amanhã e está sem nenhum território designado.`,
+          url: "/dashboard/assignments",
+          createdBy: dirigente.id,
+        })
+
+        results.idle_publisher++
+      }
     }
   }
 

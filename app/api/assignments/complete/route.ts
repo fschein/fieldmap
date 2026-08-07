@@ -1,9 +1,13 @@
 import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import { sendNotification, notifyAdmins } from "@/lib/notifications"
+import { requireUser } from "@/lib/utils/api-auth"
 
 export async function POST(request: Request) {
   try {
+    const { user, error: authError } = await requireUser()
+    if (authError) return authError
+
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 
@@ -19,6 +23,10 @@ export async function POST(request: Request) {
 
     if (!territoryId || !userId || !action) {
       return NextResponse.json({ error: "territoryId, userId e action são obrigatórios" }, { status: 400 })
+    }
+
+    if (user.id !== userId) {
+      return NextResponse.json({ error: "Você só pode concluir/devolver seus próprios territórios." }, { status: 403 })
     }
 
     // 0. Verifica se o território ainda está designado para este usuário e busca o campaign_id do assignment ativo
