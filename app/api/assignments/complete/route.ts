@@ -55,6 +55,30 @@ export async function POST(request: Request) {
     const now = new Date().toISOString()
     const isComplete = action === "complete"
 
+    // 0b. Devolução: bloqueia se houver quadra "pela metade" (com anotação de
+    // progresso mas não concluída) — força o dirigente a finalizar ou limpar
+    // a anotação antes de devolver o território.
+    if (!isComplete) {
+      const { data: subdivisions } = await supabaseAdmin
+        .from("subdivisions")
+        .select("name, completed, status, notes")
+        .eq("territory_id", territoryId)
+
+      const halfDone = (subdivisions ?? []).filter(
+        (s) => !(s.completed || s.status === "completed") && s.notes?.trim()
+      )
+
+      if (halfDone.length > 0) {
+        const names = halfDone.map((s) => s.name).join(", ")
+        return NextResponse.json(
+          {
+            error: `Finalize ou limpe a anotação de progresso da(s) quadra(s) ${names} antes de devolver o território.`,
+          },
+          { status: 409 }
+        )
+      }
+    }
+
     // 1. Atualiza o assignment
     const { error: assignmentError } = await supabaseAdmin
       .from("assignments")

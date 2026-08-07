@@ -35,6 +35,11 @@ export function CompleteAssignmentDialog({
   const totalSubdivisions = territory.subdivisions?.length || 0
   const allCompleted = completedSubdivisions === totalSubdivisions
 
+  const halfDoneSubdivisions = territory.subdivisions?.filter(
+    s => !(s.completed || s.status === 'completed') && s.notes?.trim()
+  ) || []
+  const hasHalfDone = halfDoneSubdivisions.length > 0
+
   // Math for deadline
   let timeInFieldMs = 0;
   if (activeAssignmentDate) {
@@ -44,6 +49,7 @@ export function CompleteAssignmentDialog({
   const daysRemaining = 90 - daysInField;
 
   const handleConfirm = () => {
+    if (!allCompleted && hasHalfDone) return
     if (!allCompleted && !reason.trim()) {
       alert("Por favor, informe o motivo da devolução incompleta.")
       return
@@ -81,6 +87,15 @@ export function CompleteAssignmentDialog({
 
             {!allCompleted ? (
               <div className="space-y-3">
+                {hasHalfDone && (
+                  <div className="rounded-lg p-3 text-[0.8125rem] border bg-red-50 border-red-200 text-red-800">
+                    <p className="font-semibold">⚠️ Não é possível devolver ainda</p>
+                    <p className="mt-1">
+                      A quadra {halfDoneSubdivisions.map(s => s.name).join(", ")} está com anotação de progresso ("Onde parou") mas não foi finalizada.
+                      Finalize a quadra ou apague a anotação antes de devolver o território.
+                    </p>
+                  </div>
+                )}
                 <div className={`rounded-lg p-3 text-[0.8125rem] border ${daysRemaining < 0 ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
                   {daysRemaining < 0 ? (
                     <>
@@ -99,15 +114,16 @@ export function CompleteAssignmentDialog({
                     </>
                   )}
                 </div>
-                
+
                 <div className="space-y-1.5">
                   <Label htmlFor="reason" className="text-sm font-semibold text-slate-700">Motivo da devolução <span className="text-red-500">*</span></Label>
-                  <Textarea 
+                  <Textarea
                     id="reason"
                     placeholder="Ex: Não consegui terminar a Rua X pois choveu..."
                     className="h-24 text-[0.8125rem]"
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
+                    disabled={hasHalfDone}
                     required
                   />
                 </div>
@@ -122,9 +138,10 @@ export function CompleteAssignmentDialog({
         </DialogHeader>
         <DialogFooter className="gap-2 sm:gap-0">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button 
+          <Button
             className={allCompleted ? "bg-green-600 hover:bg-green-700" : "bg-orange-600 hover:bg-orange-700"}
             onClick={handleConfirm}
+            disabled={!allCompleted && hasHalfDone}
           >
             {allCompleted ? "Sim, concluir tudo" : "Confirmar devolução"}
           </Button>
