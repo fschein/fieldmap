@@ -21,6 +21,38 @@ interface TerritoryMapViewerProps {
   animatingSubdivisionId?: string | null
 }
 
+const SMOOTH = 0.25
+// Abaixo disso entre dois pontos, a variação é ruído de GPS, não deslocamento
+// real — calcular rumo nesse caso dá uma direção sem sentido.
+const MIN_DISPLACEMENT_M = 4
+
+function smoothAngle(current: number, target: number): number {
+  let diff = target - current
+  if (diff > 180) diff -= 360
+  if (diff < -180) diff += 360
+  return current + diff * SMOOTH
+}
+
+function haversineDistanceMeters(a: { lat: number, lng: number }, b: { lat: number, lng: number }): number {
+  const R = 6371000
+  const toRad = Math.PI / 180
+  const dLat = (b.lat - a.lat) * toRad
+  const dLng = (b.lng - a.lng) * toRad
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * toRad) * Math.cos(b.lat * toRad) * Math.sin(dLng / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(s))
+}
+
+function computeBearing(a: { lat: number, lng: number }, b: { lat: number, lng: number }): number {
+  const toRad = Math.PI / 180
+  const toDeg = 180 / Math.PI
+  const φ1 = a.lat * toRad
+  const φ2 = b.lat * toRad
+  const Δλ = (b.lng - a.lng) * toRad
+  const y = Math.sin(Δλ) * Math.cos(φ2)
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ)
+  return (Math.atan2(y, x) * toDeg + 360) % 360
+}
+
 export default function TerritoryMapViewer({
   territory,
   onSubdivisionClick,
@@ -39,6 +71,8 @@ export default function TerritoryMapViewer({
   const polygonsRef = useRef<L.FeatureGroup | null>(null)
   const osmLayerRef = useRef<L.TileLayer | null>(null)
   const satLayerRef = useRef<L.TileLayer | null>(null)
+  const currentHeadingRef = useRef(0)
+  const headingAnchorRef = useRef<{ lat: number, lng: number } | null>(null)
   const [isSatellite, setIsSatellite] = useState(false)
   const [isLocating, setIsLocating] = useState(false)
   const [isCenteredOnUser, setIsCenteredOnUser] = useState(false)
@@ -236,7 +270,26 @@ export default function TerritoryMapViewer({
     }
   }, [territory, onSubdivisionClick, onMapClick, pinMode, animatingSubdivisionId])
 
-  // Geolocalização
+  const applyHeading = useCallback((rawHeading: number) => {
+    const prev = currentHeadingRef.current
+    const smoothed = smoothAngle(prev, rawHeading)
+    currentHeadingRef.current = smoothed
+    if (Math.abs(smoothed - prev) < 2) return
+    const el = userMarkerRef.current?.getElement()
+    if (!el) return
+    const cone = el.querySelector('.heading-cone') as HTMLElement | null
+    if (!cone) return
+    cone.style.transform = `rotate(${smoothed}deg)`
+    cone.style.opacity = '1'
+  }, [])
+
+  // Geolocalização + rumo. Em vez de usar o sensor de orientação do celular
+  // (instável parado ou na vertical — a "bússola do Jack Sparrow"), o rumo
+  // vem do próprio deslocamento por GPS: coords.heading (quando o navegador
+  // fornece, geralmente andando) ou, como fallback, o ângulo entre a última
+  // posição "âncora" e a atual, só quando o deslocamento supera o ruído do
+  // GPS. Parado, a seta simplesmente mantém a última direção conhecida —
+  // igual ao Google Maps.
   useEffect(() => {
     if (!mapRef.current) return
     const map = mapRef.current
@@ -244,9 +297,22 @@ export default function TerritoryMapViewer({
 
     const locationIcon = L.divIcon({
       className: 'user-location-marker',
-      html: `<div class="location-dot"></div>`,
-      iconSize: [14, 14],
-      iconAnchor: [7, 7],
+      html: `<div class="location-wrapper">
+        <div class="heading-cone" style="opacity:0">
+          <svg width="24" height="32" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="coneGrad" x1="0.5" y1="0" x2="0.5" y2="1">
+                <stop offset="0%" stop-color="#378ADD" stop-opacity="0.95"/>
+                <stop offset="100%" stop-color="#378ADD" stop-opacity="0.2"/>
+              </linearGradient>
+            </defs>
+            <path d="M12,2 L22,30 Q12,24 2,30 Z" fill="url(#coneGrad)"/>
+          </svg>
+        </div>
+        <div class="location-dot"></div>
+      </div>`,
+      iconSize: [44, 46],
+      iconAnchor: [22, 38],
     })
 
     if ('geolocation' in navigator) {
@@ -255,6 +321,8 @@ export default function TerritoryMapViewer({
           const lat = position.coords.latitude
           const lng = position.coords.longitude
           const accuracy = position.coords.accuracy
+          const gpsHeading = position.coords.heading
+          const speed = position.coords.speed
 
           if (!userMarkerRef.current) {
             userMarkerRef.current = L.marker([lat, lng], { icon: locationIcon, zIndexOffset: 1000 }).addTo(map)
@@ -272,6 +340,19 @@ export default function TerritoryMapViewer({
               userRadiusRef.current.setRadius(accuracy)
             }
           }
+
+          if (typeof gpsHeading === 'number' && !Number.isNaN(gpsHeading) && (speed == null || speed > 0.3)) {
+            applyHeading(gpsHeading)
+            headingAnchorRef.current = { lat, lng }
+          } else if (headingAnchorRef.current) {
+            const dist = haversineDistanceMeters(headingAnchorRef.current, { lat, lng })
+            if (dist > MIN_DISPLACEMENT_M) {
+              applyHeading(computeBearing(headingAnchorRef.current, { lat, lng }))
+              headingAnchorRef.current = { lat, lng }
+            }
+          } else {
+            headingAnchorRef.current = { lat, lng }
+          }
         },
         null,
         { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
@@ -283,7 +364,7 @@ export default function TerritoryMapViewer({
         navigator.geolocation.clearWatch(watchId)
       }
     }
-  }, [])
+  }, [applyHeading])
 
   // Ao entrar em pin mode, centraliza o mapa na localização atual (se disponível)
   // como ponto de partida — o usuário ainda precisa arrastar/confirmar.
@@ -481,13 +562,36 @@ export default function TerritoryMapViewer({
           display: none !important;
         }
 
+        .location-wrapper {
+          position: relative;
+          width: 44px;
+          height: 46px;
+        }
+
+        .heading-cone {
+          position: absolute;
+          top: 0;
+          left: 10px;
+          width: 24px;
+          height: 38px;
+          transform-origin: center bottom;
+          transition: opacity 0.4s ease;
+          pointer-events: none;
+          filter: drop-shadow(0 1px 3px rgba(55,138,221,0.4));
+        }
+
         .location-dot {
+          position: absolute;
+          top: 31px;
+          left: 50%;
+          transform: translateX(-50%);
           width: 14px;
           height: 14px;
           background-color: #378ADD;
           border-radius: 50%;
           border: 2.5px solid white;
           box-shadow: 0 1px 4px rgba(55,138,221,0.5);
+          z-index: 1;
         }
       `}</style>
     </div>
