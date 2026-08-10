@@ -428,12 +428,9 @@ export default function TerritoryMapPage() {
     <div className="flex flex-col bg-background overflow-hidden h-dvh">
 
       {/* ── Barra do território ── */}
-      <div
-        className="relative shrink-0 flex items-center gap-3 px-4"
-        style={{ height: 44, background: '#fff', borderBottom: '0.5px solid #e8e8e8' }}
-      >
-        <button onClick={() => router.push("/dashboard/my-assignments")} className="shrink-0">
-          <IconArrowLeft size={20} color="#333" />
+      <div className="relative shrink-0 flex items-center gap-3 px-4 h-11 bg-card border-b border-border">
+        <button onClick={() => router.push("/dashboard/my-assignments")} className="shrink-0 text-foreground">
+          <IconArrowLeft size={20} />
         </button>
 
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -446,16 +443,13 @@ export default function TerritoryMapPage() {
           </span>
         </div>
 
-        <span
-          className="shrink-0 tabular-nums"
-          style={{ background: '#E6F1FB', color: '#0C447C', fontSize: 12, fontWeight: 500, borderRadius: 12, padding: '4px 10px' }}
-        >
+        <span className="shrink-0 tabular-nums text-xs font-medium bg-primary/10 text-primary rounded-full px-2.5 py-1">
           {completedCount} / {totalCount}
         </span>
 
         {/* Barra de progresso — borda inferior */}
-        <div className="absolute bottom-0 left-0 right-0" style={{ height: 3, background: '#e8e8e8' }}>
-          <div style={{ height: '100%', width: `${progress}%`, background: '#378ADD', borderRadius: '0 2px 2px 0' }} />
+        <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-border">
+          <div className="h-full bg-primary rounded-r-sm transition-all" style={{ width: `${progress}%` }} />
         </div>
       </div>
 
