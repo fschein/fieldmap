@@ -57,22 +57,41 @@ export async function POST(request: Request) {
 
     // 0b. Devolução: bloqueia se houver quadra "pela metade" (com anotação de
     // progresso mas não concluída) — força o dirigente a finalizar ou limpar
-    // a anotação antes de devolver o território.
+    // a anotação antes de devolver o território. Com campanha ativa, o
+    // progresso real está em subdivision_campaign_progress, não na coluna
+    // crua subdivisions — checar só a tabela crua deixaria esse bloqueio
+    // nunca disparar quando há campanha.
     if (!isComplete) {
       const { data: subdivisions } = await supabaseAdmin
         .from("subdivisions")
-        .select("name, completed, status, notes")
+        .select("id, name, completed, status, notes")
         .eq("territory_id", territoryId)
 
-      const halfDone = (subdivisions ?? []).filter(
-        (s) => !(s.completed || s.status === "completed") && s.notes?.trim()
-      )
+      let halfDoneNames: string[] = []
 
-      if (halfDone.length > 0) {
-        const names = halfDone.map((s) => s.name).join(", ")
+      if (campaignId && subdivisions?.length) {
+        const { data: progress } = await supabaseAdmin
+          .from("subdivision_campaign_progress")
+          .select("subdivision_id, completed, status, notes")
+          .eq("campaign_id", campaignId)
+          .in("subdivision_id", subdivisions.map((s) => s.id))
+
+        halfDoneNames = subdivisions
+          .filter((s) => {
+            const p = progress?.find((pr) => pr.subdivision_id === s.id)
+            return p && !(p.completed || p.status === "completed") && p.notes?.trim()
+          })
+          .map((s) => s.name)
+      } else {
+        halfDoneNames = (subdivisions ?? [])
+          .filter((s) => !(s.completed || s.status === "completed") && s.notes?.trim())
+          .map((s) => s.name)
+      }
+
+      if (halfDoneNames.length > 0) {
         return NextResponse.json(
           {
-            error: `Finalize ou limpe a anotação de progresso da(s) quadra(s) ${names} antes de devolver o território.`,
+            error: `Finalize ou limpe a anotação de progresso da(s) quadra(s) ${halfDoneNames.join(", ")} antes de devolver o território.`,
           },
           { status: 409 }
         )
@@ -106,11 +125,21 @@ export async function POST(request: Request) {
 
     if (territoryError) throw territoryError
 
-    // 3. Reseta as quadras APENAS se for conclusão TOTAL e não for campanha
-    if (isComplete && !campaignId) {
+    // 3. Ao concluir o território, a anotação crua de quadra nunca deve
+    // persistir — senão ela "vaza" de volta numa campanha futura (quando
+    // subdivision_campaign_progress ainda não tem linha e o app cai pro
+    // valor cru de subdivisions.notes). completed/status só são resetados
+    // quando não há campanha, pra não sobrescrever o histórico por campanha.
+    if (isComplete) {
+      const resetPayload: Record<string, unknown> = { notes: null, updated_at: now }
+      if (!campaignId) {
+        resetPayload.completed = false
+        resetPayload.status = "available"
+      }
+
       const { error: subdivisionError } = await supabaseAdmin
         .from("subdivisions")
-        .update({ completed: false, status: "available", updated_at: now })
+        .update(resetPayload)
         .eq("territory_id", territoryId)
 
       if (subdivisionError) {

@@ -88,7 +88,7 @@ export default function AssignmentsPage() {
   const [campaignFilter, setCampaignFilter] = useState<string>("all")
   const [periodFilter, setPeriodFilter] = useState<PeriodFilter>("all")
   const [sortBy, setSortBy] = useState<SortOption>("number")
-  const [campaigns, setCampaigns] = useState<{ id: string, name: string }[]>([])
+  const [campaigns, setCampaigns] = useState<{ id: string, name: string, start_date: string | null, end_date: string | null }[]>([])
 
   const [selectedTerritoryId, setSelectedTerritoryId] = useState<string | null>(null)
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -122,7 +122,7 @@ export default function AssignmentsPage() {
 
       const { data: campaignsData } = await supabase
         .from("campaigns")
-        .select("id, name")
+        .select("id, name, start_date, end_date")
         .eq("active", true)
         .order("name")
 
@@ -261,7 +261,12 @@ export default function AssignmentsPage() {
   // Campanha ativa: mostra a strip de progresso automaticamente, sem depender do filtro selecionado.
   // Por quadra concluída (mais preciso que por território — reflete trabalho parcial),
   // sobre o total de quadras de territórios ativos (todos os tipos). Mesmo critério do Dashboard.
-  const activeCampaign = campaigns[0] ?? null
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const activeCampaign = campaigns.find(c => {
+    if (!c.start_date || todayStr < c.start_date) return false
+    if (c.end_date && todayStr > c.end_date) return false
+    return true
+  }) ?? null
   const activeSubdivisionIds = useMemo(() => new Set(
     rawTerritories
       .filter(t => t.status !== "inactive")

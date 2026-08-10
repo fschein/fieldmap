@@ -112,6 +112,7 @@ export default function TerritoryDetailPage({
       *,
       subdivisions(*),
       do_not_visits(*),
+      assignments(status, campaign_id),
       group:groups(id, name, color),
       assigned_to_user:profiles!territories_assigned_to_fkey(id, name, email)
     `)
@@ -132,9 +133,40 @@ export default function TerritoryDetailPage({
       }
 
       if (territoryRes.data) {
-        setTerritory(territoryRes.data as unknown as TerritoryWithDetails)
+        const data = territoryRes.data as any
+        let subdivisions = data.subdivisions || []
+
+        // Mesmo critério dos mapas de designação: se há campanha ativa pra
+        // esse território, o progresso/notas exibidos vêm de
+        // subdivision_campaign_progress (por campanha), não da coluna crua
+        // subdivisions.notes/completed — senão uma nota antiga de uma
+        // designação passada "vaza" de volta numa campanha nova.
+        const activeAssignment = (data.assignments || []).find((a: any) => a.status === "active")
+        const campaignId = activeAssignment?.campaign_id
+
+        if (campaignId && subdivisions.length > 0) {
+          const { data: progressData } = await supabase
+            .from("subdivision_campaign_progress")
+            .select("*")
+            .eq("campaign_id", campaignId)
+            .in("subdivision_id", subdivisions.map((s: any) => s.id))
+
+          if (progressData) {
+            subdivisions = subdivisions.map((s: any) => {
+              const prog = progressData.find((p: any) => p.subdivision_id === s.id)
+              return {
+                ...s,
+                completed: prog ? prog.completed : false,
+                status: prog ? prog.status : "available",
+                notes: prog ? prog.notes : (s.notes || null),
+              }
+            })
+          }
+        }
+
+        setTerritory({ ...data, subdivisions } as unknown as TerritoryWithDetails)
       }
-      
+
       if (usersRes.data) {
         setUsers(usersRes.data as Profile[])
       }
@@ -175,27 +207,28 @@ export default function TerritoryDetailPage({
     setSubmitting(true)
 
     try {
-      const payload = {
-        territory_id: id,
-        name: formData.name,
-        notes: formData.notes,
-        order_index: territory?.subdivisions?.length || 0,
-        completed: false,
-      }
-
       if (editingBlock) {
-        
+        // Hoje este formulário não expõe nome (campo desabilitado) nem notas
+        // pra edição real — não escrevemos completed/notes aqui pra não
+        // reabrir sem querer uma quadra já concluída nem sobrescrever notas
+        // que pertencem ao progresso da campanha ativa.
         const { error } = await supabase
           .from("subdivisions")
-          .update(payload)
+          .update({ name: formData.name })
           .eq("id", editingBlock.id)
-        
+
         if (error) throw error
       } else {
         const { error } = await supabase
           .from("subdivisions")
-          .insert([payload])
-        
+          .insert([{
+            territory_id: id,
+            name: formData.name,
+            notes: "",
+            order_index: territory?.subdivisions?.length || 0,
+            completed: false,
+          }])
+
         if (error) throw error
       }
 

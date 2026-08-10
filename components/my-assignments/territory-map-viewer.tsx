@@ -68,6 +68,7 @@ export default function TerritoryMapViewer({
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const userMarkerRef = useRef<L.Marker | null>(null)
   const userRadiusRef = useRef<L.Circle | null>(null)
+  const overlayGroupRef = useRef<L.LayerGroup | null>(null)
   const polygonsRef = useRef<L.FeatureGroup | null>(null)
   const osmLayerRef = useRef<L.TileLayer | null>(null)
   const satLayerRef = useRef<L.TileLayer | null>(null)
@@ -121,12 +122,14 @@ export default function TerritoryMapViewer({
 
     const map = mapRef.current
 
-    // Limpar camadas anteriores (exceto a base)
-    map.eachLayer((layer) => {
-      if (layer instanceof L.Polygon || layer instanceof L.Marker || layer instanceof L.CircleMarker) {
-        map.removeLayer(layer)
-      }
-    })
+    // Camada dedicada a quadras/DNVs: limpa só o que este efeito desenha,
+    // sem nunca tocar no marcador de localização do usuário (que é gerenciado
+    // por outro efeito e some do mapa pra sempre se for removido por engano aqui).
+    if (!overlayGroupRef.current) {
+      overlayGroupRef.current = L.layerGroup().addTo(map)
+    }
+    const overlayGroup = overlayGroupRef.current
+    overlayGroup.clearLayers()
 
     const polygons: L.Polygon[] = []
     let hasValidPolygons = false
@@ -183,7 +186,7 @@ export default function TerritoryMapViewer({
           onSubdivisionClick(subdivision)
         })
 
-        polygon.addTo(map)
+        polygon.addTo(overlayGroup)
         polygons.push(polygon)
         hasValidPolygons = true
 
@@ -209,7 +212,7 @@ export default function TerritoryMapViewer({
             onSubdivisionClick(subdivision)
           })
           
-          labelAnchor.addTo(map)
+          labelAnchor.addTo(overlayGroup)
         }
       } catch (error) {
         console.error("Erro ao renderizar subdivision:", subdivision.id, error)
@@ -244,7 +247,7 @@ export default function TerritoryMapViewer({
           direction: "top",
           offset: [0, -10]
         })
-        marker.addTo(map)
+        marker.addTo(overlayGroup)
       }
     })
 

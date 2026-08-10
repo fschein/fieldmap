@@ -182,7 +182,7 @@ export function AssignmentCreateModal({
           if (todayStr < c.start_date) return false
           if (c.end_date && todayStr > c.end_date) return false
           return true
-        }) ?? campsData[0]
+        })
 
         if (currentCampaign) setSelectedCampaignId(currentCampaign.id)
       }
