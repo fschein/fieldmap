@@ -29,3 +29,4 @@ next-env.d.ts
 
 .agent
 CLAUDE.md
+certificates/

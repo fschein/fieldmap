@@ -43,6 +43,7 @@ export default function TerritoryMapPage() {
   const [selectedSubdivision, setSelectedSubdivision] = useState<Subdivision | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [pinMode, setPinMode] = useState(false)
+  const [pinModeCenter, setPinModeCenter] = useState<{ lat: number, lng: number } | null>(null)
   const [dnvDialogOpen, setDnvDialogOpen] = useState(false)
   const [dnvCoords, setDnvCoords] = useState<{ lat: number, lng: number } | null>(null)
   const [animatingSubdivisionId, setAnimatingSubdivisionId] = useState<string | null>(null)
@@ -324,19 +325,24 @@ export default function TerritoryMapPage() {
   }
 
   const handleAddDnvClick = () => {
+    // Sempre entra em Pin Mode: o GPS só serve para centralizar o mapa como
+    // ponto de partida, o publicador ainda precisa arrastar até o local exato
+    // e confirmar antes de salvar.
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setDnvCoords({ lat: position.coords.latitude, lng: position.coords.longitude })
-          setDnvDialogOpen(true)
+          setPinModeCenter({ lat: position.coords.latitude, lng: position.coords.longitude })
+          setPinMode(true)
         },
         (error) => {
-          console.warn("Geolocalização indisponível, ativando Pin Mode", error)
+          console.warn("Geolocalização indisponível", error)
+          setPinModeCenter(null)
           setPinMode(true)
         },
         { enableHighAccuracy: true, timeout: 5000 }
       )
     } else {
+      setPinModeCenter(null)
       setPinMode(true)
     }
   }
@@ -459,6 +465,7 @@ export default function TerritoryMapPage() {
           territory={territory}
           onSubdivisionClick={handleSubdivisionClick}
           pinMode={pinMode}
+          pinModeCenter={pinModeCenter}
           onPinConfirm={handlePinConfirm}
           onPinCancel={handlePinCancel}
         />

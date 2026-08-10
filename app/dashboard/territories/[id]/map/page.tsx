@@ -33,11 +33,11 @@ import {
   Trash2,
   Pencil,
   Plus,
-  X,
   TrendingUp,
   LayoutGrid,
 } from "lucide-react"
 import type { TerritoryWithSubdivisions, Subdivision } from "@/lib/types"
+import { countExpiredDnvs, isDnvExpired } from "@/lib/utils/do-not-visit"
 
 const TerritoryMap = dynamic(
   () => import("@/components/map/territory-map").then((mod) => mod.TerritoryMap),
@@ -78,7 +78,7 @@ export default function TerritoryMapPage({
   const [pendingCoordinates, setPendingCoordinates] = useState<[number, number][][] | null>(null)
   const [focusedSubdivisionId, setFocusedSubdivisionId] = useState<string | null>(null)
 
-  const [isAddingDnv, setIsAddingDnv] = useState(false)
+  const [pinMode, setPinMode] = useState(false)
   const [newDnvCoords, setNewDnvCoords] = useState<[number, number] | null>(null)
   const [editingDnv, setEditingDnv] = useState<any>(null)
   const [dnvFormData, setDnvFormData] = useState({ address: "", notes: "" })
@@ -267,18 +267,21 @@ export default function TerritoryMapPage({
     fetchTerritory()
   }
 
-  const handleMapClick = async (latlng: [number, number]) => {
-    if (!isAddingDnv) return
+  const handlePinConfirm = async (latlng: [number, number]) => {
+    setPinMode(false)
     setNewDnvCoords(latlng)
     setDnvFormData({ address: "Carregando endereço...", notes: "" })
     setCreateDnvDialogOpen(true)
-    setIsAddingDnv(false)
     try {
       const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng[0]}&lon=${latlng[1]}`)
       const data = await res.json()
       const shortAddress = data?.display_name?.split(",").slice(0, 3).join(", ") || ""
       setDnvFormData(prev => ({ ...prev, address: shortAddress }))
     } catch { setDnvFormData(prev => ({ ...prev, address: "" })) }
+  }
+
+  const handlePinCancel = () => {
+    setPinMode(false)
   }
 
   const handleCreateDnv = async (e: React.FormEvent) => {
@@ -397,6 +400,7 @@ export default function TerritoryMapPage({
   }
 
   const stats = getProgressStats()
+  const expiredDnvCount = countExpiredDnvs((territory as any).do_not_visits)
 
   return (
     /*
@@ -462,14 +466,13 @@ export default function TerritoryMapPage({
           />
         )}
 
-        {/* DNV adding banner */}
-        {isAddingDnv && (
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-red-600 text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 animate-bounce">
-            <MapPin className="h-4 w-4" />
-            <span className="text-sm font-bold">Clique no endereço no mapa</span>
-            <button className="ml-1" onClick={() => setIsAddingDnv(false)}>
-              <X className="h-4 w-4" />
-            </button>
+        {/* Aviso de "não visitar" com 1 ano completo */}
+        {!pinMode && expiredDnvCount > 0 && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-amber-50 border border-amber-300 text-amber-800 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-200 px-3 py-1.5 rounded-full shadow-md text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap max-w-[90%]">
+            <MapPin className="h-3.5 w-3.5" />
+            {expiredDnvCount === 1
+              ? '1 endereço "não visitar" completou 1 ano — já pode ser visitado'
+              : `${expiredDnvCount} endereços "não visitar" completaram 1 ano — já podem ser visitados`}
           </div>
         )}
 
@@ -483,8 +486,10 @@ export default function TerritoryMapPage({
             onSubdivisionUpdate={handleSubdivisionUpdate}
             onSubdivisionDelete={handleSubdivisionDelete}
             onSubdivisionSelect={handleSubdivisionSelect}
-            onMapClick={handleMapClick}
             focusedSubdivisionId={focusedSubdivisionId}
+            pinMode={pinMode}
+            onPinConfirm={handlePinConfirm}
+            onPinCancel={handlePinCancel}
           />
         </div>
 
@@ -645,7 +650,7 @@ export default function TerritoryMapPage({
               <div className="px-4 py-3 border-b shrink-0">
                 <Button
                   className="w-full bg-red-600 hover:bg-red-700 text-white h-9 text-sm font-medium gap-1.5"
-                  onClick={() => setIsAddingDnv(true)}
+                  onClick={() => { setPinMode(true); setShowMobileSidebar(false) }}
                 >
                   <Plus className="h-3.5 w-3.5" /> Marcar não visitar
                 </Button>
@@ -665,7 +670,7 @@ export default function TerritoryMapPage({
                 ) : (
                   (territory as any).do_not_visits.map((dnv: any) => {
                     const date = new Date(dnv.created_at)
-                    const isExpired = Date.now() - date.getTime() > 365 * 24 * 60 * 60 * 1000
+                    const isExpired = isDnvExpired(dnv.created_at)
                     return (
                       <div
                         key={dnv.id}
@@ -681,7 +686,7 @@ export default function TerritoryMapPage({
                               {dnv.address || "Endereço não informado"}
                             </p>
                             {isExpired ? (
-                              <span className="text-[10px] font-bold text-destructive uppercase tracking-wide">Expirado</span>
+                              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-500 uppercase tracking-wide">⚠️ Pode visitar novamente</span>
                             ) : (
                               <span className="text-[10px] text-muted-foreground">
                                 Desde {date.toLocaleDateString("pt-BR")}

@@ -5,6 +5,9 @@ import L from "leaflet"
 import "leaflet/dist/leaflet.css"
 import "leaflet-draw/dist/leaflet.draw.css"
 import "leaflet-draw"
+import { MapPinOff } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { isDnvExpired } from "@/lib/utils/do-not-visit"
 import type { Subdivision, Territory } from "@/lib/types"
 
 if (typeof window !== "undefined") {
@@ -30,6 +33,9 @@ interface TerritoryMapProps {
   onSubdivisionSelect?: (subdivision: Subdivision) => void
   onDnvClick?: (dnv: any) => void
   onMapClick?: (latlng: [number, number]) => void
+  pinMode?: boolean
+  onPinConfirm?: (latlng: [number, number]) => void
+  onPinCancel?: () => void
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -53,6 +59,9 @@ export function TerritoryMap({
   onSubdivisionDelete,
   onSubdivisionSelect,
   onMapClick,
+  pinMode = false,
+  onPinConfirm,
+  onPinCancel,
 }: TerritoryMapProps) {
   const mapRef = useRef<HTMLDivElement>(null)
   const mapInstanceRef = useRef<L.Map | null>(null)
@@ -70,10 +79,10 @@ export function TerritoryMap({
     if (!seen) localStorage.setItem('map-instructions-seen', '1')
   }, [])
 
-  const cbRef = useRef({ onSubdivisionCreate, onSubdivisionUpdate, onSubdivisionDelete, onMapClick, territoryColor: territory.color })
+  const cbRef = useRef({ onSubdivisionCreate, onSubdivisionUpdate, onSubdivisionDelete, onMapClick, territoryColor: territory.color, pinMode })
   useEffect(() => {
-    cbRef.current = { onSubdivisionCreate, onSubdivisionUpdate, onSubdivisionDelete, onMapClick, territoryColor: territory.color }
-  }, [onSubdivisionCreate, onSubdivisionUpdate, onSubdivisionDelete, onMapClick, territory.color])
+    cbRef.current = { onSubdivisionCreate, onSubdivisionUpdate, onSubdivisionDelete, onMapClick, territoryColor: territory.color, pinMode }
+  }, [onSubdivisionCreate, onSubdivisionUpdate, onSubdivisionDelete, onMapClick, territory.color, pinMode])
 
   const initializeMap = useCallback(() => {
     if (!mapRef.current || mapInstanceRef.current) return
@@ -105,6 +114,7 @@ export function TerritoryMap({
     map.on("draw:deletestop", () => { setIsEditing(false) })
 
     map.on("click", (e) => {
+      if (cbRef.current.pinMode) return
       cbRef.current.onMapClick?.([e.latlng.lat, e.latlng.lng])
     })
 
@@ -217,12 +227,16 @@ export function TerritoryMap({
 
     ;((territory as any).do_not_visits ?? []).forEach((dnv: any) => {
       if (!dnv.latitude || !dnv.longitude) return
-      const isExpired = Date.now() - new Date(dnv.created_at).getTime() > 365 * 864e5
+      const expired = isDnvExpired(dnv.created_at)
       L.circleMarker([dnv.latitude, dnv.longitude], {
-        color: "#dc2626", fillColor: "#ef4444", fillOpacity: 1, radius: 8, weight: 2,
+        color: expired ? "#b45309" : "#dc2626",
+        fillColor: expired ? "#f59e0b" : "#ef4444",
+        fillOpacity: 1, radius: 8, weight: 2,
       })
         .bindTooltip(
-          `<div class="dnv-tip-title">🛑 Não Visitar${isExpired ? " (Expirado)" : ""}</div>${dnv.address ? `<div class="dnv-tip-addr">${dnv.address}</div>` : ""}`,
+          expired
+            ? `<div class="dnv-tip-title dnv-tip-title-warning">⚠️ Pode visitar novamente (1 ano completo)</div>${dnv.address ? `<div class="dnv-tip-addr">${dnv.address}</div>` : ""}`
+            : `<div class="dnv-tip-title">🛑 Não Visitar</div>${dnv.address ? `<div class="dnv-tip-addr">${dnv.address}</div>` : ""}`,
           { className: "dnv-tooltip", direction: "top", offset: [0, -10] }
         )
         .addTo(drawnItems)
@@ -256,10 +270,47 @@ export function TerritoryMap({
   }, [focusedSubdivisionId])
 
   return (
-    <div className="relative h-full w-full overflow-hidden">
+    <div className={`relative h-full w-full overflow-hidden${pinMode ? ' pin-mode-active' : ''}`}>
       <div ref={mapRef} className="h-full w-full bg-background" style={{ zIndex: 1 }} />
 
-      {editable && (
+      {pinMode && (
+        <>
+          <div className="absolute top-[calc(50%-16px)] left-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] pointer-events-none drop-shadow-md">
+            <MapPinOff className="w-8 h-8 text-destructive animate-bounce" />
+            <div className="w-2 h-2 bg-destructive rounded-full mx-auto mt-1 opacity-70"></div>
+          </div>
+
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] drop-shadow-lg flex flex-col gap-2 w-[85%] max-w-xs">
+            <Button
+              size="lg"
+              className="bg-destructive hover:bg-destructive/90 text-white font-bold h-12 w-full shadow-md"
+              onClick={() => {
+                if (mapInstanceRef.current && onPinConfirm) {
+                  const c = mapInstanceRef.current.getCenter()
+                  onPinConfirm([c.lat, c.lng])
+                }
+              }}
+            >
+              Confirmar Local
+            </Button>
+            <Button
+              size="lg"
+              variant="secondary"
+              className="h-12 w-full bg-card text-foreground border border-border hover:bg-accent font-semibold shadow-md"
+              onClick={onPinCancel}
+            >
+              Cancelar
+            </Button>
+          </div>
+
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-card/95 px-4 py-2 rounded-full shadow-md border border-border text-sm font-medium text-foreground flex items-center gap-2 whitespace-nowrap">
+            <MapPinOff className="w-4 h-4 text-destructive" />
+            Mova o mapa para apontar o local
+          </div>
+        </>
+      )}
+
+      {editable && !pinMode && (
         <div className="absolute bottom-4 left-4 z-10">
           {instructionsOpen ? (
             <div className="rounded-xl bg-card/95 backdrop-blur-sm p-3 shadow-lg border border-border pointer-events-auto max-w-[200px]">
@@ -299,6 +350,14 @@ export function TerritoryMap({
        * Usamos <style> injetado no componente.
        */}
       <style>{`
+        /* ── Oculta a toolbar de desenho durante o posicionamento do pino
+         * de "Não visitar", pra evitar toque acidental nas ferramentas de
+         * polígono/retângulo enquanto o usuário arrasta o mapa. ── */
+        .pin-mode-active .leaflet-draw-toolbar,
+        .pin-mode-active .leaflet-draw-toolbar-top {
+          display: none !important;
+        }
+
         /* ── Toolbar icons ──
          * O ícone vira uma camada própria (::after com mask-image) por cima
          * do botão, em vez de substituir o background-image do botão —
@@ -430,6 +489,7 @@ export function TerritoryMap({
         }
         .dark .dnv-tooltip { background: #1e293b !important; border-color: rgba(220,38,38,0.4) !important; }
         .dnv-tip-title { font-size: 12px; font-weight: 700; color: #dc2626; margin-bottom: 2px; white-space: nowrap; }
+        .dnv-tip-title-warning { color: #b45309 !important; }
         .dnv-tip-addr  { font-size: 11px; color: #64748b; }
         .dark .dnv-tip-addr { color: #94a3b8; }
 

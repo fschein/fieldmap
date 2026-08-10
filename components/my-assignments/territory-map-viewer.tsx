@@ -8,12 +8,14 @@ import { MapPinOff } from "lucide-react"
 import { IconSatellite, IconMap, IconCrosshair, IconArrowsMaximize } from "@tabler/icons-react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { isDnvExpired, countExpiredDnvs } from "@/lib/utils/do-not-visit"
 
 interface TerritoryMapViewerProps {
   territory: TerritoryWithSubdivisions
   onSubdivisionClick: (subdivision: Subdivision) => void
   onMapClick?: (latlng: L.LatLng) => void
   pinMode?: boolean
+  pinModeCenter?: { lat: number, lng: number } | null
   onPinConfirm?: (latlng: L.LatLng) => void
   onPinCancel?: () => void
   animatingSubdivisionId?: string | null
@@ -28,11 +30,36 @@ function smoothAngle(current: number, target: number): number {
   return current + diff * SMOOTH
 }
 
+// Heading "cru" (só alpha) só é correto com o aparelho na horizontal (deitado
+// numa mesa). Com o celular na vertical — como ao consultar o mapa andando —
+// alpha sozinho fica sem sentido; é preciso compensar a inclinação (beta/gamma)
+// pra obter a direção real que a parte de cima do aparelho está apontando.
+function computeCompassHeading(alpha: number, beta: number, gamma: number): number {
+  const degToRad = Math.PI / 180
+  const x = beta * degToRad
+  const y = gamma * degToRad
+  const z = alpha * degToRad
+
+  const cX = Math.cos(x), sX = Math.sin(x)
+  const cY = Math.cos(y), sY = Math.sin(y)
+  const cZ = Math.cos(z), sZ = Math.sin(z)
+
+  const Vx = -cZ * sY - sZ * sX * cY
+  const Vy = -sZ * sY + cZ * sX * cY
+
+  let heading = Math.atan(Vx / Vy)
+  if (Vy < 0) heading += Math.PI
+  else if (Vx < 0) heading += 2 * Math.PI
+
+  return heading * (180 / Math.PI)
+}
+
 export default function TerritoryMapViewer({
   territory,
   onSubdivisionClick,
   onMapClick,
   pinMode = false,
+  pinModeCenter,
   onPinConfirm,
   onPinCancel,
   animatingSubdivisionId,
@@ -49,6 +76,7 @@ export default function TerritoryMapViewer({
   const [isSatellite, setIsSatellite] = useState(false)
   const [isLocating, setIsLocating] = useState(false)
   const [isCenteredOnUser, setIsCenteredOnUser] = useState(false)
+  const expiredDnvCount = countExpiredDnvs(territory.do_not_visits)
 
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return
@@ -189,28 +217,29 @@ export default function TerritoryMapViewer({
     })
 
     // Adicionar marcadores de Não Visitar
-    const activeDoNotVisits = territory.do_not_visits?.filter((dnv) => {
-      if (!dnv.created_at) return true;
-      const date = new Date(dnv.created_at);
-      const isExpired = new Date().getTime() - date.getTime() > 365 * 24 * 60 * 60 * 1000;
-      return !isExpired;
-    }) || [];
+    const allDoNotVisits = territory.do_not_visits || [];
 
-    activeDoNotVisits.forEach((dnv) => {
+    allDoNotVisits.forEach((dnv) => {
       if (dnv.latitude && dnv.longitude) {
+        const expired = isDnvExpired(dnv.created_at)
         const marker = L.circleMarker([dnv.latitude, dnv.longitude], {
-          color: '#dc2626',
-          fillColor: '#ef4444',
+          color: expired ? '#b45309' : '#dc2626',
+          fillColor: expired ? '#f59e0b' : '#ef4444',
           fillOpacity: 0.9,
           radius: 8,
           weight: 2
         });
 
-        const tooltipContent = `
-          <div class="text-xs font-bold text-red-700 mb-0.5 whitespace-nowrap">🛑 Não Visitar</div>
-          ${dnv.address ? `<div class="text-[0.625rem] opacity-90 font-medium"><strong>Endereço:</strong> ${dnv.address}</div>` : ''}
-        `
-        marker.bindTooltip(tooltipContent, { 
+        const tooltipContent = expired
+          ? `
+            <div class="text-xs font-bold text-amber-700 mb-0.5 whitespace-nowrap">⚠️ Pode visitar novamente (1 ano completo)</div>
+            ${dnv.address ? `<div class="text-[0.625rem] opacity-90 font-medium"><strong>Endereço:</strong> ${dnv.address}</div>` : ''}
+          `
+          : `
+            <div class="text-xs font-bold text-red-700 mb-0.5 whitespace-nowrap">🛑 Não Visitar</div>
+            ${dnv.address ? `<div class="text-[0.625rem] opacity-90 font-medium"><strong>Endereço:</strong> ${dnv.address}</div>` : ''}
+          `
+        marker.bindTooltip(tooltipContent, {
           className: "dnv-tooltip",
           direction: "top",
           offset: [0, -10]
@@ -301,6 +330,13 @@ export default function TerritoryMapViewer({
     }
   }, [])
 
+  // Ao entrar em pin mode, centraliza o mapa na localização atual (se disponível)
+  // como ponto de partida — o usuário ainda precisa arrastar/confirmar.
+  useEffect(() => {
+    if (!pinMode || !pinModeCenter || !mapRef.current) return
+    mapRef.current.setView([pinModeCenter.lat, pinModeCenter.lng], 18)
+  }, [pinMode, pinModeCenter])
+
   const applyHeading = useCallback((rawHeading: number) => {
     const prev = currentHeadingRef.current
     const smoothed = smoothAngle(prev, rawHeading)
@@ -318,19 +354,18 @@ export default function TerritoryMapViewer({
     let usedAbsolute = false
 
     const absoluteHandler = (e: DeviceOrientationEvent) => {
-      if (e.alpha === null) return
+      if (e.alpha === null || e.beta === null || e.gamma === null) return
       usedAbsolute = true
-      // deviceorientationabsolute: alpha é anti-horário a partir do Norte geográfico → inverter
-      applyHeading((360 - e.alpha) % 360)
+      applyHeading(computeCompassHeading(e.alpha, e.beta, e.gamma))
     }
 
     const relativeHandler = (e: DeviceOrientationEvent) => {
       if (usedAbsolute) return // prefere absolute quando disponível
       if (typeof (e as any).webkitCompassHeading === 'number') {
-        // iOS: já é horário a partir do Norte magnético
+        // iOS: já é horário a partir do Norte magnético e compensado por inclinação
         applyHeading((e as any).webkitCompassHeading)
-      } else if (e.alpha !== null) {
-        applyHeading((360 - e.alpha) % 360)
+      } else if (e.alpha !== null && e.beta !== null && e.gamma !== null) {
+        applyHeading(computeCompassHeading(e.alpha, e.beta, e.gamma))
       }
     }
 
@@ -451,6 +486,15 @@ export default function TerritoryMapViewer({
         </>
       )}
 
+      {!pinMode && expiredDnvCount > 0 && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[900] bg-amber-50 border border-amber-300 text-amber-800 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-200 px-3 py-1.5 rounded-full shadow-md text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap max-w-[90%]">
+          <MapPinOff className="w-3.5 h-3.5" />
+          {expiredDnvCount === 1
+            ? '1 endereço "não visitar" completou 1 ano — já pode ser visitado'
+            : `${expiredDnvCount} endereços "não visitar" completaram 1 ano — já podem ser visitados`}
+        </div>
+      )}
+
       {!pinMode && (
         <div className="absolute top-4 right-4 bg-card/90 backdrop-blur-sm rounded-lg shadow-lg p-3 z-[900] border border-border hidden sm:block">
           <h3 className="text-xs font-bold mb-2 text-foreground uppercase tracking-wider">Legenda</h3>
@@ -470,6 +514,10 @@ export default function TerritoryMapViewer({
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-full border border-red-700 bg-red-600 opacity-80" />
               <span className="text-[0.625rem] font-bold text-red-700 uppercase">Não Visitar</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full border border-amber-700 bg-amber-500 opacity-80" />
+              <span className="text-[0.625rem] font-bold text-amber-700 uppercase">Pode visitar (1 ano+)</span>
             </div>
           </div>
         </div>

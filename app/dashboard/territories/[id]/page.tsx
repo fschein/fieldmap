@@ -34,6 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import type { Subdivision, Profile } from "@/lib/types"
+import { isDnvExpired } from "@/lib/utils/do-not-visit"
 
 interface Block {
   notes: string
@@ -566,10 +567,10 @@ export default function TerritoryDetailPage({
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {territory.do_not_visits.map((dnv) => {
             const date = new Date(dnv.created_at)
-            const isExpired = new Date().getTime() - date.getTime() > 365 * 24 * 60 * 60 * 1000
-            
+            const isExpired = isDnvExpired(dnv.created_at)
+
             return (
-              <Card key={dnv.id} className={isExpired ? "border-orange-300 bg-orange-50/50" : "border-red-200"}>
+              <Card key={dnv.id} className={isExpired ? "border-amber-300 bg-amber-50/50" : "border-red-200"}>
                 <CardHeader className="pb-3 px-4 pt-4">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
@@ -592,8 +593,8 @@ export default function TerritoryDetailPage({
                 </CardHeader>
                 <CardContent className="px-4 pb-4">
                   {isExpired && (
-                    <Badge variant="outline" className="mb-2 bg-orange-100 text-orange-800 border-orange-200">
-                      Expirado (Acima de 1 ano)
+                    <Badge variant="outline" className="mb-2 bg-amber-100 text-amber-800 border-amber-200">
+                      ⚠️ 1 ano completo — pode visitar novamente
                     </Badge>
                   )}
                   {dnv.notes ? (
