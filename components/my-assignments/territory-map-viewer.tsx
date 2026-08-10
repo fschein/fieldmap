@@ -21,39 +21,6 @@ interface TerritoryMapViewerProps {
   animatingSubdivisionId?: string | null
 }
 
-const SMOOTH = 0.15
-
-function smoothAngle(current: number, target: number): number {
-  let diff = target - current
-  if (diff > 180) diff -= 360
-  if (diff < -180) diff += 360
-  return current + diff * SMOOTH
-}
-
-// Heading "cru" (só alpha) só é correto com o aparelho na horizontal (deitado
-// numa mesa). Com o celular na vertical — como ao consultar o mapa andando —
-// alpha sozinho fica sem sentido; é preciso compensar a inclinação (beta/gamma)
-// pra obter a direção real que a parte de cima do aparelho está apontando.
-function computeCompassHeading(alpha: number, beta: number, gamma: number): number {
-  const degToRad = Math.PI / 180
-  const x = beta * degToRad
-  const y = gamma * degToRad
-  const z = alpha * degToRad
-
-  const cX = Math.cos(x), sX = Math.sin(x)
-  const cY = Math.cos(y), sY = Math.sin(y)
-  const cZ = Math.cos(z), sZ = Math.sin(z)
-
-  const Vx = -cZ * sY - sZ * sX * cY
-  const Vy = -sZ * sY + cZ * sX * cY
-
-  let heading = Math.atan(Vx / Vy)
-  if (Vy < 0) heading += Math.PI
-  else if (Vx < 0) heading += 2 * Math.PI
-
-  return heading * (180 / Math.PI)
-}
-
 export default function TerritoryMapViewer({
   territory,
   onSubdivisionClick,
@@ -72,8 +39,6 @@ export default function TerritoryMapViewer({
   const polygonsRef = useRef<L.FeatureGroup | null>(null)
   const osmLayerRef = useRef<L.TileLayer | null>(null)
   const satLayerRef = useRef<L.TileLayer | null>(null)
-  const currentHeadingRef = useRef(0)
-  const [needsCompassPermission, setNeedsCompassPermission] = useState(false)
   const [isSatellite, setIsSatellite] = useState(false)
   const [isLocating, setIsLocating] = useState(false)
   const [isCenteredOnUser, setIsCenteredOnUser] = useState(false)
@@ -279,22 +244,9 @@ export default function TerritoryMapViewer({
 
     const locationIcon = L.divIcon({
       className: 'user-location-marker',
-      html: `<div class="location-wrapper">
-        <div class="heading-cone" style="opacity:0">
-          <svg width="24" height="32" viewBox="0 0 24 32" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <linearGradient id="coneGrad" x1="0.5" y1="0" x2="0.5" y2="1">
-                <stop offset="0%" stop-color="#378ADD" stop-opacity="0.95"/>
-                <stop offset="100%" stop-color="#378ADD" stop-opacity="0.2"/>
-              </linearGradient>
-            </defs>
-            <path d="M12,2 L22,30 Q12,24 2,30 Z" fill="url(#coneGrad)"/>
-          </svg>
-        </div>
-        <div class="location-dot"></div>
-      </div>`,
-      iconSize: [44, 46],
-      iconAnchor: [22, 38],
+      html: `<div class="location-dot"></div>`,
+      iconSize: [14, 14],
+      iconAnchor: [7, 7],
     })
 
     if ('geolocation' in navigator) {
@@ -340,57 +292,6 @@ export default function TerritoryMapViewer({
     mapRef.current.setView([pinModeCenter.lat, pinModeCenter.lng], 18)
   }, [pinMode, pinModeCenter])
 
-  const applyHeading = useCallback((rawHeading: number) => {
-    const prev = currentHeadingRef.current
-    const smoothed = smoothAngle(prev, rawHeading)
-    currentHeadingRef.current = smoothed
-    if (Math.abs(smoothed - prev) < 2) return
-    const el = userMarkerRef.current?.getElement()
-    if (!el) return
-    const cone = el.querySelector('.heading-cone') as HTMLElement | null
-    if (!cone) return
-    cone.style.transform = `rotate(${smoothed}deg)`
-    cone.style.opacity = '1'
-  }, [])
-
-  const setupOrientationListeners = useCallback(() => {
-    let usedAbsolute = false
-
-    const absoluteHandler = (e: DeviceOrientationEvent) => {
-      if (e.alpha === null || e.beta === null || e.gamma === null) return
-      usedAbsolute = true
-      applyHeading(computeCompassHeading(e.alpha, e.beta, e.gamma))
-    }
-
-    const relativeHandler = (e: DeviceOrientationEvent) => {
-      if (usedAbsolute) return // prefere absolute quando disponível
-      if (typeof (e as any).webkitCompassHeading === 'number') {
-        // iOS: já é horário a partir do Norte magnético e compensado por inclinação
-        applyHeading((e as any).webkitCompassHeading)
-      } else if (e.alpha !== null && e.beta !== null && e.gamma !== null) {
-        applyHeading(computeCompassHeading(e.alpha, e.beta, e.gamma))
-      }
-    }
-
-    window.addEventListener('deviceorientationabsolute', absoluteHandler as EventListener)
-    window.addEventListener('deviceorientation', relativeHandler as EventListener)
-
-    return () => {
-      window.removeEventListener('deviceorientationabsolute', absoluteHandler as EventListener)
-      window.removeEventListener('deviceorientation', relativeHandler as EventListener)
-    }
-  }, [applyHeading])
-
-  // Bússola do device para direção do cone
-  useEffect(() => {
-    // iOS 13+ exige permissão explícita via gesto do usuário
-    if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
-      setNeedsCompassPermission(true)
-      return
-    }
-    return setupOrientationListeners()
-  }, [setupOrientationListeners])
-
   const handleToggleLayer = useCallback(() => {
     const map = mapRef.current
     if (!map || !osmLayerRef.current || !satLayerRef.current) return
@@ -405,21 +306,9 @@ export default function TerritoryMapViewer({
     }
   }, [isSatellite])
 
-  const handleLocateToggle = useCallback(async () => {
+  const handleLocateToggle = useCallback(() => {
     const map = mapRef.current
     if (!map) return
-
-    if (needsCompassPermission) {
-      try {
-        const result = await (DeviceOrientationEvent as any).requestPermission()
-        if (result === 'granted') {
-          setNeedsCompassPermission(false)
-          setupOrientationListeners()
-        }
-      } catch {
-        setNeedsCompassPermission(false)
-      }
-    }
 
     if (isCenteredOnUser) {
       if (polygonsRef.current) {
@@ -444,7 +333,7 @@ export default function TerritoryMapViewer({
       })
       map.locate({ setView: true, maxZoom: 17 })
     }
-  }, [isCenteredOnUser, isLocating, needsCompassPermission, setupOrientationListeners])
+  }, [isCenteredOnUser, isLocating])
 
   return (
     <div className="relative w-full h-full min-h-[500px] overflow-hidden">
@@ -592,36 +481,13 @@ export default function TerritoryMapViewer({
           display: none !important;
         }
 
-        .location-wrapper {
-          position: relative;
-          width: 44px;
-          height: 46px;
-        }
-
-        .heading-cone {
-          position: absolute;
-          top: 0;
-          left: 10px;
-          width: 24px;
-          height: 38px;
-          transform-origin: center bottom;
-          transition: opacity 0.4s ease;
-          pointer-events: none;
-          filter: drop-shadow(0 1px 3px rgba(55,138,221,0.4));
-        }
-
         .location-dot {
-          position: absolute;
-          top: 31px;
-          left: 50%;
-          transform: translateX(-50%);
           width: 14px;
           height: 14px;
           background-color: #378ADD;
           border-radius: 50%;
           border: 2.5px solid white;
           box-shadow: 0 1px 4px rgba(55,138,221,0.5);
-          z-index: 1;
         }
       `}</style>
     </div>
