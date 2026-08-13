@@ -7,7 +7,7 @@ import { cn, fmtTerritoryNumber } from "@/lib/utils"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import {
-  Clock, Activity, AlertTriangle, Star, TrendingUp
+  Clock, AlertTriangle, TrendingUp
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 
@@ -98,8 +98,6 @@ interface Assignment {
   id: string
   status: string
   assigned_at: string
-  completed_at: string | null
-  returned_at: string | null
   territory_id: string
   user_id: string
   group_id?: string | null
@@ -112,19 +110,10 @@ interface TerritoryWithStats {
   number: string
   color: string
   status: string
-  assignmentCount: number
   isActive: boolean
   daysInField?: number
   subdivisions?: any[]
   activeAssignee?: string
-}
-
-interface RecentActivity {
-  id: string
-  type: 'assigned' | 'completed' | 'returned'
-  territory: string
-  publisher: string
-  date: string
 }
 
 interface CampaignProgress {
@@ -149,7 +138,6 @@ export default function DashboardPage() {
     overdueAssignments: number
   } | null>(null)
   const [territories, setTerritories] = useState<TerritoryWithStats[]>([])
-  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([])
   const [namesLookup, setNamesLookup] = useState<Map<string, string>>(new Map())
   const [campaignProgress, setCampaignProgress] = useState<CampaignProgress | null>(null)
   const [loading, setLoading] = useState(true)
@@ -177,53 +165,40 @@ export default function DashboardPage() {
         `)
         .order("number", { ascending: true })
 
-      // 3. Busca designações
+      // 3. Busca designações ativas (histórico não é mais exibido no dashboard)
       const { data: aData } = await supabase
         .from("assignments")
         .select(`
-          id, status, assigned_at, completed_at, returned_at,
+          id, status, assigned_at,
           territory_id, user_id, group_id,
           territories ( name, number )
         `)
-        .order("assigned_at", { ascending: false })
-        .limit(500)
+        .eq("status", "active")
 
       if (!tData || !aData) return
 
-      const activeAssignments = aData.filter((a: any) => a.status === 'active')
-      const overdueCount = activeAssignments.filter((a: any) => {
+      const overdueCount = aData.filter((a: any) => {
         const days = Math.ceil((new Date().getTime() - new Date(a.assigned_at).getTime()) / (1000 * 60 * 60 * 24))
         return days > 90
       }).length
 
       setStats({
-        activeAssignments: activeAssignments.length,
+        activeAssignments: aData.length,
         overdueAssignments: overdueCount
       })
 
       const tStats: TerritoryWithStats[] = tData
         .filter((t: any) => t.status !== 'inactive')
         .map((t: any) => {
-          const tA = aData.filter((a: any) => a.territory_id === t.id)
-          const active = tA.find((a: any) => a.status === 'active')
+          const active = aData.find((a: any) => a.territory_id === t.id)
           return {
             ...t,
-            assignmentCount: tA.filter((a: any) => a.status === 'completed').length,
             isActive: !!active,
             daysInField: active ? Math.ceil((new Date().getTime() - new Date(active.assigned_at).getTime()) / (1000 * 60 * 60 * 24)) : undefined,
             activeAssignee: active ? (lookup.get(active.user_id) || lookup.get(active.group_id) || '?') : undefined
           }
         })
       setTerritories(tStats)
-
-      const acts: RecentActivity[] = aData.slice(0, 10).map((a: any) => ({
-        id: a.id,
-        type: a.status === 'completed' ? 'completed' : a.status === 'returned' ? 'returned' : 'assigned',
-        territory: a.territories?.name || '?',
-        publisher: lookup.get(a.user_id) || lookup.get(a.group_id) || '?',
-        date: a.completed_at || a.returned_at || a.assigned_at
-      }))
-      setRecentActivity(acts)
 
       // 4. Campanha ativa
       setCampaignProgress(null)
@@ -559,78 +534,6 @@ export default function DashboardPage() {
               )
             })
           )}
-        </div>
-      </SectionCard>
-
-      {/* ── Section: Ranking ── */}
-      <SectionCard>
-        <SectionHeader
-          icon={<Star className="w-3.5 h-3.5 text-amber-500" />}
-          title="Mais trabalhados"
-          sub="Territórios com mais conclusões recentes"
-          badge={
-            <span className="ml-auto text-[0.625rem] font-black px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/60 uppercase">
-              6 meses
-            </span>
-          }
-        />
-        <Divider />
-        <div className="divide-y divide-border/30 text-xs">
-          {territories
-            .sort((a, b) => b.assignmentCount - a.assignmentCount)
-            .slice(0, 5)
-            .map((t, i) => {
-              const rankColors = ["#E24B4A", "#378ADD", "#378ADD", "#378ADD", "#A1A1AA"]
-              return (
-                <div key={t.id} className="flex items-center px-4 py-3 hover:bg-muted/5 transition-colors gap-3">
-                  <span className="w-4 text-center text-[0.6875rem] font-black text-muted-foreground/30">{i + 1}</span>
-                  <div className="w-[3px] h-7 rounded-full shrink-0" style={{ backgroundColor: rankColors[i] || "#A1A1AA" }} />
-                  <div className="flex-1 min-w-0 ml-1">
-                    <h4 className="text-[0.8125rem] font-bold text-foreground leading-tight truncate">{t.name}</h4>
-                    <span className="text-[0.625rem] font-black text-muted-foreground/60 uppercase tracking-widest leading-none">Nº {t.number}</span>
-                  </div>
-                  <div className="text-right flex flex-col items-end">
-                    <span className="text-[1.375rem] font-medium text-foreground leading-none">{t.assignmentCount}</span>
-                    <span className="text-[0.5625rem] font-black text-muted-foreground/60 uppercase tracking-widest mt-0.5">vezes</span>
-                  </div>
-                </div>
-              )
-            })}
-        </div>
-      </SectionCard>
-
-      {/* ── Section: Atividades ── */}
-      <SectionCard>
-        <SectionHeader
-          icon={<Activity className="w-3.5 h-3.5 text-blue-500" />}
-          title="Atividades"
-          sub="Últimas movimentações do sistema"
-        />
-        <Divider />
-        <div className="divide-y divide-border/30">
-          {recentActivity.map((activity) => (
-            <div key={activity.id} className="flex items-start px-4 py-3 hover:bg-muted/5 transition-colors gap-3">
-              <div className={cn(
-                "w-2 h-2 rounded-full mt-3.5 shrink-0",
-                activity.type === 'completed' ? 'bg-emerald-500' : activity.type === 'returned' ? 'bg-red-400' : 'bg-amber-400'
-              )} />
-              <div className="flex-1 min-w-0">
-                <span className={cn(
-                  "inline-flex text-[0.5625rem] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-[4px] mb-1.5 outline outline-1 outline-offset-0",
-                  activity.type === 'completed' ? 'bg-emerald-500/10 text-emerald-600 outline-emerald-500/20' :
-                    activity.type === 'returned' ? 'bg-red-400/10 text-red-600 outline-red-400/20' :
-                      'bg-amber-400/10 text-amber-600 outline-amber-400/20'
-                )}>
-                  {activity.type === 'completed' ? 'Concluído' : activity.type === 'returned' ? 'Devolvido' : 'Designado'}
-                </span>
-                <h4 className="text-[0.8125rem] font-bold text-foreground truncate leading-tight">{activity.territory}</h4>
-                <p className="text-[0.6875rem] font-medium text-muted-foreground/80 truncate">{activity.publisher}</p>
-              </div>
-              <span className="text-[0.625rem] font-bold text-muted-foreground/40 mt-1 uppercase whitespace-nowrap">
-                {new Date(activity.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '')}
-              </span>
-            </div>
-          ))}
         </div>
       </SectionCard>
     </div>
