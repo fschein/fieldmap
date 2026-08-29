@@ -11,9 +11,11 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Subdivision } from "@/lib/types"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
-import { CheckCircle2, Calendar, Loader2, Info, Check, CloudUpload, Link2, Copy, Ban } from "lucide-react"
+import { CheckCircle2, Calendar, Loader2, Info, Check, CloudUpload, Link2, Copy, Ban, QrCode } from "lucide-react"
+import { QRCodeSVG } from "qrcode.react"
 import { useState, useEffect, useCallback } from "react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -58,11 +60,11 @@ export function SubdivisionDrawer({
   const [completionDate, setCompletionDate] = useState(new Date().toISOString().split('T')[0])
   const [fieldLink, setFieldLink] = useState<FieldLink | null>(null)
   const [linkLoading, setLinkLoading] = useState(false)
+  const [liveUnits, setLiveUnits] = useState<{ status: string }[]>([])
   const isCompleted = subdivision.completed || subdivision.status === "completed"
 
-  const allUnits = ((subdivision as any).streets || []).flatMap((s: any) => s.units || [])
-  const housesTotal = allUnits.length
-  const housesDone = allUnits.filter((u: any) => u.status === "visited" || u.status === "visited_carta" || u.status === "do_not_visit").length
+  const housesTotal = liveUnits.length
+  const housesDone = liveUnits.filter((u) => u.status === "visited" || u.status === "visited_carta" || u.status === "do_not_visit").length
 
   // Reset states when opening/closing
   useEffect(() => {
@@ -70,8 +72,30 @@ export function SubdivisionDrawer({
       setCompletionDate(new Date().toISOString().split('T')[0])
       setNotes(subdivision.notes || "")
       setSaveStatus("idle")
+      // Snapshot inicial (o que já veio no prop) — evita mostrar 0/0 no
+      // instante entre abrir o modal e a primeira resposta do polling.
+      setLiveUnits(((subdivision as any).streets || []).flatMap((s: any) => s.units || []))
     }
   }, [open, subdivision])
+
+  // Auto-refresh do contador "X de Y casas" — pra acompanhar o link de
+  // campo sendo preenchido sem precisar fechar e reabrir o modal. Busca
+  // direto (não depende do território pai ter sido recarregado).
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    const fetchUnits = async () => {
+      const { data } = await supabase
+        .from("streets")
+        .select("units(status)")
+        .eq("subdivision_id", subdivision.id)
+      if (!cancelled && data) {
+        setLiveUnits(data.flatMap((s: any) => s.units || []))
+      }
+    }
+    const interval = setInterval(fetchUnits, 10000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [open, subdivision.id])
 
   useEffect(() => {
     if (!open || !isSupervisor) {
@@ -130,9 +154,13 @@ export function SubdivisionDrawer({
     }
   }
 
+  const fieldLinkUrl = fieldLink
+    ? `${typeof window !== "undefined" ? window.location.origin : ""}/campo/${fieldLink.id}`
+    : ""
+
   const handleCopyLink = async () => {
     if (!fieldLink) return
-    await navigator.clipboard.writeText(`${window.location.origin}/campo/${fieldLink.id}`)
+    await navigator.clipboard.writeText(fieldLinkUrl)
     toast.success("Link copiado!")
   }
 
@@ -235,7 +263,7 @@ export function SubdivisionDrawer({
                   <div className="flex items-center gap-2">
                     <Input
                       readOnly
-                      value={`${typeof window !== "undefined" ? window.location.origin : ""}/campo/${fieldLink.id}`}
+                      value={fieldLinkUrl}
                       className="h-10 bg-background border-border rounded-lg font-mono text-xs"
                       onFocus={(e) => e.target.select()}
                     />
@@ -248,6 +276,26 @@ export function SubdivisionDrawer({
                     >
                       <Copy className="h-4 w-4" />
                     </Button>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="icon"
+                          className="h-10 w-10 shrink-0 rounded-lg"
+                        >
+                          <QrCode className="h-4 w-4" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-4 flex flex-col items-center gap-2" align="end">
+                        <div className="bg-white p-3 rounded-lg">
+                          <QRCodeSVG value={fieldLinkUrl} size={180} />
+                        </div>
+                        <p className="text-[0.625rem] text-muted-foreground text-center max-w-[180px]">
+                          Aponte a câmera do celular pra abrir o link
+                        </p>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   <div className="flex items-center justify-between gap-2">
                     <span className="inline-flex items-center gap-1.5 text-[0.625rem] font-bold text-emerald-500 uppercase tracking-wide">

@@ -52,10 +52,10 @@ export default function TerritoryMapPage() {
   const [showHouses, setShowHouses] = useState(false)
   const territoryId = params.id as string
 
-  const fetchTerritory = useCallback(async () => {
+  const fetchTerritory = useCallback(async (silent = false) => {
     if (!territoryId || !user?.id) return
 
-    setLoading(true)
+    if (!silent) setLoading(true)
     const { signal, clear } = createTimeoutSignal(15000)
     try {
       const { data, error } = await supabase
@@ -126,10 +126,15 @@ export default function TerritoryMapPage() {
       localStorage.setItem(`territory_cache_${territoryId}`, JSON.stringify(mergedTerritory))
       setTerritory(mergedTerritory as any)
     } catch (error: any) {
-      if (error.name === 'AbortError') {
+      if (error.name === 'AbortError' && !silent) {
         toast.error("Tempo esgotado ao carregar mapa.")
       }
       console.error("Erro ao carregar território:", error?.message || error)
+
+      // Silencioso (refresh automático em segundo plano): nunca redireciona
+      // nem mexe no cache por causa de uma falha passageira de rede — só
+      // desiste dessa rodada e tenta de novo no próximo intervalo.
+      if (silent) return
 
       // Tentar carregar do cache se estiver offline ou der erro
       const cached = localStorage.getItem(`territory_cache_${territoryId}`)
@@ -163,6 +168,15 @@ export default function TerritoryMapPage() {
       fetchTerritory()
     }
   }, [isReady, fetchTerritory])
+
+  // Auto-refresh silencioso — pra ver as casas sendo marcadas por quem
+  // recebeu o link de campo sem precisar recarregar a página manualmente.
+  // Não precisa ser instantâneo, só automático.
+  useEffect(() => {
+    if (!isReady || !isOnline) return
+    const interval = setInterval(() => fetchTerritory(true), 10000)
+    return () => clearInterval(interval)
+  }, [isReady, isOnline, fetchTerritory])
 
   const { syncPendingActions } = useOfflineManager()
 
