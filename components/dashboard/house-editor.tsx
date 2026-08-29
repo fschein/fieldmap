@@ -5,11 +5,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { cn, compareHouseNumbers } from "@/lib/utils"
-import { ArrowLeft, ChevronDown, ChevronUp, Loader2, Pencil, Trash2, X, Check } from "lucide-react"
+import { ArrowLeft, ChevronDown, ChevronUp, Loader2, Pencil, Trash2, X, Check, Lightbulb } from "lucide-react"
 
 export interface EditableUnit {
   id: string
   number: string
+  pending_action?: "add" | "remove" | null
+  suggestion_batch_id?: string | null
 }
 
 export interface EditableGroup {
@@ -39,6 +41,8 @@ interface GroupListProps {
   onRenameGroup?: (groupId: string, name: string) => Promise<void>
   /** Presente quando o grupo pode ser excluído (junto com suas casas). */
   onDeleteGroup?: (groupId: string) => Promise<void>
+  /** Aplica ou recusa um lote de sugestão de edição vindo do link de campo. */
+  onResolveSuggestion?: (batchId: string, approve: boolean) => Promise<void>
   addGroupLabel?: string
   addGroupPlaceholder?: string
   emptyHint?: string
@@ -59,6 +63,7 @@ export function GroupList({
   onAddGroup,
   onRenameGroup,
   onDeleteGroup,
+  onResolveSuggestion,
   addGroupLabel = "Nova rua",
   addGroupPlaceholder = "Nome da rua",
   emptyHint = "Nenhuma rua cadastrada ainda.",
@@ -74,6 +79,17 @@ export function GroupList({
   const [renameValue, setRenameValue] = useState("")
   const [savingRenameId, setSavingRenameId] = useState<string | null>(null)
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null)
+  const [resolvingBatchId, setResolvingBatchId] = useState<string | null>(null)
+
+  const handleResolve = async (batchId: string, approve: boolean) => {
+    if (!onResolveSuggestion) return
+    setResolvingBatchId(batchId)
+    try {
+      await onResolveSuggestion(batchId, approve)
+    } finally {
+      setResolvingBatchId(null)
+    }
+  }
 
   const handleAdd = async (groupId: string) => {
     const numbers = parseNumbers(inputByGroup[groupId] || "")
@@ -139,6 +155,16 @@ export function GroupList({
       {groups.map((group) => {
         const isExpanded = expandedId === group.id
         const sortedUnits = [...group.units].sort((a, b) => compareHouseNumbers(a.number, b.number))
+
+        const pendingBatches = new Map<string, { add: EditableUnit[]; remove: EditableUnit[] }>()
+        group.units.forEach((u) => {
+          if (!u.pending_action || !u.suggestion_batch_id) return
+          if (!pendingBatches.has(u.suggestion_batch_id)) {
+            pendingBatches.set(u.suggestion_batch_id, { add: [], remove: [] })
+          }
+          pendingBatches.get(u.suggestion_batch_id)![u.pending_action === "add" ? "add" : "remove"].push(u)
+        })
+
         return (
           <div key={group.id} className="rounded-xl border border-border bg-card overflow-hidden">
             <div className="w-full flex items-center justify-between gap-3 px-4 py-3">
@@ -190,6 +216,12 @@ export function GroupList({
               )}
 
               <div className="flex items-center gap-1 shrink-0">
+                {pendingBatches.size > 0 && (
+                  <Badge className="text-[0.6875rem] bg-teal-500/15 text-teal-700 dark:text-teal-400 border-teal-500/30 hover:bg-teal-500/15">
+                    <Lightbulb className="h-3 w-3 mr-1" />
+                    sugestão
+                  </Badge>
+                )}
                 <Badge variant="secondary" className="text-[0.6875rem]">{group.units.length} casas</Badge>
                 {onDeleteGroup && renamingGroupId !== group.id && (
                   <button
@@ -213,11 +245,63 @@ export function GroupList({
 
             {isExpanded && (
               <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
+                {onResolveSuggestion && Array.from(pendingBatches.entries()).map(([batchId, { add, remove }]) => (
+                  <div key={batchId} className="rounded-lg border border-teal-500/30 bg-teal-500/5 p-3 space-y-2">
+                    <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <Lightbulb className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
+                      Sugestão de edição pendente
+                    </p>
+                    {add.length > 0 && (
+                      <p className="text-xs text-emerald-600 dark:text-emerald-500">
+                        + Adicionar: {add.map((u) => u.number).join(", ")}
+                      </p>
+                    )}
+                    {remove.length > 0 && (
+                      <p className="text-xs text-red-600 dark:text-red-500">
+                        − Remover: {remove.map((u) => u.number).join(", ")}
+                      </p>
+                    )}
+                    <div className="flex gap-2 pt-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 h-8 text-xs"
+                        disabled={resolvingBatchId === batchId}
+                        onClick={() => handleResolve(batchId, false)}
+                      >
+                        Recusar
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="flex-1 h-8 text-xs"
+                        disabled={resolvingBatchId === batchId}
+                        onClick={() => handleResolve(batchId, true)}
+                      >
+                        {resolvingBatchId === batchId ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Aplicar"}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+
                 <div className="flex flex-wrap gap-2">
                   {sortedUnits.map((u) => (
                     <span
                       key={u.id}
-                      className="h-8 pl-3 pr-1.5 rounded-lg bg-muted text-foreground text-xs font-bold flex items-center gap-1.5"
+                      className={cn(
+                        "h-8 pl-3 pr-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5",
+                        u.pending_action === "add"
+                          ? "text-emerald-700 dark:text-emerald-400 border border-dashed border-emerald-500"
+                          : u.pending_action === "remove"
+                          ? "text-red-700 dark:text-red-400 border border-dashed border-red-500"
+                          : "bg-muted text-foreground"
+                      )}
+                      style={
+                        u.pending_action === "add"
+                          ? { backgroundImage: "repeating-linear-gradient(45deg, rgba(16,185,129,0.16) 0 6px, transparent 6px 12px)" }
+                          : u.pending_action === "remove"
+                          ? { backgroundImage: "repeating-linear-gradient(45deg, rgba(239,68,68,0.16) 0 6px, transparent 6px 12px)" }
+                          : undefined
+                      }
                     >
                       {u.number}
                       <button

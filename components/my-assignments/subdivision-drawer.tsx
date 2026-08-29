@@ -287,7 +287,7 @@ export function SubdivisionDrawer({
                           <QrCode className="h-4 w-4" />
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-4 flex flex-col items-center gap-2" align="end">
+                      <PopoverContent className="z-[10010] w-auto p-4 flex flex-col items-center gap-2" align="end">
                         <div className="bg-white p-3 rounded-lg">
                           <QRCodeSVG value={fieldLinkUrl} size={180} />
                         </div>

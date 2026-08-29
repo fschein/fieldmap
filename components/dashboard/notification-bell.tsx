@@ -11,6 +11,7 @@ import {
   Clock,
   LayoutList,
   TrendingUp,
+  Lightbulb,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -42,6 +43,8 @@ function NotifIcon({ type }: { type: NotificationType }) {
       return <TrendingUp className="h-4 w-4 text-orange-500" />
     case "request":
       return <MapPin className="h-4 w-4 text-blue-500" />
+    case "suggested_edit":
+      return <Lightbulb className="h-4 w-4 text-teal-500" />
     default:
       return <Bell className="h-4 w-4 text-muted-foreground" />
   }
@@ -57,6 +60,7 @@ function notifIconBg(type: NotificationType) {
     case "completed_subdivisions": return "bg-blue-500/10"
     case "progress_60":            return "bg-orange-500/10"
     case "request":              return "bg-blue-500/10"
+    case "suggested_edit":       return "bg-teal-500/10"
     default:                     return "bg-muted"
   }
 }
@@ -76,6 +80,10 @@ function notifRoute(notif: AppNotification): string | null {
     case "idle_publisher":
     case "request":
       return "/dashboard/assignments"
+    case "suggested_edit":
+      return notif.territory_id && notif.subdivision_id
+        ? `/dashboard/territories/${notif.territory_id}?editHouses=${notif.subdivision_id}`
+        : null
     default:
       return null
   }
@@ -134,6 +142,45 @@ export function NotificationBell() {
           ) : (
             notifications.map((notif) => {
               const route = notifRoute(notif)
+
+              if (notif.type === "suggested_edit") {
+                return (
+                  <div key={notif.id} className={cn("p-3.5", !notif.read && "bg-primary/5")}>
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => { if (route) router.push(route) }}
+                      className="flex items-start gap-3 cursor-pointer"
+                    >
+                      <span className={cn("mt-0.5 p-1.5 rounded-full shrink-0", notifIconBg(notif.type))}>
+                        <NotifIcon type={notif.type} />
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-xs text-foreground line-clamp-1">{notif.title}</p>
+                        <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{notif.message}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-2 ml-9 rounded-lg border border-border bg-muted/40 p-2 space-y-1">
+                      {notif.suggestion_add && (
+                        <p className="text-[0.6875rem] text-emerald-600 dark:text-emerald-500">
+                          + Adicionar: {notif.suggestion_add}
+                        </p>
+                      )}
+                      {notif.suggestion_remove && (
+                        <p className="text-[0.6875rem] text-amber-600 dark:text-amber-500">
+                          − Remover: {notif.suggestion_remove}
+                        </p>
+                      )}
+                    </div>
+
+                    <p className="mt-2 ml-9 text-[0.625rem] text-muted-foreground italic">
+                      Toque pra revisar e aplicar/recusar na edição de casas.
+                    </p>
+                  </div>
+                )
+              }
+
               return (
                 <button
                   key={notif.id}

@@ -29,6 +29,8 @@ export interface HouseUnit {
   status: UnitStatus
   marked_at: string | null
   marked_by: string | null
+  /** Sugestão de edição pendente de aprovação (link de campo) — null/undefined = normal. */
+  pending_action?: "add" | "remove" | null
 }
 
 export interface HouseGroup {
@@ -60,7 +62,13 @@ function isGroupFullyMarked(group: HouseGroup) {
   return group.units.every((u) => u.status === "visited" || u.status === "visited_carta" || u.status === "do_not_visit")
 }
 
-function statusChipClasses(status: UnitStatus) {
+function statusChipClasses(status: UnitStatus, pendingAction?: "add" | "remove" | null) {
+  if (pendingAction === "add") {
+    return "text-emerald-700 dark:text-emerald-400 border-2 border-dashed border-emerald-500"
+  }
+  if (pendingAction === "remove") {
+    return "text-red-700 dark:text-red-400 border-2 border-dashed border-red-500"
+  }
   switch (status) {
     case "visited":
     case "visited_carta":
@@ -72,7 +80,13 @@ function statusChipClasses(status: UnitStatus) {
   }
 }
 
-function statusChipStyle(status: UnitStatus): CSSProperties | undefined {
+function statusChipStyle(status: UnitStatus, pendingAction?: "add" | "remove" | null): CSSProperties | undefined {
+  if (pendingAction === "add") {
+    return { backgroundImage: "repeating-linear-gradient(45deg, rgba(16,185,129,0.16) 0 6px, transparent 6px 12px)" }
+  }
+  if (pendingAction === "remove") {
+    return { backgroundImage: "repeating-linear-gradient(45deg, rgba(239,68,68,0.16) 0 6px, transparent 6px 12px)" }
+  }
   switch (status) {
     case "visited":
     case "visited_carta":
@@ -189,10 +203,10 @@ export function HouseByHouse({
                       key={u.id}
                       type="button"
                       onClick={() => setActiveUnit(u)}
-                      style={statusChipStyle(u.status)}
+                      style={statusChipStyle(u.status, u.pending_action)}
                       className={cn(
                         "aspect-square rounded-xl text-lg font-bold flex flex-col items-center justify-center gap-1 transition-transform active:scale-95",
-                        statusChipClasses(u.status)
+                        statusChipClasses(u.status, u.pending_action)
                       )}
                     >
                       <span>{u.number}</span>

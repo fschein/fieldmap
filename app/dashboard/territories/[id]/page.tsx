@@ -46,6 +46,8 @@ interface UnitRow {
   status: UnitStatus
   marked_at: string | null
   marked_by: string | null
+  pending_action?: "add" | "remove" | null
+  suggestion_batch_id?: string | null
 }
 
 interface Street {
@@ -130,7 +132,7 @@ export default function TerritoryDetailPage({
           .from("territories")
           .select(`
       *,
-      subdivisions(*, streets(*, units(id, number, floor, status, marked_at, marked_by))),
+      subdivisions(*, streets(*, units(id, number, floor, status, marked_at, marked_by, pending_action, suggestion_batch_id))),
       assignments(status, campaign_id),
       group:groups(id, name, color),
       assigned_to_user:profiles!territories_assigned_to_fkey(id, name, email)
@@ -339,6 +341,18 @@ export default function TerritoryDetailPage({
     fetchData()
   }
 
+  const handleResolveSuggestion = async (batchId: string, approve: boolean) => {
+    const { error } = await supabase.rpc("resolve_unit_suggestion_batch", {
+      p_batch_id: batchId,
+      p_approve: approve,
+    })
+    if (error) {
+      alert("Erro ao resolver sugestão: " + error.message)
+      return
+    }
+    fetchData()
+  }
+
   const handleAddStreet = async (quadraId: string, name: string) => {
     const quadra = territory?.subdivisions?.find((s) => s.id === quadraId)
     const { error } = await supabase.from("streets").insert({
@@ -437,6 +451,7 @@ export default function TerritoryDetailPage({
         onRemoveUnit={handleRemoveUnit}
         onRenameStreet={isAdmin ? handleRenameStreet : undefined}
         onDeleteStreet={isAdmin ? handleDeleteStreet : undefined}
+        onResolveSuggestion={handleResolveSuggestion}
       />
     )
   }

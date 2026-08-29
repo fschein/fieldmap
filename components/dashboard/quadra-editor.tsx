@@ -22,6 +22,8 @@ interface QuadraEditorProps {
   onRemoveUnit: (unitId: string, streetId: string) => Promise<void>
   onRenameStreet?: (streetId: string, name: string) => Promise<void>
   onDeleteStreet?: (streetId: string) => Promise<void>
+  /** Aplica ou recusa um lote de sugestão de edição vindo do link de campo. */
+  onResolveSuggestion?: (batchId: string, approve: boolean) => Promise<void>
   /** Abre já expandida nessa quadra — usado pelo atalho de "casas" no card da quadra. */
   initialExpandedQuadraId?: string | null
 }
@@ -42,6 +44,7 @@ export function QuadraEditor({
   onRemoveUnit,
   onRenameStreet,
   onDeleteStreet,
+  onResolveSuggestion,
   initialExpandedQuadraId,
 }: QuadraEditorProps) {
   const [expandedQuadraId, setExpandedQuadraId] = useState<string | null>(
@@ -93,6 +96,7 @@ export function QuadraEditor({
                     onAddGroup={onAddStreet ? (name) => onAddStreet(quadra.id, name) : undefined}
                     onRenameGroup={onRenameStreet}
                     onDeleteGroup={onDeleteStreet}
+                    onResolveSuggestion={onResolveSuggestion}
                     addGroupLabel="Nova rua"
                     addGroupPlaceholder="Nome da rua"
                     emptyHint="Nenhuma rua cadastrada nesta quadra ainda."

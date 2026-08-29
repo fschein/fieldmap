@@ -14,6 +14,7 @@ export type NotificationType =
   | "progress_60"            // dirigente passou de 60% do território
   | "request"                // publicador solicitou território
   | "idle"                   // (legado)
+  | "suggested_edit"         // visitante do link de campo sugeriu casas a adicionar/remover
 
 export interface AppNotification {
   id: string
@@ -25,6 +26,11 @@ export interface AppNotification {
   created_by?: string
   territory_id?: string
   target_user_id?: string | null
+  subdivision_id?: string | null
+  suggestion_batch_id?: string | null
+  suggestion_add?: string | null
+  suggestion_remove?: string | null
+  suggestion_status?: "pending" | "applied" | "declined" | null
 }
 
 export function useNotifications() {
