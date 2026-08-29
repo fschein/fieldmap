@@ -62,7 +62,7 @@ export function SubdivisionDrawer({
 
   const allUnits = ((subdivision as any).streets || []).flatMap((s: any) => s.units || [])
   const housesTotal = allUnits.length
-  const housesDone = allUnits.filter((u: any) => u.status === "visited" || u.status === "visited_carta").length
+  const housesDone = allUnits.filter((u: any) => u.status === "visited" || u.status === "visited_carta" || u.status === "do_not_visit").length
 
   // Reset states when opening/closing
   useEffect(() => {
@@ -229,7 +229,7 @@ export function SubdivisionDrawer({
                 <div className="bg-muted/50 border border-border rounded-xl p-4 space-y-3">
                   {housesTotal > 0 && (
                     <p className="text-xs font-bold text-foreground">
-                      {housesDone} de {housesTotal} casas visitadas
+                      {housesDone} de {housesTotal} casas concluídas
                     </p>
                   )}
                   <div className="flex items-center gap-2">

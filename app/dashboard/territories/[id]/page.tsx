@@ -386,11 +386,11 @@ export default function TerritoryDetailPage({
   }
 
   // Contador "casas X/Y" do card — mesmo critério do QuadraHouseByHouse:
-  // concluída = falou com morador ou deixou carta (não conta pendente/não visitar).
+  // concluída = falou com morador, deixou carta ou não visitar (não conta pendente).
   const getHouseCounts = (subdivisions: Block) => {
     const allUnits = (subdivisions.streets || []).flatMap((s) => s.units || [])
     const total = allUnits.length
-    const done = allUnits.filter((u) => u.status === "visited" || u.status === "visited_carta").length
+    const done = allUnits.filter((u) => u.status === "visited" || u.status === "visited_carta" || u.status === "do_not_visit").length
     return { done, total }
   }
 

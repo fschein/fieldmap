@@ -57,7 +57,7 @@ interface HouseByHouseProps {
 
 function isGroupFullyMarked(group: HouseGroup) {
   if (group.units.length === 0) return false
-  return group.units.every((u) => u.status === "visited" || u.status === "visited_carta")
+  return group.units.every((u) => u.status === "visited" || u.status === "visited_carta" || u.status === "do_not_visit")
 }
 
 function statusChipClasses(status: UnitStatus) {
@@ -150,7 +150,7 @@ export function HouseByHouse({
       {groups.map((group) => {
         const isExpanded = expandedId === group.id
         const sortedUnits = [...group.units].sort((a, b) => compareHouseNumbers(a.number, b.number))
-        const doneCount = group.units.filter((u) => u.status === "visited" || u.status === "visited_carta").length
+        const doneCount = group.units.filter((u) => u.status === "visited" || u.status === "visited_carta" || u.status === "do_not_visit").length
         const total = group.units.length
         const fullyMarked = isGroupFullyMarked(group)
 

@@ -4,6 +4,23 @@ Registro de bugs difíceis e lições aprendidas, pra não repetir o mesmo camin
 
 ---
 
+## Link de campo (`/campo/[token]`) sempre mostrava "Link inválido" (erro de tipo mascarado)
+
+**Sintoma:** qualquer link de campo gerado (residencial ou condomínio) mostrava "Link inválido ou expirado" pra quem abria, mesmo recém-criado. A primeira suspeita razoável — "deve ser o link apontando pra localhost" — não era a causa: o mesmo erro acontecia abrindo em produção.
+
+**Causa real:** a RPC `get_field_link_units` falhava com erro Postgres `42804` — `"Returned type character varying(10) does not match expected type text in column 4"`. A função declara `territory_number TEXT` no `RETURNS TABLE`, mas `territories.number` no banco é `character varying(10)` — em algum momento a coluna foi alterada fora das migrations rastreadas (a migration original, `001-create-tables.sql`, declara `TEXT`). Postgres não faz coerção implícita disso dentro de `RETURN QUERY`.
+
+O código do cliente (`app/campo/[token]/page.tsx`) tratava qualquer `error` da chamada RPC do mesmo jeito que "link genuinamente não existe" — `rows` ficava vazio, e a tela mostrava a mensagem genérica de link inválido tanto pra um ID errado quanto pra um erro 500 real do banco. Isso escondeu a causa por várias rodadas de teste.
+
+**Fix:** cast explícito `t.number::TEXT` (e demais colunas de texto, defensivamente) na função (`scripts/050-fix-field-link-number-type.sql`).
+
+**Lição geral:**
+- Quando uma RPC do Supabase falha com "structure of query does not match function result type" (42804), é sempre incompatibilidade entre o tipo declarado no `RETURNS TABLE` e o tipo real da coluna de origem — não adianta procurar em outro lugar, é conferir os tipos das colunas envolvidas contra o schema do banco AO VIVO, não contra o que a migration original declarava (colunas podem ter sido alteradas depois, fora de qualquer migration rastreada).
+- **Nunca engolir o `error` de uma chamada RPC/query e cair num estado genérico de "não encontrado".** Um erro real de servidor (500/400) e um "recurso não existe" (404 lógico) são coisas diferentes e merecem mensagens diferentes — misturar os dois transforma qualquer bug de backend em uma pista falsa ("deve ser algo no meu ambiente/link") que desvia a investigação.
+- Antes de assumir "só vai funcionar quando publicar" (ambiente), teste a mesma chamada em produção e localhost — se falha igual nos dois, não é ambiente.
+
+---
+
 ## Leaflet: polígonos "somem" em dev, sem erro nenhum (Strict Mode + refs órfãs)
 
 **Sintoma:** `TerritoryMapViewer` (mapa do publicador em `/dashboard/my-assignments/[id]/map`) não mostrava os polígonos das quadras — às vezes um zoom/posição estranho, às vezes nada, sem exceção nem erro de query. O editor do admin (`components/map/territory-map.tsx`), usando os mesmos dados, funcionava normalmente.

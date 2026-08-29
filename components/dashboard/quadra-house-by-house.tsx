@@ -55,7 +55,7 @@ export function QuadraHouseByHouse({
         const isExpanded = expandedQuadraId === quadra.id
         const allUnits = quadra.streets.flatMap((s) => s.units)
         const total = allUnits.length
-        const done = allUnits.filter((u) => u.status === "visited" || u.status === "visited_carta").length
+        const done = allUnits.filter((u) => u.status === "visited" || u.status === "visited_carta" || u.status === "do_not_visit").length
 
         return (
           <div key={quadra.id} className="rounded-xl border border-border bg-card overflow-hidden">

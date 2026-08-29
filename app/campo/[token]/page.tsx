@@ -47,6 +47,9 @@ export default function FieldLinkPage({
 
   async function fetchData() {
     const { data, error } = await supabase.rpc("get_field_link_units", { p_link_id: token })
+    if (error) {
+      console.error("Erro ao carregar link de campo:", error)
+    }
     if (!error && data) {
       setRows(data as RpcRow[])
     }
