@@ -5,6 +5,9 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { fmtTerritoryNumber } from "@/lib/utils"
 import { Loader2, ShieldAlert, MapPin } from "lucide-react"
 import { HouseByHouse, type HouseGroup, type UnitStatus } from "@/components/dashboard/house-by-house"
+import { SettingsProvider } from "@/providers/settings-provider"
+import { A11yControls } from "@/components/dashboard/a11y-controls"
+import { FieldMapLogoBrand } from "@/components/icons/fieldmap-logo"
 
 const SESSION_KEY = "fieldmap_field_session_id"
 
@@ -34,7 +37,29 @@ interface RpcRow {
 
 const supabase = getSupabaseBrowserClient()
 
-export default function FieldLinkPage({
+function FieldMapBrandHeader() {
+  return (
+    <div className="h-14 flex items-center justify-between gap-2 px-4 shrink-0">
+      <div className="flex items-center gap-2 min-w-0">
+        <FieldMapLogoBrand className="h-6 w-auto opacity-90 shrink-0" />
+        <span className="font-bold text-foreground tracking-tight text-base truncate">
+          Field<span className="text-primary">Map</span>
+        </span>
+      </div>
+      <A11yControls />
+    </div>
+  )
+}
+
+export default function FieldLinkPage(props: { params: Promise<{ token: string }> }) {
+  return (
+    <SettingsProvider>
+      <FieldLinkPageContent {...props} />
+    </SettingsProvider>
+  )
+}
+
+function FieldLinkPageContent({
   params,
 }: {
   params: Promise<{ token: string }>
@@ -79,8 +104,11 @@ export default function FieldLinkPage({
 
   if (loading || !sessionId) {
     return (
-      <div className="flex items-center justify-center min-h-dvh">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-dvh flex flex-col">
+        <FieldMapBrandHeader />
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
       </div>
     )
   }
@@ -91,10 +119,13 @@ export default function FieldLinkPage({
 
   if (!linkValid) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-dvh text-center px-6 space-y-3">
-        <ShieldAlert className="h-12 w-12 text-destructive/40" />
-        <h1 className="text-lg font-bold">Link inválido</h1>
-        <p className="text-sm text-muted-foreground">Este link de campo não existe mais ou foi digitado errado.</p>
+      <div className="min-h-dvh flex flex-col">
+        <FieldMapBrandHeader />
+        <div className="flex-1 flex flex-col items-center justify-center text-center px-6 space-y-3">
+          <ShieldAlert className="h-12 w-12 text-destructive/40" />
+          <h1 className="text-lg font-bold">Link inválido</h1>
+          <p className="text-sm text-muted-foreground">Este link de campo não existe mais ou foi digitado errado.</p>
+        </div>
       </div>
     )
   }
@@ -118,7 +149,8 @@ export default function FieldLinkPage({
 
   return (
     <div className="min-h-dvh flex flex-col">
-      <div className="h-14 flex items-center gap-2 px-4 shrink-0">
+      <FieldMapBrandHeader />
+      <div className="h-14 flex items-center gap-2 px-4 shrink-0 border-t border-border">
         <MapPin className="h-4 w-4 text-primary shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-foreground truncate">
