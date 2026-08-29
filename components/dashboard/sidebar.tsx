@@ -231,7 +231,7 @@ export function Sidebar() {
               </p>
               <p className="text-xs text-muted-foreground mt-0.5 mb-2">
                 {profile?.role === "admin" ? "Administrador" :
-                 profile?.role === "supervisor" ? "Supervisor" :
+                 profile?.role === "supervisor" ? "Spte. de Serviço" :
                  profile?.role === "dirigente" ? "Dirigente" : "Publicador"}
               </p>
               <button

@@ -39,7 +39,7 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   territory: TerritoryData | null
-  groups: { id: string; name: string; color: string }[]
+  groups: { id: string; name: string; color: string; is_active?: boolean }[]
   onSuccess: () => void
 }
 
@@ -53,6 +53,7 @@ type TerritoryTypeOption = "residencial" | "comercial" | "condominium"
 type SubtypeOption = "building" | "houses"
 
 const supabase = getSupabaseBrowserClient()
+const NONE_GROUP_COLOR = "#6b7280"
 
 // ============================================================================
 // HELPERS
@@ -233,7 +234,7 @@ export function TerritoryFormModal({ open, onOpenChange, territory, groups, onSu
           .single()
         if (error) throw error
 
-        if (type === "condominium") {
+        if (type === "condominium" && subtype === "building") {
           setCreatedTerritoryId(data.id)
           setStep(2)
         } else {
@@ -422,24 +423,26 @@ export function TerritoryFormModal({ open, onOpenChange, territory, groups, onSu
         <div className="space-y-2 flex flex-col justify-start">
           <Label className="text-primary font-bold">Grupo</Label>
           <div className="space-y-1.5 max-h-[300px] overflow-y-auto pr-1">
-            {/* Nenhum */}
+            {/* Nenhum — mesma bordinha dos grupos, mas cinza */}
             <div
               role="button"
               onClick={() => setGroupId(null)}
               className="flex items-center gap-[10px] cursor-pointer rounded-md transition-all"
               style={{
                 padding: "9px 12px",
-                border: !groupId ? "1.5px solid var(--color-border-tertiary, hsl(var(--border)))" : "0.5px solid var(--color-border-tertiary, hsl(var(--border)))",
-                background: "var(--color-background-primary, hsl(var(--card)))",
+                border: !groupId ? `1.5px solid ${NONE_GROUP_COLOR}` : "0.5px solid var(--color-border-tertiary, hsl(var(--border)))",
+                background: !groupId ? `${NONE_GROUP_COLOR}14` : "var(--color-background-primary, hsl(var(--card)))",
               }}
             >
-              <span className="w-2 h-2 rounded-full border border-muted-foreground/40 shrink-0" />
-              <span className="flex-1 text-sm text-muted-foreground">Nenhum</span>
-              {!groupId && <IconCheck size={14} className="text-muted-foreground shrink-0" />}
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: NONE_GROUP_COLOR }} />
+              <span className="flex-1 text-sm font-medium" style={{ color: !groupId ? NONE_GROUP_COLOR : "inherit" }}>
+                Nenhum
+              </span>
+              {!groupId && <IconCheck size={14} style={{ color: NONE_GROUP_COLOR }} className="shrink-0" />}
             </div>
 
-            {/* Grupos */}
-            {groups.map(g => {
+            {/* Grupos — inclui grupos inativos só se já forem o grupo atual do território */}
+            {groups.filter(g => g.is_active !== false || g.id === groupId).map(g => {
               const selected = groupId === g.id
               return (
                 <div
@@ -518,7 +521,7 @@ export function TerritoryFormModal({ open, onOpenChange, territory, groups, onSu
           <Button onClick={handleSaveStep1} disabled={saving || numberLoading}>
             {saving
               ? <Loader2 className="h-4 w-4 animate-spin" />
-              : (!isEdit && type === "condominium") ? "Continuar →" : "Salvar"
+              : (!isEdit && type === "condominium" && subtype === "building") ? "Continuar →" : "Salvar"
             }
           </Button>
         </DialogFooter>

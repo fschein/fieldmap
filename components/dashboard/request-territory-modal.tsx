@@ -55,6 +55,7 @@ export function RequestTerritoryModal({
   const [noCampaignTerritory, setNoCampaignTerritory] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [tooRecent, setTooRecent] = useState(false)
+  const [crossGroupTerritory, setCrossGroupTerritory] = useState(false)
   const [urgentSuggestion, setUrgentSuggestion] = useState<UrgentGroupSuggestion | null>(null)
   const [activeCampaign, setActiveCampaign] = useState<ActiveCampaign | null>(null)
   const [campaignMode, setCampaignMode] = useState(false)
@@ -69,6 +70,7 @@ export function RequestTerritoryModal({
     setNoCampaignTerritory(false)
     setTooRecent(false)
     setUrgentSuggestion(null)
+    setCrossGroupTerritory(false)
 
     const today = new Date().toISOString().slice(0, 10)
 
@@ -99,8 +101,8 @@ export function RequestTerritoryModal({
     setLoadingGroups(true)
   }, [open, fetchGroups])
 
-  const handleSelect = useCallback(async (opts: { groupId?: string; commercial?: boolean }) => {
-    const key = opts.commercial ? "comercial" : (opts.groupId ?? "")
+  const handleSelect = useCallback(async (opts: { groupId?: string; commercial?: boolean; general?: boolean }) => {
+    const key = opts.commercial ? "comercial" : opts.general ? "geral" : (opts.groupId ?? "")
     setSelectedGroupId(key)
     setSelectedIsCommercial(!!opts.commercial)
     setLoadingGroupId(key)
@@ -114,9 +116,12 @@ export function RequestTerritoryModal({
         : null
       const selector = opts.commercial
         ? { territoryType: "comercial" as const }
+        : opts.general
+        ? { general: true as const }
         : { groupId: opts.groupId! }
-      const { territory: result, blockedByRecency } = await fetchAvailableTerritory(selector, campaign)
+      const { territory: result, blockedByRecency, crossGroup } = await fetchAvailableTerritory(selector, campaign)
       setTerritory(result)
+      setCrossGroupTerritory(!!crossGroup)
       if (result === null) {
         if (campaignMode) {
           setNoCampaignTerritory(true)
@@ -171,7 +176,7 @@ export function RequestTerritoryModal({
     setUrgentSuggestion(null)
   }, [])
 
-  const selectedGroup = groups.find((g) => g.id === selectedGroupId)
+  const territoryGroup = territory ? groups.find((g) => g.id === territory.group_id) : undefined
   const COMMERCIAL_KEY = "comercial"
 
   return (
@@ -233,6 +238,25 @@ export function RequestTerritoryModal({
                       Região {g.name}
                     </button>
                   ))}
+
+                  <div className="h-px bg-border my-0.5" />
+
+                  <button
+                    onClick={() => handleSelect({ general: true })}
+                    disabled={loadingGroupId !== null}
+                    className={cn(
+                      "flex items-center gap-3 w-full px-3 py-2.5 rounded-lg border text-sm font-medium text-left transition-colors",
+                      "bg-card hover:bg-muted/60 border-border",
+                      "disabled:opacity-50 disabled:cursor-not-allowed"
+                    )}
+                  >
+                    {loadingGroupId === "geral" ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0 text-muted-foreground" />
+                    ) : (
+                      <span className="inline-block h-3 w-3 rounded-full shrink-0 bg-muted-foreground" />
+                    )}
+                    Geral
+                  </button>
 
                   <div className="h-px bg-border my-0.5" />
 
@@ -309,7 +333,7 @@ export function RequestTerritoryModal({
                 <div className="flex items-center gap-3">
                   <div
                     className="h-8 w-1 rounded-full shrink-0"
-                    style={{ backgroundColor: selectedIsCommercial ? "#f59e0b" : (selectedGroup?.color || territory.color || "var(--primary)") }}
+                    style={{ backgroundColor: selectedIsCommercial ? "#f59e0b" : (territoryGroup?.color || "hsl(var(--muted-foreground))") }}
                   />
                   <div>
                     <p className="font-semibold text-foreground text-base leading-tight">
@@ -326,6 +350,13 @@ export function RequestTerritoryModal({
                   <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />
                   <span>{priorityReason(territory)}</span>
                 </div>
+
+                {crossGroupTerritory && (
+                  <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 rounded-lg px-3 py-2 border border-amber-500/20">
+                    <ArrowRight className="h-3.5 w-3.5 shrink-0" />
+                    <span>Este território é de outra região, mas está muito atrasado.</span>
+                  </div>
+                )}
               </div>
             )}
 

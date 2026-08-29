@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { useAuth } from "@/hooks/use-auth"
 import {
@@ -30,9 +31,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, UserPlus, Pencil, Trash2, Mail, Phone, ShieldAlert, Lock, Copy, RefreshCw, CheckCircle2, UserCheck, UserMinus } from "lucide-react"
-import { Switch } from "@/components/ui/switch"
+import { Loader2, UserPlus, Pencil, Trash2, Mail, Phone, ShieldAlert, Copy, RefreshCw, UserCheck, UserMinus } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface UserProfile {
@@ -79,15 +78,15 @@ function generateTempPassword() {
 
 export default function UsersPage() {
   const { isReady, isAdmin, isDirigente, user } = useAuth()
+  const router = useRouter()
 
   const [users, setUsers] = useState<UserProfile[]>([])
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Modal de Criar/Editar
+  // Modal de Criar Usuário
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [editingUser, setEditingUser] = useState<UserProfile | null>(null)
   const [formData, setFormData] = useState<{
     name: string
     email: string
@@ -96,21 +95,13 @@ export default function UsersPage() {
     gender: "M" | "F"
     groupId: string
     password: string
-    isActive: boolean
-  }>({ name: "", email: "", role: "publicador", phone: "", gender: "M", groupId: "none", password: "", isActive: true })
-
-  // Modal de Redefinir Senha
-  const [resetUser, setResetUser] = useState<UserProfile | null>(null)
-  const [tempPassword, setTempPassword] = useState("")
-  const [isCopied, setIsCopied] = useState(false)
-  const [isResetting, setIsResetting] = useState(false)
-  const [resetError, setResetError] = useState<string | null>(null)
+  }>({ name: "", email: "", role: "publicador", phone: "", gender: "M", groupId: "none", password: "" })
 
   const supabase = getSupabaseBrowserClient()
 
   const fetchGroups = useCallback(async () => {
     try {
-      const { data, error } = await supabase.from("groups").select("id, name").order("name")
+      const { data, error } = await supabase.from("groups").select("id, name").eq("is_active", true).order("name")
       if (error) throw error
       setGroups(data || [])
     } catch (err: any) {
@@ -142,33 +133,17 @@ export default function UsersPage() {
     }
   }, [isReady, isAdmin, isDirigente, user, fetchUsers, fetchGroups])
 
-  // ─────────── Criar / Editar ───────────
-  const handleOpenDialog = (u?: UserProfile) => {
-    if (u) {
-      setEditingUser(u)
-      setFormData({ 
-        name: u.name, 
-        email: u.email, 
-        role: u.role, 
-        phone: u.phone || "", 
-        gender: u.gender || "M", 
-        groupId: u.group_id || "none",
-        password: "" ,
-        isActive: u.is_active !== false
-      })
-    } else {
-      setEditingUser(null)
-      setFormData({ 
-        name: "", 
-        email: "", 
-        role: "publicador", 
-        phone: "", 
-        gender: "M", 
-        groupId: "none",
-        password: generateTempPassword(),
-        isActive: true
-      })
-    }
+  // ─────────── Criar ───────────
+  const handleOpenDialog = () => {
+    setFormData({
+      name: "",
+      email: "",
+      role: "publicador",
+      phone: "",
+      gender: "M",
+      groupId: "none",
+      password: generateTempPassword(),
+    })
     setIsDialogOpen(true)
   }
 
@@ -176,32 +151,16 @@ export default function UsersPage() {
     e.preventDefault()
     setIsSubmitting(true)
     try {
-      const profilePayload = {
-        name: formData.name,
-        email: formData.email,
-        role: formData.role,
-        phone: formData.phone || null,
-        group_id: formData.groupId === "none" ? null : formData.groupId,
-        is_active: formData.isActive,
-        updated_at: new Date().toISOString(),
-      }
-
-      if (editingUser) {
-        const { error } = await supabase.from("profiles").update(profilePayload).eq("id", editingUser.id)
-        if (error) throw error
-      } else {
-        // Novo usuário via API Admin
-        const res = await fetch("/api/admin/create-user", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ 
-            ...formData, 
-            group_id: formData.groupId === "none" ? null : formData.groupId 
-          }),
-        })
-        const json = await res.json()
-        if (!res.ok) throw new Error(json.error || "Erro ao criar usuário")
-      }
+      const res = await fetch("/api/admin/create-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...formData,
+          group_id: formData.groupId === "none" ? null : formData.groupId
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || "Erro ao criar usuário")
       setIsDialogOpen(false)
       fetchUsers()
     } catch (err: any) {
@@ -209,41 +168,6 @@ export default function UsersPage() {
     } finally {
       setIsSubmitting(false)
     }
-  }
-
-  // ─────────── Redefinir Senha ───────────
-  const handleOpenResetDialog = (u: UserProfile) => {
-    setResetUser(u)
-    setTempPassword(generateTempPassword())
-    setIsCopied(false)
-    setResetError(null)
-  }
-
-  const handleConfirmReset = async () => {
-    if (!resetUser) return
-    setIsResetting(true)
-    setResetError(null)
-    try {
-      const res = await fetch("/api/admin/reset-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: resetUser.id, newPassword: tempPassword }),
-      })
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error || "Erro ao redefinir senha")
-      // Sucesso — fechar o modal
-      setResetUser(null)
-    } catch (err: any) {
-      setResetError(err.message)
-    } finally {
-      setIsResetting(false)
-    }
-  }
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(tempPassword)
-    setIsCopied(true)
-    setTimeout(() => setIsCopied(false), 2500)
   }
 
   // ─────────── Deletar ───────────
@@ -278,7 +202,7 @@ export default function UsersPage() {
           <h1 className="text-[1.375rem] font-semibold tracking-tight text-foreground">Usuários</h1>
           <p className="text-xs text-muted-foreground font-medium mt-1">Controle de acesso, níveis de permissão e contatos.</p>
         </div>
-        <Button onClick={() => handleOpenDialog()}>
+        <Button onClick={handleOpenDialog}>
           <UserPlus className="mr-2 h-4 w-4" /> Criar Usuário
         </Button>
       </div>
@@ -308,7 +232,7 @@ export default function UsersPage() {
               </TableRow>
             ) : (
               users.map((u) => (
-                 <TableRow key={u.id} className="hover:bg-muted/50 cursor-pointer transition-colors" onClick={() => handleOpenDialog(u)}>
+                 <TableRow key={u.id} className="hover:bg-muted/50 cursor-pointer transition-colors" onClick={() => router.push(`/dashboard/users/${u.id}/edit`)}>
                    <TableCell className="font-medium text-foreground">
                      <div className="flex items-center gap-2">
                        <span
@@ -360,12 +284,12 @@ export default function UsersPage() {
         </Table>
       </div>
 
-      {/* ── Modal Criar/Editar ── */}
+      {/* ── Modal Criar Usuário ── */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="flex flex-col max-h-[90dvh] overflow-hidden p-0 gap-0">
           <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
             <DialogHeader className="px-6 pt-5 pb-2 shrink-0">
-              <DialogTitle>{editingUser ? "Editar Usuário" : "Novo Usuário"}</DialogTitle>
+              <DialogTitle>Novo Usuário</DialogTitle>
               <DialogDescription>Ajuste as permissões e dados do perfil.</DialogDescription>
             </DialogHeader>
             <div className="flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-6 py-3 grid gap-3 content-start">
@@ -405,7 +329,7 @@ export default function UsersPage() {
                     <SelectContent>
                       <SelectItem value="publicador">Publicador</SelectItem>
                       <SelectItem value="dirigente">Dirigente</SelectItem>
-                      <SelectItem value="supervisor">Supervisor</SelectItem>
+                      <SelectItem value="supervisor">Spte. de Serviço</SelectItem>
                       <SelectItem value="admin">Administrador</SelectItem>
                     </SelectContent>
                   </Select>
@@ -424,134 +348,27 @@ export default function UsersPage() {
                 </div>
               </div>
 
-              {editingUser && (
-                <div className="flex items-center justify-between p-2.5 border rounded-md bg-muted/30">
-                  <div className="space-y-0.5">
-                    <Label className="text-sm font-medium">Status do Usuário</Label>
-                    <p className="text-xs text-muted-foreground">
-                      {formData.isActive ? "Acesso liberado ao sistema." : "Acesso bloqueado temporariamente."}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[0.625rem] font-bold text-muted-foreground uppercase tracking-wider">{formData.isActive ? "Ativo" : "Inativo"}</span>
-                    <Switch
-                      checked={formData.isActive}
-                      onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {editingUser && (
-                <div className="bg-primary/5 p-2.5 rounded-md border border-primary/20 flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label className="text-xs text-primary font-bold flex items-center gap-1.5">
-                      <Lock className="h-3 w-3" /> Segurança
-                    </Label>
-                    <p className="text-[0.625rem] text-primary/70">Redefinir acesso do usuário.</p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 text-[0.6875rem] border-primary/30 text-primary hover:bg-primary/10"
-                    onClick={() => handleOpenResetDialog(editingUser)}
-                  >
-                    Redefinir Senha
+              <div className="space-y-1 bg-yellow-500/10 p-2.5 rounded-md border border-yellow-500/20">
+                <Label className="text-xs text-foreground font-bold italic">Senha Temporária</Label>
+                <div className="flex items-center gap-2">
+                  <Input readOnly value={formData.password} className="bg-card font-mono text-sm border-border" />
+                  <Button type="button" size="sm" variant="outline" onClick={() => setFormData({ ...formData, password: generateTempPassword() })}>
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(formData.password) }}>
+                    <Copy className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-              )}
-
-              {!editingUser && (
-                <div className="space-y-1 bg-yellow-500/10 p-2.5 rounded-md border border-yellow-500/20">
-                  <Label className="text-xs text-foreground font-bold italic">Senha Temporária</Label>
-                  <div className="flex items-center gap-2">
-                    <Input readOnly value={formData.password} className="bg-card font-mono text-sm border-border" />
-                    <Button type="button" size="sm" variant="outline" onClick={() => setFormData({ ...formData, password: generateTempPassword() })}>
-                      <RefreshCw className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button type="button" size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(formData.password) }}>
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                  <p className="text-[0.625rem] text-muted-foreground mt-1">Copie esta senha e envie ao usuário. Ele deverá trocá-la no primeiro acesso.</p>
-                </div>
-              )}
+                <p className="text-[0.625rem] text-muted-foreground mt-1">Copie esta senha e envie ao usuário. Ele deverá trocá-la no primeiro acesso.</p>
+              </div>
             </div>
             <DialogFooter className="px-6 py-3 border-t shrink-0">
               <Button type="submit" disabled={isSubmitting} className="w-full">
                 {isSubmitting && <Loader2 className="animate-spin h-4 w-4 mr-2" />}
-                {editingUser ? "Salvar Alterações" : "Criar Usuário"}
+                Criar Usuário
               </Button>
             </DialogFooter>
           </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Modal Redefinir Senha ── */}
-      <Dialog open={!!resetUser} onOpenChange={(open) => !open && setResetUser(null)}>
-        <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Lock className="h-4 w-4 text-primary" />
-              Redefinir Senha
-            </DialogTitle>
-            <DialogDescription>
-              Uma nova senha temporária será gerada para <strong>{resetUser?.name}</strong>. Copie e envie ao usuário — ele deverá trocá-la no próximo acesso.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="py-4 space-y-3">
-            <Label className="text-xs text-muted-foreground">Nova senha temporária</Label>
-            <div className="flex items-center gap-2">
-              <Input
-                readOnly
-                value={tempPassword}
-                className="font-mono text-base tracking-widest text-center"
-              />
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                onClick={() => { setTempPassword(generateTempPassword()); setIsCopied(false) }}
-                title="Gerar nova senha"
-              >
-                <RefreshCw className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <Button
-              type="button"
-              variant={isCopied ? "default" : "outline"}
-              className={cn("w-full transition-colors", isCopied && "bg-emerald-600 text-white")}
-              onClick={handleCopy}
-            >
-              {isCopied ? (
-                <><CheckCircle2 className="h-4 w-4 mr-2" /> Copiado!</>
-              ) : (
-                <><Copy className="h-4 w-4 mr-2" /> Copiar Senha</>
-              )}
-            </Button>
-
-            {resetError && (
-              <Alert variant="destructive">
-                <AlertDescription>{resetError}</AlertDescription>
-              </Alert>
-            )}
-          </div>
-
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={() => setResetUser(null)} className="w-full sm:w-auto">
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleConfirmReset}
-              disabled={isResetting}
-              className="w-full sm:w-auto bg-primary text-primary-foreground"
-            >
-              {isResetting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmar e Aplicar"}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

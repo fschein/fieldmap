@@ -76,6 +76,7 @@ export default function TerritoryMapViewer({
   const [isSatellite, setIsSatellite] = useState(false)
   const [isLocating, setIsLocating] = useState(false)
   const [isCenteredOnUser, setIsCenteredOnUser] = useState(false)
+  const [noGeometry, setNoGeometry] = useState(false)
   const expiredDnvCount = countExpiredDnvs(territory.do_not_visits)
 
   useEffect(() => {
@@ -110,9 +111,26 @@ export default function TerritoryMapViewer({
 
     mapRef.current = map
 
+    // O container é montado via next/dynamic (troca do skeleton de loading
+    // pelo mapa real) dentro de um layout flex — o tamanho que o Leaflet lê
+    // na inicialização às vezes fica desatualizado/zerado, e sem isso o mapa
+    // projeta os polígonos errado (ou nem mostra nada), mesmo com bounds
+    // geograficamente corretos. Mesmo padrão do editor do admin
+    // (territory-map.tsx:165).
+    setTimeout(() => map.invalidateSize(), 100)
+
     return () => {
       map.remove()
       mapRef.current = null
+      // overlayGroupRef/polygonsRef são reaproveitados entre execuções do
+      // efeito de subdivisions (criados só uma vez, via `if (!ref.current)`).
+      // Em dev, o Strict Mode roda este efeito de montagem duas vezes
+      // (monta → desmonta → monta de novo), criando um SEGUNDO mapa aqui —
+      // sem resetar essas refs, o efeito de subdivisions reaproveita o
+      // layerGroup preso ao mapa JÁ REMOVIDO, e os polígonos adicionados a
+      // ele nunca chegam a aparecer no mapa novo (órfãos, sem erro nenhum).
+      overlayGroupRef.current = null
+      polygonsRef.current = null
     }
   }, [])
 
@@ -138,23 +156,18 @@ export default function TerritoryMapViewer({
       if (!subdivision.coordinates || subdivision.coordinates.length === 0) return
 
       try {
-        const latLngs = subdivision.coordinates.map((ring) => {
-          return ring.map(([coord1, coord2]) => {
-            let lat, lng
-            if (coord1 >= -33 && coord1 <= 5) {
-              lat = coord1; lng = coord2
-            } else if (coord2 >= -33 && coord2 <= 5) {
-              lat = coord2; lng = coord1
-            } else if (coord1 >= -74 && coord1 <= -35) {
-              lng = coord1; lat = coord2
-            } else if (coord2 >= -74 && coord2 <= -35) {
-              lng = coord2; lat = coord1
-            } else {
-              lng = coord1; lat = coord2
-            }
-            return [lat, lng] as [number, number]
-          })
-        })
+        // Coordenadas já vêm salvas como [lat, lng] — mesmo formato que
+        // components/map/territory-map.tsx (editor do admin) usa direto,
+        // sem heurística. A troca de coordenadas por faixa numérica que
+        // existia aqui corrompia geometria que já estava correta.
+        //
+        // Só o primeiro anel (contorno externo) — igual ao editor do admin
+        // (territory-map.tsx:193, `coordinates[0]`). Anéis extras aqui
+        // (se existirem, por dado malformado) alargavam o bounding box do
+        // fitBounds pra muito além da quadra real.
+        const latLngs = [
+          subdivision.coordinates[0].map(([lat, lng]) => [lat, lng] as [number, number])
+        ]
 
         const isCompleted = subdivision.completed || subdivision.status === "completed"
         const hasNotes = !!subdivision.notes
@@ -254,7 +267,23 @@ export default function TerritoryMapViewer({
     if (hasValidPolygons && polygons.length > 0) {
       const group = L.featureGroup(polygons)
       polygonsRef.current = group
-      map.fitBounds(group.getBounds(), { padding: [50, 50] })
+      const bounds = group.getBounds()
+      map.invalidateSize()
+      // animate: false — igual ao editor do admin (territory-map.tsx:253).
+      // Sem isso, o Leaflet tenta uma transição de zoom animada logo após o
+      // invalidateSize() e quebra dentro de _tryAnimatedZoom (TypeError:
+      // Cannot read properties of undefined (reading '_leaflet_pos')),
+      // deixando os panes fora de sincronia — por isso os polígonos não
+      // apareciam em lugar nenhum do mapa, mesmo com bounds corretos.
+      map.fitBounds(bounds, { animate: false, padding: [50, 50] })
+      setNoGeometry(false)
+    } else if (territory.subdivisions.length > 0) {
+      // Há quadras cadastradas, mas nenhuma tem geometria desenhada no mapa
+      // (ex.: criadas direto pelo diálogo "Nova Quadra", sem editor de mapa).
+      // Sem isso, o mapa fica parado no centro padrão sem explicar por quê.
+      setNoGeometry(true)
+    } else {
+      setNoGeometry(false)
     }
 
     const handleMapClick = (e: L.LeafletMouseEvent) => {
@@ -422,6 +451,15 @@ export default function TerritoryMapViewer({
         ref={mapContainerRef}
         className="w-full h-full rounded-lg z-0"
       />
+
+      {!pinMode && noGeometry && (
+        <div className="absolute inset-x-4 top-4 z-[900] bg-card border border-border rounded-xl shadow-md p-4 text-center">
+          <p className="text-sm font-semibold text-foreground">Nenhuma quadra tem localização desenhada no mapa</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            As quadras existem, mas ainda não foram desenhadas no editor de mapa.
+          </p>
+        </div>
+      )}
 
       {pinMode && (
         <>

@@ -656,18 +656,13 @@ export default function AssignmentsPage() {
                 key={t.id}
                 onClick={() => openSheet(t.id)}
                 className={cn(
-                  "flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all active:scale-[0.98]",
+                  "flex items-center gap-3 p-3 rounded-xl border border-l-4 cursor-pointer transition-all active:scale-[0.98] overflow-hidden",
                   t.status === 'overdue'
                     ? 'border-red-500/40 bg-red-500/5'
                     : 'border-border bg-card hover:border-primary/30'
                 )}
+                style={{ borderLeftColor: t.groupColor || (t.status === 'overdue' ? '#ef4444' : t.status === 'active' ? 'var(--primary)' : '#e5e7eb') }}
               >
-                {/* Indicador de grupo / cor */}
-                <div
-                  className="w-1 self-stretch rounded-full flex-shrink-0"
-                  style={{ backgroundColor: t.groupColor || (t.status === 'overdue' ? '#ef4444' : t.status === 'active' ? 'var(--primary)' : '#e5e7eb') }}
-                />
-
                 {/* Conteúdo principal */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2 mb-0.5">

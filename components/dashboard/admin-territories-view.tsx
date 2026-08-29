@@ -21,162 +21,11 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import type { Subdivision } from "@/lib/types"
-
-// ============================================================================
-// INTERFACES
-// ============================================================================
-
-interface TerritoryWithDetails {
-  id: string
-  number: string
-  name: string
-  type: string
-  subtype?: string | null
-  color: string
-  status?: string
-  description?: string
-  assigned_to: string | null
-  last_completed_at: string | null
-  created_at: string
-  group?: {
-    id: string
-    name: string
-    color: string
-  }
-  assigned_to_user?: {
-    id: string
-    name: string
-    email: string
-  } | null
-  campaign?: {
-    id: string
-    name: string
-  } | null
-  subdivisions?: Subdivision[]
-}
-
-interface PriorityScore {
-  territory: TerritoryWithDetails & { assignments?: any[] }
-  score: number
-  daysInactive: number
-  daysAssigned?: number
-  isReturned?: boolean
-  priority: 'critical' | 'high' | 'medium' | 'low'
-  reason: string
-}
+import { calculatePriorityScore, type TerritoryWithDetails, type PriorityScore } from "@/lib/territory-priority"
 
 // ============================================================================
 // FUNÇÕES DE CÁLCULO
 // ============================================================================
-
-function calculatePriorityScore(territory: TerritoryWithDetails & { assignments?: any[] }): PriorityScore {
-  // DEBUG temporary (remover após validar)
-  if (!territory.assigned_to) {
-    console.log(`[${territory.number}]`, {
-      last_completed_at: territory.last_completed_at,
-      assignments: territory.assignments?.map((a: any) => ({
-        status: a.status,
-        returned_at: a.returned_at,
-        completed_at: a.completed_at,
-        assigned_at: a.assigned_at,
-        updated_at: a.updated_at
-      }))
-    })
-  }
-
-  const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-
-  let score = 0
-  let daysInactive = 0
-  let daysAssigned = 0
-  let priority: 'critical' | 'high' | 'medium' | 'low' = 'low'
-  let reason = ''
-
-  // 1. Encontrar a última designação encerrada (returned ou completed)
-  const latestFinishedAssignment = [...(territory.assignments || [])]
-    .filter(a => a.status !== 'active')
-    .sort((a, b) => {
-      const dateA = new Date(a.completed_at || a.returned_at || a.updated_at || a.assigned_at).getTime()
-      const dateB = new Date(b.completed_at || b.returned_at || b.updated_at || b.assigned_at).getTime()
-      if (dateA !== dateB) return dateB - dateA
-      return b.id.localeCompare(a.id)
-    })[0]
-
-  const isReturned = !territory.assigned_to && latestFinishedAssignment?.status === 'returned'
-
-  // 2. Dias Inativo (LIVRE): hoje - (data real da liberação)
-  // Isso define a URGÊNCIA do território ser trabalhado.
-  let lastActivityDate: string | Date = territory.created_at || new Date().toISOString()
-  
-  if (isReturned) {
-    lastActivityDate = latestFinishedAssignment?.returned_at || latestFinishedAssignment?.updated_at || lastActivityDate
-  } else if (!territory.assigned_to) {
-    if (latestFinishedAssignment) {
-      lastActivityDate = latestFinishedAssignment.completed_at || latestFinishedAssignment.updated_at || lastActivityDate
-    } else if (territory.last_completed_at) {
-      lastActivityDate = territory.last_completed_at
-    }
-  }
-
-  const lastActivity = new Date(lastActivityDate)
-  // Fallback seguro: se a data for inválida (ex: string malformada ou undefined), assume a data atual para evitar NaN
-  const activityDay = isNaN(lastActivity.getTime()) 
-    ? new Date(today) 
-    : new Date(lastActivity.getFullYear(), lastActivity.getMonth(), lastActivity.getDate())
-
-  const diffInactive = today.getTime() - activityDay.getTime()
-  daysInactive = Math.max(0, Math.floor(diffInactive / (1000 * 60 * 60 * 24)))
-
-  // 3. Dias Designado: hoje - (assigned_at da designação ativa)
-  if (territory.assigned_to) {
-    const activeAssignment = territory.assignments?.find((a: any) => a.status === 'active')
-    if (activeAssignment && activeAssignment.assigned_at) {
-      const assignedDate = new Date(activeAssignment.assigned_at)
-      if (!isNaN(assignedDate.getTime())) {
-        const assignedDay = new Date(assignedDate.getFullYear(), assignedDate.getMonth(), assignedDate.getDate())
-        const diffAssigned = today.getTime() - assignedDay.getTime()
-        daysAssigned = Math.max(0, Math.floor(diffAssigned / (1000 * 60 * 60 * 24)))
-      }
-    }
-  }
-
-  // Calcula score baseado em dias inativos (mesmo se estiver designado, o score de "atraso" é mantido)
-  if (daysInactive >= 30) {
-    score = 100
-    priority = 'critical'
-    reason = `Inativo há ${daysInactive} dias`
-  } else if (daysInactive >= 10) {
-    score = 50
-    priority = 'medium'
-    reason = `Parado há ${daysInactive} dias`
-  } else {
-    score = 25
-    priority = 'low'
-    reason = 'Em dia'
-  }
-
-  // Bonus: território nunca designado
-  if (!territory.last_completed_at) {
-    score += 10
-    reason = 'Nunca foi trabalhado'
-  }
-
-  // Penalidade: já está designado (reduz prioridade na lista de "A designar")
-  if (territory.assigned_to) {
-    score -= 50
-  }
-
-  return {
-    territory,
-    score: Math.max(0, score),
-    daysInactive,
-    daysAssigned,
-    isReturned,
-    priority,
-    reason
-  }
-}
 
 function getProgressStats(subdivisions?: Subdivision[]) {
   if (!subdivisions || subdivisions.length === 0) {
@@ -322,18 +171,15 @@ export function AdminTerritoriesView() {
     const territory = p.territory
     const isLivre = !territory.assigned_to
 
-    const barColor = territory.group?.color ||
-      (isLivre && p.daysInactive >= 30 ? '#ef4444' :
-       isLivre && p.daysInactive >= 10 ? '#eab308' :
-       'hsl(var(--border))')
+    const barColor = territory.group?.color
+      || (territory.type === 'comercial' ? '#f59e0b' : 'hsl(var(--muted-foreground))')
 
     return (
       <div
-        onClick={() => router.push(`/dashboard/territories/${territory.id}/${territory.type === 'condominium' ? 'condominium' : 'map'}`)}
-        className="bg-card p-4 rounded-xl border shadow-sm transition-all active:scale-[0.98] cursor-pointer hover:shadow-md flex items-center gap-3 overflow-hidden"
+        onClick={() => router.push(territory.type === 'condominium' ? `/dashboard/territories/${territory.id}/condominium` : `/dashboard/territories/${territory.id}`)}
+        className="bg-card p-4 rounded-xl border border-l-4 shadow-sm transition-all active:scale-[0.98] cursor-pointer hover:shadow-md flex items-center gap-3 overflow-hidden"
+        style={{ borderLeftColor: barColor }}
       >
-        <div className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: barColor }} />
-
         <div className="flex-1 min-w-0 flex flex-col justify-center">
           <div className="flex items-center gap-2 mb-1 w-full min-w-0">
             <span className="text-xs font-mono font-semibold text-muted-foreground shrink-0">
@@ -489,6 +335,18 @@ export function AdminTerritoriesView() {
             )}
           >
             Urgentes ({counts.urgentes})
+          </button>
+
+          <button
+            onClick={() => setActiveFilter('inactive')}
+            className={cn(
+              "shrink-0 h-10 px-4 rounded-full text-sm font-bold border transition-colors shadow-sm",
+              activeFilter === 'inactive'
+                ? "bg-foreground text-background border-foreground"
+                : "bg-card text-muted-foreground border-border hover:bg-muted/50"
+            )}
+          >
+            Inativos ({counts.inactive})
           </button>
         </div>
 

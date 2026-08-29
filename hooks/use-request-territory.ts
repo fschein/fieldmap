@@ -13,6 +13,7 @@ const URGENT_THRESHOLD_DAYS = 60
 export interface FetchAvailableResult {
   territory: Territory | null
   blockedByRecency: boolean
+  crossGroup?: boolean
 }
 
 export interface UrgentGroupSuggestion {
@@ -25,14 +26,58 @@ export function useRequestTerritory() {
   const { user } = useAuth()
 
   const fetchGroups = useCallback(async (): Promise<Group[]> => {
-    const { data } = await supabase.from("groups").select("*").order("name")
+    const { data } = await supabase.from("groups").select("*").eq("is_active", true).order("name")
     return (data as Group[]) ?? []
   }, [])
 
   const fetchAvailableTerritory = useCallback(async (
-    selector: { groupId: string; territoryType?: never } | { territoryType: string; groupId?: never },
+    selector:
+      | { groupId: string; territoryType?: never; general?: never }
+      | { territoryType: string; groupId?: never; general?: never }
+      | { general: true; groupId?: never; territoryType?: never },
     campaign?: { id: string; startDate: string } | null
   ): Promise<FetchAvailableResult> => {
+    // IDs já cobertos na campanha ativa — usado tanto no override de urgência quanto no pool normal
+    let coveredIds: Set<string> | null = null
+    if (campaign) {
+      const { data: covered } = await supabase
+        .from("assignments")
+        .select("territory_id")
+        .eq("campaign_id", campaign.id)
+        .in("status", ["completed", "active"])
+      coveredIds = new Set((covered ?? []).map((a: { territory_id: string }) => a.territory_id))
+    }
+
+    // ── Override: território urgente (60+ dias, ou nunca trabalhado) na mesma família
+    // de tipo (residencial+condominial vs. comercial), cruzando grupos/regiões. ──
+    let urgentQuery = supabase
+      .from("territories")
+      .select("*, assignments(id, completed_at)")
+      .in("status", ["available", "completed"])
+      .is("assigned_to", null)
+      .order("last_completed_at", { ascending: true, nullsFirst: true })
+      .limit(20)
+
+    urgentQuery = selector.territoryType
+      ? urgentQuery.eq("type", selector.territoryType)
+      : urgentQuery.neq("type", "comercial")
+
+    const { data: urgentPool } = await urgentQuery
+    const urgentCandidate = (urgentPool as any[] ?? []).find(
+      (t) => !coveredIds || !coveredIds.has(t.id)
+    )
+
+    const urgentCutoffOverride = new Date(Date.now() - URGENT_THRESHOLD_DAYS * 86400000).toISOString()
+    const isTrulyUrgent =
+      urgentCandidate && (!urgentCandidate.last_completed_at || urgentCandidate.last_completed_at < urgentCutoffOverride)
+
+    if (isTrulyUrgent) {
+      const { assignments: _a, ...territory } = urgentCandidate
+      const crossGroup = !!selector.groupId && territory.group_id !== selector.groupId
+      return { territory: territory as Territory, blockedByRecency: false, crossGroup }
+    }
+
+    // ── Fluxo normal, escopado no grupo/tipo/geral pedido ──
     let query = supabase
       .from("territories")
       .select("*, assignments(id, completed_at)")
@@ -41,6 +86,7 @@ export function useRequestTerritory() {
 
     if (selector.groupId) query = query.eq("group_id", selector.groupId)
     else if (selector.territoryType) query = query.eq("type", selector.territoryType)
+    else if (selector.general) query = query.is("group_id", null).neq("type", "comercial")
 
     const { data, error } = await query
 
@@ -48,15 +94,8 @@ export function useRequestTerritory() {
 
     let candidates = data as any[]
 
-    if (campaign) {
-      const { data: covered } = await supabase
-        .from("assignments")
-        .select("territory_id")
-        .eq("campaign_id", campaign.id)
-        .in("status", ["completed", "active"])
-
-      const coveredIds = new Set((covered ?? []).map((a: { territory_id: string }) => a.territory_id))
-      candidates = candidates.filter((t) => !coveredIds.has(t.id))
+    if (coveredIds) {
+      candidates = candidates.filter((t) => !coveredIds!.has(t.id))
     }
 
     if (!candidates.length) return { territory: null, blockedByRecency: false }

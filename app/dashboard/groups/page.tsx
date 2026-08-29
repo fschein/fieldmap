@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -17,7 +17,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Plus, Palette, Loader2, MoreVertical, Pencil, Trash2 } from "lucide-react"
+import { Plus, Palette, Loader2, MoreVertical, Pencil, Trash2, PowerOff, Power } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +25,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import type { Group } from "@/lib/types"
+import { calculatePriorityScore, type TerritoryWithDetails } from "@/lib/territory-priority"
+
+interface GroupStats {
+  total: number
+  livres: number
+  urgentes: number
+}
+
+const EMPTY_STATS: GroupStats = { total: 0, livres: 0, urgentes: 0 }
 
 const PRESET_COLORS = [
   { name: "Azul", value: "#3b82f6" },
@@ -48,6 +57,8 @@ const isValidHexColor = (color: string): boolean => {
 
 export default function GroupsPage() {
   const [groups, setGroups] = useState<Group[]>([])
+  const [groupStats, setGroupStats] = useState<Record<string, GroupStats>>({})
+  const [generalStats, setGeneralStats] = useState<GroupStats>(EMPTY_STATS)
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingGroup, setEditingGroup] = useState<Group | null>(null)
@@ -65,21 +76,43 @@ export default function GroupsPage() {
   }, [])
 
   async function fetchGroups() {
-    console.log("Fetching groups...")
     try {
-      const { data, error } = await supabase
-        .from("groups")
-        .select("*")
-        .order("created_at", { ascending: false })
+      const [groupsRes, territoriesRes] = await Promise.all([
+        supabase.from("groups").select("*").order("created_at", { ascending: false }),
+        supabase.from("territories").select(`
+          id, number, name, type, color, status, assigned_to, last_completed_at, created_at,
+          group:groups(id, name, color),
+          assignments(id, assigned_at, status, completed_at, returned_at, updated_at)
+        `),
+      ])
 
-      if (error) {
-        console.error("Error fetching groups:", error)
-      } else {
-        console.log("Groups fetched:", data?.length || 0)
-        if (data) {
-          setGroups(data as Group[])
+      if (groupsRes.error) throw groupsRes.error
+      if (territoriesRes.error) throw territoriesRes.error
+
+      setGroups((groupsRes.data || []) as Group[])
+
+      // Mesmo critério de "livre"/"urgente" do painel de territórios
+      // (lib/territory-priority.ts) — território com status 'inactive' não
+      // entra na contagem, igual lá.
+      const priorities = ((territoriesRes.data || []) as unknown as TerritoryWithDetails[])
+        .map(calculatePriorityScore)
+        .filter((p) => p.territory.status !== "inactive")
+
+      const byGroup: Record<string, GroupStats> = {}
+      const general: GroupStats = { total: 0, livres: 0, urgentes: 0 }
+
+      priorities.forEach((p) => {
+        const groupId = p.territory.group?.id
+        const bucket = groupId ? (byGroup[groupId] ??= { total: 0, livres: 0, urgentes: 0 }) : general
+        bucket.total += 1
+        if (!p.territory.assigned_to) {
+          bucket.livres += 1
+          if (p.daysInactive > 30) bucket.urgentes += 1
         }
-      }
+      })
+
+      setGroupStats(byGroup)
+      setGeneralStats(general)
     } catch (err) {
       console.error("Exception fetching groups:", err)
     } finally {
@@ -177,6 +210,26 @@ export default function GroupsPage() {
     if (error) {
       console.error("Error deleting group:", error)
       alert("Erro ao excluir grupo: " + (error.message || "Erro desconhecido"))
+    } else {
+      fetchGroups()
+    }
+  }
+
+  const handleToggleActive = async (group: Group) => {
+    const nextActive = !group.is_active
+    const message = nextActive
+      ? `Reativar o grupo "${group.name}"? Ele volta a aparecer para seleção.`
+      : `Inativar o grupo "${group.name}"? Ele deixa de aparecer para pedir território, atribuir designações ou cadastrar usuários — territórios e perfis já vinculados não são afetados.`
+    if (!confirm(message)) return
+
+    const { error } = await supabase
+      .from("groups")
+      .update({ is_active: nextActive })
+      .eq("id", group.id)
+
+    if (error) {
+      console.error("Error toggling group active state:", error)
+      alert("Erro ao atualizar grupo: " + (error.message || "Erro desconhecido"))
     } else {
       fetchGroups()
     }
@@ -311,7 +364,7 @@ export default function GroupsPage() {
         </Dialog>
       </div>
 
-      {groups.length === 0 ? (
+      {groups.length === 0 && generalStats.total === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Palette className="h-12 w-12 text-muted-foreground mb-4" />
@@ -326,53 +379,86 @@ export default function GroupsPage() {
           </CardContent>
         </Card>
       ) : (
-        // ...existing code...
-
-<div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-  {groups.map((group) => (
-    <Card key={group.id} className="p-3">
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-3 min-w-0 flex-1">
-          <div
-            className="h-6 w-6 rounded border border-border flex-shrink-0"
-            style={{ backgroundColor: group.color }}
-          />
-          <div className="min-w-0 flex-1">
-            <h3 className="text-sm font-semibold truncate text-foreground">{group.name}</h3>
-            {group.description && (
-              <p className="text-xs text-muted-foreground truncate">
-                {group.description}
-              </p>
-            )}
-          </div>
-        </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 -mr-2 text-muted-foreground hover:text-foreground">
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => handleOpenDialog(group)}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Editar
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="text-destructive"
-              onClick={() => handleDelete(group.id)}
+        <div className="grid gap-4 md:[grid-template-columns:repeat(3,1fr)]">
+          {groups.map((group) => (
+            <div
+              key={group.id}
+              className={`rounded-xl border border-border bg-card border-l-4 p-4 ${group.is_active === false ? "opacity-60" : ""}`}
+              style={{ borderLeftColor: group.color }}
             >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Excluir
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    </Card>
-  ))}
-</div>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <h3 className="text-sm font-semibold truncate text-foreground">{group.name}</h3>
+                  {group.is_active === false && (
+                    <Badge variant="secondary" className="text-[0.5625rem] h-4 px-1 shrink-0">Inativo</Badge>
+                  )}
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0 -mr-2 -mt-1 text-muted-foreground hover:text-foreground">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleOpenDialog(group)}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Editar
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleToggleActive(group)}>
+                      {group.is_active === false ? (
+                        <>
+                          <Power className="mr-2 h-4 w-4" />
+                          Ativar
+                        </>
+                      ) : (
+                        <>
+                          <PowerOff className="mr-2 h-4 w-4" />
+                          Inativar
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={() => handleDelete(group.id)}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Excluir
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
 
-// ...existing code...
+              <GroupStatsRow stats={groupStats[group.id] ?? EMPTY_STATS} />
+            </div>
+          ))}
+
+          {generalStats.total > 0 && (
+            <div className="rounded-xl border border-border bg-card border-l-4 border-l-muted-foreground/30 p-4">
+              <h3 className="text-sm font-semibold text-muted-foreground">Geral</h3>
+              <GroupStatsRow stats={generalStats} />
+            </div>
+          )}
+        </div>
       )}
+    </div>
+  )
+}
+
+function GroupStatsRow({ stats }: { stats: GroupStats }) {
+  return (
+    <div className="flex items-center gap-6 mt-3">
+      <div>
+        <p className="text-2xl font-bold text-foreground tabular-nums leading-tight">{stats.total}</p>
+        <p className="text-[0.6875rem] text-muted-foreground">territórios</p>
+      </div>
+      <div>
+        <p className="text-2xl font-bold text-emerald-500 tabular-nums leading-tight">{stats.livres}</p>
+        <p className="text-[0.6875rem] text-muted-foreground">livres</p>
+      </div>
+      <div>
+        <p className="text-2xl font-bold text-orange-500 tabular-nums leading-tight">{stats.urgentes}</p>
+        <p className="text-[0.6875rem] text-muted-foreground">urgentes</p>
+      </div>
     </div>
   )
 }

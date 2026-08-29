@@ -113,7 +113,7 @@ export default function DashboardShell({
           showBottomNav && !isOverviewMapPage && "pb-16 md:pb-0"
         )}>
           <div className={cn(
-            "container mx-auto p-2 pt-20 md:pt-6",
+            "container mx-auto p-2 pt-20 md:px-6 md:pt-6",
             isSetupPage && "pt-6",
             isMapPage && "p-0"
           )}>

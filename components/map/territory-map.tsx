@@ -38,12 +38,6 @@ interface TerritoryMapProps {
   onPinCancel?: () => void
 }
 
-const STATUS_COLORS: Record<string, string> = {
-  available: "hsl(142, 71%, 45%)",
-  assigned: "hsl(192, 60%, 45%)",
-  completed: "hsl(215, 16%, 47%)",
-}
-
 const DEFAULT_CENTER: [number, number] = [-29.9447, -50.9919]
 const DEFAULT_ZOOM = 15
 
@@ -192,7 +186,14 @@ export function TerritoryMap({
 
       const coords = subdivision.coordinates[0].map(c => [c[0], c[1]] as L.LatLngExpression)
       const isSelected = selectedSubdivisionId === subdivision.id
-      const color = STATUS_COLORS[subdivision.status] ?? territory.color
+
+      // Mesma regra de cores do mapa de designação (territory-map-viewer.tsx):
+      // azul (pendente) → amarelo (em andamento, com notas) → verde (concluída).
+      const isCompleted = subdivision.completed || subdivision.status === "completed"
+      const hasNotes = !!subdivision.notes
+      let color = "#3b82f6" // Azul padrão
+      if (isCompleted) color = "#22c55e" // Verde
+      else if (hasNotes) color = "#facc15" // Amarelo
 
       const polygon = L.polygon(coords, {
         color: isSelected ? "#1e293b" : color,

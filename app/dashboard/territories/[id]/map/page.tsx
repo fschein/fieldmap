@@ -35,8 +35,10 @@ import {
   Plus,
   TrendingUp,
   LayoutGrid,
+  Home,
 } from "lucide-react"
 import type { TerritoryWithSubdivisions, Subdivision } from "@/lib/types"
+import { useAuth } from "@/hooks/use-auth"
 import { countExpiredDnvs, isDnvExpired } from "@/lib/utils/do-not-visit"
 
 const TerritoryMap = dynamic(
@@ -61,6 +63,7 @@ export default function TerritoryMapPage({
 }) {
   const { id } = use(params)
   const router = useRouter()
+  const { isSupervisor } = useAuth()
   const [territory, setTerritory] = useState<TerritoryWithSubdivisions | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -417,10 +420,10 @@ export default function TerritoryMapPage({
       {/* ── Barra do território ── */}
       <div className="relative h-11 border-b bg-card flex items-center gap-3 px-4 shrink-0 z-20">
 
-        {/* Voltar */}
-        <Link href="/dashboard/territories" className="shrink-0 text-foreground">
+        {/* Voltar — sempre pra tela de onde o usuário entrou (histórico), não fixo pra lista */}
+        <button onClick={() => router.back()} className="shrink-0 text-foreground">
           <IconArrowLeft size={20} />
-        </Link>
+        </button>
 
         {/* Dot + nome */}
         <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -579,6 +582,15 @@ export default function TerritoryMapPage({
                         <div className="flex items-center justify-between gap-2 mb-1.5">
                           <span className="font-bold text-foreground text-sm truncate">{subdivision.name}</span>
                           <div className="flex items-center gap-1 shrink-0">
+                            {isSupervisor && (
+                              <button
+                                className="hidden md:flex w-7 h-7 items-center justify-center rounded-lg hover:bg-muted text-muted-foreground transition-all"
+                                onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/territories/${id}?editHouses=${subdivision.id}`) }}
+                                title="Editar casas desta quadra"
+                              >
+                                <Home className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                             {getStatusBadge(subdivision)}
                             <button
                               className={[
@@ -622,6 +634,15 @@ export default function TerritoryMapPage({
                             >
                               {isCompleted ? "Marcar pendente" : "Concluir"}
                             </Button>
+                            {isSupervisor && (
+                              <Button
+                                size="sm" variant="outline"
+                                className="md:hidden h-8 w-8 p-0 shrink-0"
+                                onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/territories/${id}?editHouses=${subdivision.id}`) }}
+                              >
+                                <Home className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
                             <Button
                               size="sm" variant="outline"
                               className="h-8 w-8 p-0 shrink-0"

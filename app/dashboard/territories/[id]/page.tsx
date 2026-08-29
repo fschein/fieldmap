@@ -3,12 +3,11 @@
 
 import { useEffect, useState, use } from "react"
 import Link from "next/link"
+import { useSearchParams, useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
@@ -26,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { ArrowLeft, Plus, Map, Loader2, MoreVertical, Pencil, Trash2, UserPlus, LayoutGrid, User } from "lucide-react"
+import { ArrowLeft, Plus, Map, Loader2, MoreVertical, Pencil, Trash2, UserPlus, LayoutGrid, User, Home, Link2 } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,7 +33,28 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import type { Subdivision, Profile } from "@/lib/types"
-import { isDnvExpired } from "@/lib/utils/do-not-visit"
+import { useAuth } from "@/hooks/use-auth"
+import { type UnitStatus } from "@/components/dashboard/house-by-house"
+import { fmtTerritoryNumber } from "@/lib/utils"
+import { QuadraEditor, type EditableQuadra } from "@/components/dashboard/quadra-editor"
+import { toast } from "sonner"
+
+interface UnitRow {
+  id: string
+  number: string
+  floor: number | null
+  status: UnitStatus
+  marked_at: string | null
+  marked_by: string | null
+}
+
+interface Street {
+  id: string
+  name: string
+  order_index: number
+  completed: boolean
+  units: UnitRow[]
+}
 
 interface Block {
   notes: string
@@ -45,16 +65,7 @@ interface Block {
   order_index: number
   completed: boolean
   status?: "available" | "assigned" | "completed"
-}
-
-interface DoNotVisit {
-  id: string
-  territory_id: string
-  latitude?: number
-  longitude?: number
-  address?: string
-  notes?: string
-  created_at: string
+  streets?: Street[]
 }
 
 interface TerritoryWithDetails {
@@ -63,7 +74,6 @@ interface TerritoryWithDetails {
   name: string
   group?: { id: string; name: string; color: string }
   subdivisions?: Block[]
-  do_not_visits?: DoNotVisit[]
   assigned_to_user?: Profile
 }
 
@@ -73,6 +83,9 @@ export default function TerritoryDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = use(params)
+  const { user, isAdmin, isSupervisor } = useAuth()
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const [territory, setTerritory] = useState<TerritoryWithDetails | null>(null)
   const [users, setUsers] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
@@ -84,22 +97,29 @@ export default function TerritoryDetailPage({
     name: "",
     notes: "",
   })
-  const [dnvDialogOpen, setDnvDialogOpen] = useState(false)
-  const [editingDnv, setEditingDnv] = useState<DoNotVisit | null>(null)
-  const [dnvFormData, setDnvFormData] = useState({
-    address: "",
-    notes: "",
-  })
   const [assignData, setAssignData] = useState({
     user_id: "",
     due_date: "",
   })
   const [submitting, setSubmitting] = useState(false)
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [focusGroupId, setFocusGroupId] = useState<string | null>(null)
   const supabase = getSupabaseBrowserClient()
 
   useEffect(() => {
     fetchData()
   }, [id])
+
+  // Atalho "casas" no card da quadra (tela de mapa) — abre o editor já focado nela
+  useEffect(() => {
+    const editHouses = searchParams.get("editHouses")
+    if (editHouses) {
+      setFocusGroupId(editHouses)
+      setEditorOpen(true)
+      router.replace(`/dashboard/territories/${id}`)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   async function fetchData() {
     try {
@@ -110,8 +130,7 @@ export default function TerritoryDetailPage({
           .from("territories")
           .select(`
       *,
-      subdivisions(*),
-      do_not_visits(*),
+      subdivisions(*, streets(*, units(id, number, floor, status, marked_at, marked_by))),
       assignments(status, campaign_id),
       group:groups(id, name, color),
       assigned_to_user:profiles!territories_assigned_to_fkey(id, name, email)
@@ -283,41 +302,74 @@ export default function TerritoryDetailPage({
     }
   }
 
-  const handleDeleteDnv = async (dnvId: string) => {
-    if (!confirm("Tem certeza que deseja excluir este registro de 'Não Visitar'?")) return
-
+  // ─────────── Casa-a-casa (units) ───────────
+  const handleGenerateFieldLink = async (subdivisionId: string) => {
     try {
-      const { error } = await supabase.from("do_not_visits").delete().eq("id", dnvId)
+      const { data, error } = await supabase
+        .from("field_links")
+        .insert({ territory_id: id, subdivision_id: subdivisionId, created_by: user?.id ?? null })
+        .select("id")
+        .single()
       if (error) throw error
-      fetchData()
+      const url = `${window.location.origin}/campo/${data.id}`
+      await navigator.clipboard.writeText(url)
+      toast.success("Link copiado! Válido por 2 horas.", { description: url, duration: 8000 })
     } catch (error: any) {
-      alert("Erro ao excluir Não Visitar: " + error.message)
+      toast.error("Erro ao gerar link: " + error.message)
     }
   }
 
-  const handleEditDnv = (dnv: DoNotVisit) => {
-    setEditingDnv(dnv)
-    setDnvFormData({ address: dnv.address || "", notes: dnv.notes || "" })
-    setDnvDialogOpen(true)
+  const handleAddUnits = async (streetId: string, numbers: string[]) => {
+    const { error } = await supabase
+      .from("units")
+      .insert(numbers.map((number) => ({ street_id: streetId, number, status: "pending" })))
+    if (error) {
+      alert("Erro ao adicionar casas: " + error.message)
+      return
+    }
+    fetchData()
   }
 
-  const handleDnvSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!editingDnv) return
-    setSubmitting(true)
-    try {
-      const { error } = await supabase.from("do_not_visits").update({
-        address: dnvFormData.address,
-        notes: dnvFormData.notes,
-      }).eq("id", editingDnv.id)
-      if (error) throw error
-      setDnvDialogOpen(false)
-      fetchData()
-    } catch (error: any) {
-      alert("Erro ao atualizar Não Visitar: " + error.message)
-    } finally {
-      setSubmitting(false)
+  const handleRemoveUnit = async (unitId: string) => {
+    const { error } = await supabase.from("units").delete().eq("id", unitId)
+    if (error) {
+      alert("Erro ao remover casa: " + error.message)
+      return
     }
+    fetchData()
+  }
+
+  const handleAddStreet = async (quadraId: string, name: string) => {
+    const quadra = territory?.subdivisions?.find((s) => s.id === quadraId)
+    const { error } = await supabase.from("streets").insert({
+      subdivision_id: quadraId,
+      name,
+      order_index: quadra?.streets?.length || 0,
+      completed: false,
+    })
+    if (error) {
+      alert("Erro ao criar rua: " + error.message)
+      return
+    }
+    fetchData()
+  }
+
+  const handleRenameStreet = async (streetId: string, name: string) => {
+    const { error } = await supabase.from("streets").update({ name }).eq("id", streetId)
+    if (error) {
+      alert("Erro ao renomear rua: " + error.message)
+      return
+    }
+    fetchData()
+  }
+
+  const handleDeleteStreet = async (streetId: string) => {
+    const { error } = await supabase.from("streets").delete().eq("id", streetId)
+    if (error) {
+      alert("Erro ao excluir rua: " + error.message)
+      return
+    }
+    fetchData()
   }
 
   const getQuadraStatus = (subdivisions: Block) => {
@@ -332,6 +384,25 @@ export default function TerritoryDetailPage({
     }
     return { label: "Disponível", badgeClassName: "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20", percent }
   }
+
+  // Contador "casas X/Y" do card — mesmo critério do QuadraHouseByHouse:
+  // concluída = falou com morador ou deixou carta (não conta pendente/não visitar).
+  const getHouseCounts = (subdivisions: Block) => {
+    const allUnits = (subdivisions.streets || []).flatMap((s) => s.units || [])
+    const total = allUnits.length
+    const done = allUnits.filter((u) => u.status === "visited" || u.status === "visited_carta").length
+    return { done, total }
+  }
+
+  const quadras: EditableQuadra[] = (territory?.subdivisions || []).map((s) => ({
+    id: s.id,
+    label: s.name,
+    streets: (s.streets || []).map((st) => ({
+      id: st.id,
+      label: st.name,
+      units: st.units,
+    })),
+  }))
 
   if (loading) {
     return (
@@ -353,14 +424,29 @@ export default function TerritoryDetailPage({
     )
   }
 
+  if (editorOpen && isSupervisor) {
+    return (
+      <QuadraEditor
+        territoryName={territory.name}
+        territoryNumber={fmtTerritoryNumber(territory.number)}
+        quadras={quadras}
+        initialExpandedQuadraId={focusGroupId}
+        onBack={() => setEditorOpen(false)}
+        onAddStreet={isAdmin ? handleAddStreet : undefined}
+        onAddUnits={handleAddUnits}
+        onRemoveUnit={handleRemoveUnit}
+        onRenameStreet={isAdmin ? handleRenameStreet : undefined}
+        onDeleteStreet={isAdmin ? handleDeleteStreet : undefined}
+      />
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div className="space-y-4">
         <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" asChild className="h-8 w-8 shrink-0">
-            <Link href="/dashboard/territories">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
+          <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4" />
           </Button>
           <Badge variant="outline" className="font-mono shrink-0">
             {territory.number}
@@ -372,6 +458,17 @@ export default function TerritoryDetailPage({
               Editar mapa
             </Link>
           </Button>
+          {isSupervisor && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="shrink-0 text-muted-foreground"
+              onClick={() => { setFocusGroupId(null); setEditorOpen(true) }}
+            >
+              <Home className="mr-2 h-4 w-4" />
+              Editar casas
+            </Button>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -503,7 +600,7 @@ export default function TerritoryDetailPage({
         </DialogContent>
       </Dialog>
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         {(!territory.subdivisions || territory.subdivisions.length === 0) && (
           <div className="rounded-xl border p-8 text-center">
             <Map className="h-10 w-10 text-muted-foreground mb-3 mx-auto" />
@@ -520,60 +617,86 @@ export default function TerritoryDetailPage({
           </div>
         )}
 
-        {territory.subdivisions?.map((subdivisions, index) => {
-          const status = getQuadraStatus(subdivisions)
-          return (
-            <div key={subdivisions.id} className="rounded-xl border p-4">
-              <div className="flex items-center justify-between gap-2">
-                <p className="font-medium">
-                  Quadra {territory.number}-{String.fromCharCode(65 + index)}
-                </p>
-                <div className="flex items-center gap-1 shrink-0">
-                  <Badge variant="outline" className={status.badgeClassName}>
-                    {status.label}
-                  </Badge>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {!subdivisions.completed && (
-                        <DropdownMenuItem onClick={() => handleOpenAssignDialog(subdivisions)}>
-                          <UserPlus className="mr-2 h-4 w-4" />
-                          Designar
+        <div className="grid gap-3 md:[grid-template-columns:repeat(auto-fill,minmax(280px,340px))]">
+          {territory.subdivisions?.map((subdivisions, index) => {
+            const status = getQuadraStatus(subdivisions)
+            const houses = getHouseCounts(subdivisions)
+            return (
+              <div key={subdivisions.id} className="rounded-xl border p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-medium">
+                    Quadra {territory.number}-{String.fromCharCode(65 + index)}
+                  </p>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Badge variant="outline" className={status.badgeClassName}>
+                      {status.label}
+                    </Badge>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {!subdivisions.completed && (
+                          <DropdownMenuItem onClick={() => handleOpenAssignDialog(subdivisions)}>
+                            <UserPlus className="mr-2 h-4 w-4" />
+                            Designar
+                          </DropdownMenuItem>
+                        )}
+                        {isSupervisor && (
+                          <DropdownMenuItem onClick={() => { setFocusGroupId(subdivisions.id); setEditorOpen(true) }}>
+                            <Home className="mr-2 h-4 w-4" />
+                            Editar casas desta quadra
+                          </DropdownMenuItem>
+                        )}
+                        {isSupervisor && (
+                          <DropdownMenuItem onClick={() => handleGenerateFieldLink(subdivisions.id)}>
+                            <Link2 className="mr-2 h-4 w-4" />
+                            Link de campo
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onClick={() => handleOpenDialog(subdivisions)}>
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Editar
                         </DropdownMenuItem>
-                      )}
-                      <DropdownMenuItem onClick={() => handleOpenDialog(subdivisions)}>
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Editar
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onClick={() => handleDelete(subdivisions.id)}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Excluir
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => handleDelete(subdivisions.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </div>
-              </div>
-              <div className="mt-3 flex items-center gap-2">
-                <div className="h-1 flex-1 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-green-500 transition-all"
-                    style={{ width: `${status.percent}%` }}
-                  />
+                <div className="mt-3 flex items-center gap-2">
+                  <div className="h-1 flex-1 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-green-500 transition-all"
+                      style={{ width: `${status.percent}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                    {status.percent}%
+                  </span>
                 </div>
-                <span className="text-xs text-muted-foreground tabular-nums shrink-0">
-                  {status.percent}%
-                </span>
+                {isSupervisor && (
+                  <div className="mt-3 pt-3 border-t flex items-center justify-between text-xs">
+                    <span className="flex items-center gap-1.5 text-muted-foreground">
+                      <Home className="h-3.5 w-3.5" />
+                      Casas
+                    </span>
+                    <span className="font-medium text-foreground tabular-nums">
+                      {houses.done}/{houses.total}
+                    </span>
+                  </div>
+                )}
               </div>
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
 
         <Button
           variant="outline"
@@ -584,105 +707,6 @@ export default function TerritoryDetailPage({
           Nova quadra
         </Button>
       </div>
-
-      {/* Seção Não Visitar */}
-      <div className="flex items-center justify-between mt-10 pt-6 border-t">
-        <h2 className="text-xl font-semibold">Casas &quot;Não Visitar&quot;</h2>
-      </div>
-
-      {!territory.do_not_visits || territory.do_not_visits.length === 0 ? (
-        <Card className="bg-slate-50 border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-8">
-            <p className="text-muted-foreground">Nenhum registro de &quot;Não Visitar&quot; neste território.</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {territory.do_not_visits.map((dnv) => {
-            const date = new Date(dnv.created_at)
-            const isExpired = isDnvExpired(dnv.created_at)
-
-            return (
-              <Card key={dnv.id} className={isExpired ? "border-amber-300 bg-amber-50/50" : "border-red-200"}>
-                <CardHeader className="pb-3 px-4 pt-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <CardTitle className="text-base text-slate-800 break-words">
-                        {dnv.address || "Endereço não informado"}
-                      </CardTitle>
-                      <CardDescription className="text-xs mt-1 font-medium text-slate-500">
-                        Criado em: {date.toLocaleDateString("pt-BR")}
-                      </CardDescription>
-                    </div>
-                    <div className="flex gap-1 -mt-2 -mr-2 shrink-0">
-                      <Button variant="ghost" size="icon" className="text-slate-400 hover:text-primary hover:bg-primary/5" onClick={() => handleEditDnv(dnv)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => handleDeleteDnv(dnv.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="px-4 pb-4">
-                  {isExpired && (
-                    <Badge variant="outline" className="mb-2 bg-amber-100 text-amber-800 border-amber-200">
-                      ⚠️ 1 ano completo — pode visitar novamente
-                    </Badge>
-                  )}
-                  {dnv.notes ? (
-                    <p className="text-sm text-slate-600 line-clamp-3">{dnv.notes}</p>
-                  ) : (
-                    <p className="text-sm text-slate-400 italic">Sem observações adicionais.</p>
-                  )}
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-      )}
-
-      {/* DNV Edit Dialog */}
-      <Dialog open={dnvDialogOpen} onOpenChange={setDnvDialogOpen}>
-        <DialogContent>
-          <form onSubmit={handleDnvSubmit}>
-            <DialogHeader>
-              <DialogTitle>Editar Não Visitar</DialogTitle>
-              <DialogDescription>
-                Atualize o endereço ou as observações desta casa bloqueada.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="address">Endereço (opcional)</Label>
-                <Input
-                  id="address"
-                  value={dnvFormData.address}
-                  onChange={(e) => setDnvFormData({ ...dnvFormData, address: e.target.value })}
-                  placeholder="Ex: Rua das Flores, 123"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="notes">Observações</Label>
-                <Textarea
-                  id="notes"
-                  value={dnvFormData.notes}
-                  onChange={(e) => setDnvFormData({ ...dnvFormData, notes: e.target.value })}
-                  placeholder="Ex: Morador pediu para não bater no portão."
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDnvDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={submitting}>
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvar"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

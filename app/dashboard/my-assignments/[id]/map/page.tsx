@@ -9,10 +9,12 @@ import { useOfflineManager } from "@/hooks/use-offline-manager"
 import { TerritoryWithSubdivisions, Subdivision } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { IconArrowLeft } from "@tabler/icons-react"
-import { Loader2, CheckCircle2, MapPin, MapPinOff, Navigation } from "lucide-react"
+import { Loader2, CheckCircle2, MapPin, MapPinOff, Navigation, Home } from "lucide-react"
 import { SubdivisionDrawer } from "@/components/my-assignments/subdivision-drawer"
 import { CompleteAssignmentDialog } from "@/components/my-assignments/complete-assignment-dialog"
 import { AddDoNotVisitDialog } from "@/components/my-assignments/add-do-not-visit-dialog"
+import { type HouseGroup, type UnitStatus } from "@/components/dashboard/house-by-house"
+import { QuadraHouseByHouse, type MarkableQuadra } from "@/components/dashboard/quadra-house-by-house"
 import dynamic from "next/dynamic"
 import { toast } from "sonner"
 
@@ -35,7 +37,7 @@ const supabase = getSupabaseBrowserClient()
 export default function TerritoryMapPage() {
   const params = useParams()
   const router = useRouter()
-  const { user, isReady } = useAuth()
+  const { user, isReady, isSupervisor } = useAuth()
   const { isOnline, addPendingAction } = useOfflineManager()
   const [territory, setTerritory] = useState<TerritoryWithSubdivisions | null>(null)
   const [loading, setLoading] = useState(true)
@@ -47,6 +49,7 @@ export default function TerritoryMapPage() {
   const [dnvDialogOpen, setDnvDialogOpen] = useState(false)
   const [dnvCoords, setDnvCoords] = useState<{ lat: number, lng: number } | null>(null)
   const [animatingSubdivisionId, setAnimatingSubdivisionId] = useState<string | null>(null)
+  const [showHouses, setShowHouses] = useState(false)
   const territoryId = params.id as string
 
   const fetchTerritory = useCallback(async () => {
@@ -60,7 +63,7 @@ export default function TerritoryMapPage() {
         .select(`
           *,
           campaign:campaigns(*),
-          subdivisions(*),
+          subdivisions(*, streets(*, units(id, number, floor, status, marked_at, marked_by))),
           assignments(*),
           do_not_visits(*)
         `)
@@ -86,6 +89,11 @@ export default function TerritoryMapPage() {
       if (!canAccess) {
         toast.error("Você não tem acesso a este território.")
         router.push("/dashboard/my-assignments")
+        return
+      }
+
+      if ((data as any).type === "condominium") {
+        router.replace(`/dashboard/territories/${territoryId}/condominium`)
         return
       }
 
@@ -374,6 +382,35 @@ export default function TerritoryMapPage() {
   const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
   const isFullyCompleted = progress === 100
 
+  // Casa-a-casa — funciona independente de a quadra ter geometria desenhada
+  // no mapa ou não. Aninhado: quadra colapsável, dentro dela as ruas.
+  const markableQuadras: MarkableQuadra[] = (territory.subdivisions || [])
+    .map((s: any) => ({
+      id: s.id,
+      label: s.name,
+      streets: (s.streets || []).map((st: any) => ({
+        id: st.id,
+        label: st.name,
+        units: st.units || [],
+        completed: st.completed,
+      })) as HouseGroup[],
+    }))
+    .sort((a: MarkableQuadra, b: MarkableQuadra) =>
+      a.label.localeCompare(b.label, "pt-BR", { numeric: true, sensitivity: "base" })
+    )
+
+  const handleMarkUnit = async (unitId: string, status: UnitStatus) => {
+    const { error } = await supabase
+      .from("units")
+      .update({ status, marked_by: user?.id ?? null, marked_at: new Date().toISOString() })
+      .eq("id", unitId)
+    if (error) {
+      toast.error("Erro ao marcar unidade: " + error.message)
+      return
+    }
+    fetchTerritory()
+  }
+
   const handleSaveNotes = async (notes: string) => {
     if (!selectedSubdivision || !user?.id || saving) return
     
@@ -447,14 +484,35 @@ export default function TerritoryMapPage() {
           {completedCount} / {totalCount}
         </span>
 
+        {isSupervisor && (
+          <button
+            onClick={() => setShowHouses((v) => !v)}
+            className={`shrink-0 h-8 w-8 flex items-center justify-center rounded-lg transition-colors ${showHouses ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+            title="Casa-a-casa"
+          >
+            <Home className="h-4 w-4" />
+          </button>
+        )}
+
         {/* Barra de progresso — borda inferior */}
         <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-border">
           <div className="h-full bg-primary rounded-r-sm transition-all" style={{ width: `${progress}%` }} />
         </div>
       </div>
 
+      {showHouses && isSupervisor && (
+        <div className="flex-1 min-h-0 overflow-y-auto p-3">
+          <QuadraHouseByHouse
+            quadras={markableQuadras}
+            currentMarkerId={user?.id ?? null}
+            onMark={handleMarkUnit}
+            emptyHint="Nenhuma quadra cadastrada ainda neste território."
+          />
+        </div>
+      )}
+
       {/* ── Mapa ── */}
-      <div className={`flex-1 min-h-0 overflow-hidden relative z-0${pinMode ? ' cursor-crosshair' : ''}`}>
+      <div className={`flex-1 min-h-0 overflow-hidden relative z-0${pinMode ? ' cursor-crosshair' : ''}${showHouses ? ' hidden' : ''}`}>
         <TerritoryMapViewer
           territory={territory}
           onSubdivisionClick={handleSubdivisionClick}
@@ -510,6 +568,8 @@ export default function TerritoryMapPage() {
           onToggle={handleToggleSubdivision}
           onSaveNotes={handleSaveNotes}
           canEdit={(territory as any).canEdit}
+          territoryId={territory.id}
+          isSupervisor={isSupervisor}
         />
       )}
 

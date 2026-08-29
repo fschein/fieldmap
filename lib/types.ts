@@ -13,6 +13,7 @@ export interface Profile {
   group_id?: string | null
   must_change_password?: boolean
   is_active?: boolean
+  apto_condominio?: boolean
   last_seen_at?: string
   created_at: string
   updated_at: string
@@ -34,6 +35,7 @@ export interface Group {
   name: string
   color: string
   description: string | null
+  is_active: boolean
   created_at: string
   updated_at: string
 }

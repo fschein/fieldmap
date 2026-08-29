@@ -23,14 +23,12 @@ export default function LoginPage() {
 
   useEffect(() => {
     async function checkEmpty() {
-      const { getSupabaseBrowserClient } = await import("@/lib/supabase/client")
-      const supabase = getSupabaseBrowserClient()
-      const { count, error: countError } = await supabase
-        .from("profiles")
-        .select("*", { count: "exact", head: true })
-      
-      if (!countError && count === 0) {
-        setIsEmpty(true)
+      try {
+        const res = await fetch("/api/auth/is-empty")
+        const { isEmpty } = await res.json()
+        if (isEmpty) setIsEmpty(true)
+      } catch {
+        // Falha na checagem não deve impedir o login
       }
     }
 

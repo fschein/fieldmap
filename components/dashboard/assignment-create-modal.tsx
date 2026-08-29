@@ -22,6 +22,7 @@ interface Territory {
   name: string
   number: string
   color: string
+  type?: string | null
   assigned_to: string | null
   assignedName?: string | null
   daysInField?: number | null
@@ -34,6 +35,7 @@ interface Territory {
 interface Publisher {
   id: string
   name: string
+  apto_condominio?: boolean
 }
 
 interface Group {
@@ -100,11 +102,11 @@ export function AssignmentCreateModal({
       const results = await Promise.all([
         supabase
           .from("territories")
-          .select("id, name, number, color, assigned_to, last_completed_at, groups ( color )")
+          .select("id, name, number, color, type, assigned_to, last_completed_at, groups ( color )")
           .order("number"),
         supabase
           .from("profiles")
-          .select("id, name")
+          .select("id, name, apto_condominio")
           .in("role", ["admin", "publicador", "dirigente", "supervisor"])
           .order("name"),
         supabase
@@ -119,6 +121,7 @@ export function AssignmentCreateModal({
         supabase
           .from("groups")
           .select("id, name, color")
+          .eq("is_active", true)
           .order("name"),
         supabase
           .from("assignments")
@@ -199,11 +202,13 @@ export function AssignmentCreateModal({
       t.number.includes(searchTerritory)
   )
 
-  const filteredPublishers = publishers.filter((p) =>
-    p.name.toLowerCase().includes(searchPublisher.toLowerCase())
-  )
-
   const selectedTerr = territories.find((t) => t.id === selectedTerritoryId)
+  const isCondominium = selectedTerr?.type === "condominium"
+
+  const filteredPublishers = publishers
+    .filter((p) => !isCondominium || p.apto_condominio === true)
+    .filter((p) => p.name.toLowerCase().includes(searchPublisher.toLowerCase()))
+
   const selectedPub = publishers.find((p) => p.id === selectedPublisherId)
   const selectedGroup = groups.find((g) => g.id === selectedGroupId)
 
@@ -212,6 +217,10 @@ export function AssignmentCreateModal({
     if (assigneeType === "publisher" && !selectedPublisherId) { toast.error("Selecione um publicador"); return }
     if (assigneeType === "group" && !selectedGroupId) { toast.error("Selecione um grupo"); return }
     if (!startDate) { toast.error("Data de início é obrigatória"); return }
+    if (isCondominium && assigneeType === "publisher" && selectedPub?.apto_condominio !== true) {
+      toast.error("Este publicador não está apto para receber território de condomínio")
+      return
+    }
 
     setSaving(true)
     try {
@@ -433,6 +442,11 @@ export function AssignmentCreateModal({
                 {/* Publisher list */}
                 {assigneeType === "publisher" && (
                   <div className="space-y-1.5">
+                    {isCondominium && (
+                      <p className="text-[0.6875rem] text-muted-foreground">
+                        Território de condomínio — só publicadores marcados como aptos aparecem aqui.
+                      </p>
+                    )}
                     <div className="relative">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                       <Input
@@ -444,7 +458,11 @@ export function AssignmentCreateModal({
                     </div>
                     <div className="border rounded-xl overflow-hidden bg-card shadow-sm divide-y divide-border">
                       <div className="max-h-28 overflow-y-auto overscroll-contain">
-                        {filteredPublishers.map((p) => (
+                        {filteredPublishers.length === 0 ? (
+                          <p className="text-center text-xs text-muted-foreground py-4">
+                            {isCondominium ? "Nenhum publicador apto para condomínio" : "Nenhum publicador encontrado"}
+                          </p>
+                        ) : filteredPublishers.map((p) => (
                           <button
                             key={p.id}
                             className={cn(

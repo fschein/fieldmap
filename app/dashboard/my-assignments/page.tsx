@@ -330,7 +330,11 @@ export default function MyAssignmentsPage() {
                   )}
                 >
                   <button
-                    onClick={() => router.push(`/dashboard/my-assignments/${t.id}/map`)}
+                    onClick={() => router.push(
+                      t.type === "condominium"
+                        ? `/dashboard/territories/${t.id}/condominium`
+                        : `/dashboard/my-assignments/${t.id}/map`
+                    )}
                     className="flex-1 text-left flex items-stretch active:scale-[0.99] transition-transform"
                   >
                     <div className="w-1 shrink-0 self-stretch my-2.5 ml-2.5 rounded-full" style={{ backgroundColor: t.color || "var(--primary)" }} />
