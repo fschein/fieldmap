@@ -2,6 +2,10 @@
 DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
 DROP POLICY IF EXISTS "Users can view all profiles" ON profiles;
 DROP POLICY IF EXISTS "Admins can manage profiles" ON profiles;
+-- 001-create-tables.sql já cria estas duas com o mesmo nome — sem o DROP
+-- aqui, rodar as migrations do zero falha com "policy already exists".
+DROP POLICY IF EXISTS "Admins can insert profiles" ON profiles;
+DROP POLICY IF EXISTS "Admins can delete profiles" ON profiles;
 
 -- Allow all authenticated users to read profiles (needed for assignments dropdown)
 CREATE POLICY "Authenticated users can view profiles"

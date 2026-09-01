@@ -4,6 +4,32 @@ Registro de bugs difíceis e lições aprendidas, pra não repetir o mesmo camin
 
 ---
 
+## Rodando migrations do zero (staging): `relation "public.groups" does not exist`
+
+**Sintoma:** montando o ambiente de staging (banco novo), migration `015-add-groups-to-profiles.sql` falhava com `42P01: relation "public.groups" does not exist`.
+
+**Causa real:** terceira ocorrência da mesma classe de bug desta sessão (ver `delivered_at` e o cast de tipo do link de campo) — a tabela `groups` inteira nunca existiu em nenhuma migration. Foi criada direto no painel do Supabase antes de `015-add-groups-to-profiles.sql`/`017-add-group-id-to-assignments.sql` começarem a referenciá-la, e ninguém percebeu porque em produção ela já existia por fora do histórico versionado. Reconstruída em `015-create-groups-table.sql` a partir do tipo `Group` em `lib/types.ts` e do padrão de policies já usado por `campaigns`/`territories` em `001-create-tables.sql` (policies com subquery em `profiles`, não com `is_admin()` — esse helper só existe a partir da migration 043, não podia ser usado numa tabela criada antes disso na cadeia).
+
+**Lição geral:**
+- **Confirma o padrão**: três causas-raiz seguidas nesta mesma sessão de setup de staging foram todas "objeto criado no painel do Supabase, nunca virou migration". Rodar as migrations do zero num banco vazio é a única forma de achar esse tipo de buraco de forma sistemática — vale fazer isso preventivamente de vez em quando, não só quando um ambiente novo precisa ser criado.
+- Ao reconstruir um objeto assim, prestar atenção em qual *época* da cadeia de migrations ele pertence — usar um helper/padrão de uma migration posterior (como `is_admin()`, que só existe a partir da 043) numa migration reconstruída pra rodar mais cedo na sequência quebra tudo de novo, de um jeito diferente.
+
+---
+
+## `001-create-tables.sql` falhava num banco novo: `column "delivered_at" does not exist`
+
+**Sintoma:** rodando as migrations do zero num projeto Supabase novo (criação do ambiente de staging), `001-create-tables.sql` falhava com `42703: column "delivered_at" does not exist`, logo na criação do índice `idx_assignments_delivered_at`.
+
+**Causa real:** a mesma classe de problema do `territories.number` (ver entrada do link de campo) — schema drift entre o banco de produção e as migrations versionadas. `assignments.delivered_at` existe em produção (usado em `041-enable-rls-blocks-units.sql` e referenciado em `lib/types.ts`), mas foi adicionado direto pelo painel do Supabase em algum momento, nunca virou uma migration. `001-create-tables.sql` cria o índice e uma policy que dependem da coluna, mas nunca a declara no `CREATE TABLE assignments`. Só nunca deu erro em produção porque a coluna já existia lá por fora do controle de versão — um banco novo, rodando só o que está no git, expõe o buraco.
+
+**Fix:** adicionada a coluna `delivered_at TIMESTAMPTZ` no `CREATE TABLE assignments` de `001-create-tables.sql`.
+
+**Lição geral:**
+- **Um ambiente de staging criado do zero é o jeito mais confiável de achar schema drift** — production acumula colunas/tabelas criadas via UI do Supabase que nunca voltam pra uma migration. Rodar as migrations numa instância nova e vazia é literalmente um teste de "as migrations versionadas descrevem o banco real?" — vale considerar isso rotina, não só quando dá erro.
+- Sempre que um erro `column "X" does not exist` aparecer rodando migrations do zero, a causa quase certa é essa: a coluna existe em produção mas nunca foi declarada em nenhuma migration — não adianta procurar em outro lugar, é achar onde ela deveria ter sido criada e adicionar lá.
+
+---
+
 ## Link de campo (`/campo/[token]`) sempre mostrava "Link inválido" (erro de tipo mascarado)
 
 **Sintoma:** qualquer link de campo gerado (residencial ou condomínio) mostrava "Link inválido ou expirado" pra quem abria, mesmo recém-criado. A primeira suspeita razoável — "deve ser o link apontando pra localhost" — não era a causa: o mesmo erro acontecia abrindo em produção.

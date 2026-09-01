@@ -55,6 +55,7 @@ CREATE TABLE assignments (
   assigned_by UUID REFERENCES profiles(id),
   campaign_id UUID REFERENCES campaigns(id) ON DELETE SET NULL,
   assigned_at TIMESTAMPTZ DEFAULT NOW(),
+  delivered_at TIMESTAMPTZ,
   completed_at TIMESTAMPTZ,
   returned_at TIMESTAMPTZ,
   status TEXT DEFAULT 'active' CHECK (status IN ('active', 'completed', 'returned')),
