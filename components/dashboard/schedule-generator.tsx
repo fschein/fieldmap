@@ -76,7 +76,7 @@ export function ScheduleGenerator({
   useEffect(() => {
     async function fetchLeaders() {
       const { data: profiles } = await supabase
-        .from("profiles").select("id, name").in("role", ["admin", "dirigente"]).order("name")
+        .from("profiles").select("id, name").in("role", ["admin", "dirigente", "supervisor"]).order("name")
       setLeaders(profiles || [])
       const { data: mappings } = await supabase.from("leader_arrangements").select("profile_id, arrangement_id")
       setLeaderArrs(mappings || [])
