@@ -12,7 +12,7 @@ import { ScheduleCalendar } from "@/components/dashboard/schedule-calendar"
 import { exportScheduleToPDF } from "@/lib/utils/schedule-pdf"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
-import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns"
+import { format, startOfMonth, endOfMonth, addMonths, subMonths, getDay, parseISO } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { toast } from "sonner"
 
@@ -41,13 +41,18 @@ export default function SchedulePage() {
       .lte('date', format(end, 'yyyy-MM-dd'))
       .order('date', { ascending: true })
 
-    if (error || !data || data.length === 0) {
+    // Ignora linhas cujo arranjo foi excluído ou teve o dia da semana
+    // alterado depois que a linha foi gerada — a data não corresponde
+    // mais a nenhum arranjo válido.
+    const validData = (data || []).filter((s: any) => s.arrangement && getDay(parseISO(s.date)) === s.arrangement.weekday)
+
+    if (error || validData.length === 0) {
       toast.error("Nenhuma escala publicada encontrada para este mês")
       return
     }
 
     try {
-      await exportScheduleToPDF(data as any, currentMonth)
+      await exportScheduleToPDF(validData as any, currentMonth)
       toast.success("PDF gerado com sucesso!")
     } catch (err) {
       console.error(err)
