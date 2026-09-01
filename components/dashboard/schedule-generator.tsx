@@ -13,7 +13,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { selectBestLeader, ScheduleItem as EngineScheduleItem } from "@/lib/utils/scheduling-engine"
 import { toast } from "sonner"
 import {
-  format, addMonths, startOfMonth, endOfMonth,
+  format, startOfMonth, endOfMonth,
   eachDayOfInterval, getDay, parseISO,
 } from "date-fns"
 import { ptBR } from "date-fns/locale"
@@ -200,23 +200,6 @@ export function ScheduleGenerator({
           <h1 className="text-[0.9375rem] font-semibold text-foreground leading-tight">Motor de escala</h1>
           <p className="text-[0.75rem] text-muted-foreground">Rascunho mensal e designações</p>
         </div>
-
-        {/* Month selector */}
-        <Select
-          value={format(currentMonth, "yyyy-MM")}
-          onValueChange={(val) => setCurrentMonth(parseISO(val + "-01"))}
-        >
-          <SelectTrigger className="h-9 w-[148px] text-sm font-medium border-border">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {[0, 1, 2].map((offset) => (
-              <SelectItem key={offset} value={format(addMonths(new Date(), offset), "yyyy-MM")}>
-                {format(addMonths(new Date(), offset), "MMMM yyyy", { locale: ptBR })}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
 
         {/* Generate */}
         <Button

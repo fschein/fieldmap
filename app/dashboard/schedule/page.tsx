@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useAuth } from "@/hooks/use-auth"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Calendar, Settings, Wand2, FileDown, Plus, Users } from "lucide-react"
+import { Calendar, Settings, Wand2, FileDown, Plus, Users, ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScheduleConfig } from "@/components/dashboard/schedule-config"
 import { ScheduleGenerator } from "@/components/dashboard/schedule-generator"
@@ -12,7 +12,8 @@ import { ScheduleCalendar } from "@/components/dashboard/schedule-calendar"
 import { exportScheduleToPDF } from "@/lib/utils/schedule-pdf"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { cn } from "@/lib/utils"
-import { format, startOfMonth, endOfMonth } from "date-fns"
+import { format, startOfMonth, endOfMonth, addMonths, subMonths } from "date-fns"
+import { ptBR } from "date-fns/locale"
 import { toast } from "sonner"
 
 const supabase = getSupabaseBrowserClient()
@@ -63,7 +64,34 @@ export default function SchedulePage() {
             Organização de saídas e designações
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {/* Navegador de mês — compartilhado por Calendário, Gerar Escala e Exportar PDF */}
+          <div className="flex items-center gap-0.5 rounded-xl border-2 border-border bg-card h-10 px-1 shadow-sm">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-lg"
+              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+              aria-label="Mês anterior"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-xs sm:text-sm font-bold text-foreground px-1 min-w-[86px] sm:min-w-[110px] text-center capitalize">
+              {format(currentMonth, "MMM yyyy", { locale: ptBR })}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-lg"
+              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+              aria-label="Próximo mês"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+
           <Button variant="outline" size="sm" className="h-10 px-4 gap-2 font-bold border-2 rounded-xl bg-card hover:bg-muted transition-all shadow-sm" onClick={handleExport}>
             <FileDown className="h-4 w-4" />
             <span className="hidden sm:inline">Exportar PDF</span>

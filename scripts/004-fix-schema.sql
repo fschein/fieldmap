@@ -1,20 +1,15 @@
 -- Fix profiles table structure
 -- Add missing columns and fix constraints
 
--- Add full_name column if name exists (rename)
-DO $$ 
-BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'profiles' AND column_name = 'name') THEN
-    ALTER TABLE profiles RENAME COLUMN name TO full_name;
-  END IF;
-END $$;
-
 -- Add phone column if not exists
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS phone TEXT;
 
--- Update role constraint to accept all three roles
+-- Update role constraint to accept all os papéis válidos.
+-- 'supervisor' foi adicionado direto no painel do Supabase quando esse
+-- papel foi criado (migrations 030+ já assumem sua existência em várias
+-- RLS policies) — nunca tinha voltado pra essa constraint até agora.
 ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_role_check;
-ALTER TABLE profiles ADD CONSTRAINT profiles_role_check CHECK (role IN ('admin', 'dirigente', 'publicador'));
+ALTER TABLE profiles ADD CONSTRAINT profiles_role_check CHECK (role IN ('admin', 'dirigente', 'publicador', 'supervisor'));
 
 -- Update default role to 'publicador'
 ALTER TABLE profiles ALTER COLUMN role SET DEFAULT 'publicador';
@@ -41,10 +36,10 @@ CREATE INDEX IF NOT EXISTS idx_assignments_subdivision_id ON assignments(subdivi
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, full_name, email, role)
+  INSERT INTO public.profiles (id, name, email, role)
   VALUES (
     NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1)),
+    COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'role', 'publicador')
   );

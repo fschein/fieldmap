@@ -164,19 +164,17 @@ function EditableStreetGrid({
         ))}
 
         {adding ? (
-          <div className="aspect-square rounded-xl border-2 border-dashed border-primary flex flex-col items-center justify-center gap-1 p-1">
+          <div className="aspect-square rounded-xl border-2 border-dashed border-primary flex items-center justify-center p-1">
             <input
               autoFocus
               inputMode="numeric"
               value={addValue}
               onChange={(e) => setAddValue(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleConfirmAdd() }}
+              onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur() }}
+              onBlur={handleConfirmAdd}
               className="w-full text-center text-sm bg-transparent outline-none text-foreground"
               placeholder="Nº"
             />
-            <button type="button" onClick={handleConfirmAdd} className="text-[0.625rem] font-bold text-primary">
-              OK
-            </button>
           </div>
         ) : (
           <button
