@@ -68,8 +68,15 @@ export function ScheduleGenerator({
       .gte("date", format(start, "yyyy-MM-dd"))
       .lte("date", format(end, "yyyy-MM-dd"))
       .order("date", { ascending: true })
-    if (error) console.error("fetchExistingDrafts:", error.message)
-    else setDrafts(data || [])
+    if (error) {
+      console.error("fetchExistingDrafts:", error.message)
+    } else {
+      // Ignora linhas cujo arranjo foi excluído ou teve o dia da semana
+      // alterado depois que a linha foi gerada — a data não corresponde
+      // mais a nenhum arranjo válido.
+      const valid = (data || []).filter((d: any) => d.arrangement && getDay(parseISO(d.date)) === d.arrangement.weekday)
+      setDrafts(valid)
+    }
     setLoading(false)
   }, [currentMonth])
 

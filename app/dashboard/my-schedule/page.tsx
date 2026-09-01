@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { useAuth } from "@/hooks/use-auth"
-import { format, parseISO, startOfMonth, endOfMonth } from "date-fns"
+import { format, parseISO, startOfMonth, endOfMonth, getDay } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { Loader2, CalendarDays, ExternalLink, ChevronLeft } from "lucide-react"
 import { useRouter } from "next/navigation"
@@ -31,7 +31,7 @@ export default function MySchedulePage() {
       .select(`
         id,
         date,
-        arrangement:schedule_arrangements(id, label, start_time)
+        arrangement:schedule_arrangements(id, label, start_time, weekday)
       `)
       .eq('leader_id', user.id)
       .eq('status', 'published')
@@ -42,7 +42,10 @@ export default function MySchedulePage() {
     if (error) {
       console.error("Error fetching schedules:", error)
     } else {
-      setSchedules(data || [])
+      // Ignora linhas cujo arranjo foi excluído ou teve o dia da semana
+      // alterado depois que a linha foi gerada.
+      const valid = (data || []).filter((s: any) => s.arrangement && getDay(parseISO(s.date)) === s.arrangement.weekday)
+      setSchedules(valid)
     }
     setLoading(false)
   }, [user?.id])

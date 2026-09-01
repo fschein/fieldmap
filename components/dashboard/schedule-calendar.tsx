@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Clock, ChevronLeft, ChevronRight, PlusCircle, LayoutDashboard, BookmarkCheck, CheckCircle2 } from "lucide-react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
-import { format, startOfMonth, endOfMonth, addMonths, subMonths, parseISO, isSameDay, addDays } from "date-fns"
+import { format, startOfMonth, endOfMonth, addMonths, subMonths, parseISO, isSameDay, addDays, getDay } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -44,7 +44,10 @@ export function ScheduleCalendar({
     if (scheduleError) {
        console.error("Erro ao carregar escala:", scheduleError.message || scheduleError)
     } else {
-      const result = scheduleData || []
+      // Ignora linhas cujo arranjo foi excluído ou teve o dia da semana
+      // alterado depois que a linha foi gerada — a data não corresponde
+      // mais a nenhum arranjo válido.
+      const result = (scheduleData || []).filter((s: any) => s.arrangement && getDay(parseISO(s.date)) === s.arrangement.weekday)
       setSchedules(result)
 
       // Fetch active assignments for all leaders in this schedule
