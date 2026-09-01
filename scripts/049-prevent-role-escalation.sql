@@ -29,7 +29,12 @@ LANGUAGE plpgsql
 SET search_path = public
 AS $$
 BEGIN
-  IF NEW.role IS DISTINCT FROM OLD.role AND NOT public.is_admin() THEN
+  -- auth.uid() só é NULL quando não há usuário autenticado na sessão —
+  -- na prática, só a service_role chega aqui nesse estado (qualquer
+  -- request anônima real já é barrada pelo RLS antes de tocar na
+  -- trigger). service_role já ignora RLS por definição; não faz sentido
+  -- essa trigger ser a única coisa que ainda a bloqueia.
+  IF NEW.role IS DISTINCT FROM OLD.role AND NOT public.is_admin() AND auth.uid() IS NOT NULL THEN
     RAISE EXCEPTION 'Apenas administradores podem alterar o campo role.';
   END IF;
   RETURN NEW;
