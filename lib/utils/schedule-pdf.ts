@@ -40,7 +40,7 @@ interface ArrangementBlock {
   startTime: string
   weekday: number
   isGroupMode: boolean
-  slots: { date: string; displayDate: string; assignee: string; isPublished: boolean }[]
+  slots: { date: string; displayDate: string; assignee: string }[]
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -99,7 +99,6 @@ export async function exportScheduleToPDF(schedules: Schedule[], currentMonth: D
       date: s.date,
       displayDate: format(parsedDate, "dd/MM", { locale: ptBR }),
       assignee,
-      isPublished: s.status === "published",
     })
   }
 
@@ -209,8 +208,8 @@ function drawArrangementBlock(doc: jsPDF, block: ArrangementBlock, startY: numbe
 
   const rows = block.slots.map((slot) => {
     return [
-      { content: slot.displayDate, styles: { fontStyle: "bold", textColor: DARK, halign: "center" } } as any,
-      { content: slot.assignee, styles: { fontStyle: slot.isPublished ? "bold" : "normal", textColor: DARK } } as any,
+      { content: slot.displayDate, styles: { fontStyle: "normal", textColor: DARK, halign: "center" } } as any,
+      { content: slot.assignee, styles: { fontStyle: "bold", textColor: DARK } } as any,
     ]
   })
 
