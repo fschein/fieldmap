@@ -47,7 +47,7 @@ export function ScheduleConfig() {
   const [leaders, setLeaders] = useState<any[]>([])
   const [assignedLeaders, setAssignedLeaders] = useState<any[]>([])
   const [newLeader, setNewLeader] = useState({
-    profile_id: "", frequency: "2", limitFrequency: false,
+    profile_id: "", frequency: "1", limitFrequency: true,
   })
 
   useEffect(() => { fetchData() }, [])
@@ -122,7 +122,7 @@ export function ScheduleConfig() {
       else toast.error("Erro ao atribuir")
     } else {
       toast.success("Dirigente adicionado")
-      setNewLeader({ profile_id: "", frequency: "2", limitFrequency: false })
+      setNewLeader({ profile_id: "", frequency: "1", limitFrequency: true })
       fetchLeadersForArr(selectedArr)
     }
   }

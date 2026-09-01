@@ -17,9 +17,6 @@ const PAGE_H  = 297
 const MARGIN  = 14
 const COL_W   = PAGE_W - MARGIN * 2  // 182 mm
 
-// Weekday names abbreviated (pt-BR)
-const WEEKDAY_SHORT = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"]
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Schedule {
@@ -43,7 +40,7 @@ interface ArrangementBlock {
   startTime: string
   weekday: number
   isGroupMode: boolean
-  slots: { date: string; displayDate: string; weekdayShort: string; assignee: string; isPublished: boolean }[]
+  slots: { date: string; displayDate: string; assignee: string; isPublished: boolean }[]
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -89,7 +86,6 @@ export async function exportScheduleToPDF(schedules: Schedule[], currentMonth: D
 
     const block = arrangementMap.get(arrId)!
     const parsedDate = parseISO(s.date)
-    const weekdayIdx = parsedDate.getDay()
 
     // Assignee label
     let assignee = "—"
@@ -102,7 +98,6 @@ export async function exportScheduleToPDF(schedules: Schedule[], currentMonth: D
     block.slots.push({
       date: s.date,
       displayDate: format(parsedDate, "dd/MM", { locale: ptBR }),
-      weekdayShort: WEEKDAY_SHORT[weekdayIdx] ?? "",
       assignee,
       isPublished: s.status === "published",
     })
@@ -215,7 +210,6 @@ function drawArrangementBlock(doc: jsPDF, block: ArrangementBlock, startY: numbe
   const rows = block.slots.map((slot) => {
     return [
       { content: slot.displayDate, styles: { fontStyle: "bold", textColor: DARK, halign: "center" } } as any,
-      { content: slot.weekdayShort, styles: { textColor: MUTED, halign: "center" } } as any,
       { content: slot.assignee, styles: { fontStyle: slot.isPublished ? "bold" : "normal", textColor: DARK } } as any,
     ]
   })
@@ -233,8 +227,7 @@ function drawArrangementBlock(doc: jsPDF, block: ArrangementBlock, startY: numbe
     },
     columnStyles: {
       0: { cellWidth: 18, halign: "center" },
-      1: { cellWidth: 12, halign: "center" },
-      2: { cellWidth: COL_W - 18 - 12 },
+      1: { cellWidth: COL_W - 18 },
     },
     willDrawCell(data) {
       if (data.section === "body") {
