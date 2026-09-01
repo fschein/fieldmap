@@ -68,7 +68,7 @@ export function ScheduleConfig() {
     setSelectedArr(arr)
     setIsAssigning(true)
     const { data: allLeaders } = await supabase
-      .from("profiles").select("id, name").in("role", ["admin", "dirigente"]).order("name")
+      .from("profiles").select("id, name").in("role", ["admin", "dirigente", "supervisor"]).order("name")
     setLeaders(allLeaders || [])
     const { data: assigned } = await supabase
       .from("leader_arrangements").select("*, profile:profiles(name)").eq("arrangement_id", arr.id)
