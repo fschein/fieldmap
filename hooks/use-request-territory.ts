@@ -4,10 +4,9 @@ import { useCallback } from "react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { Territory, Group } from "@/lib/types"
 import { useAuth } from "@/hooks/use-auth"
+import { useAppSettings } from "@/hooks/use-app-settings"
 
 const supabase = getSupabaseBrowserClient()
-
-const MIN_REST_DAYS = 25
 
 export type RegionPreviewReason = "ok" | "recent" | "covered" | "empty"
 
@@ -43,13 +42,13 @@ function pickOldest(candidates: any[]): Territory {
   return territory as Territory
 }
 
-function buildPreview(scoped: any[], coveredIds: Set<string> | null): RegionPreview {
+function buildPreview(scoped: any[], coveredIds: Set<string> | null, minRestDays: number): RegionPreview {
   if (!scoped.length) return { territory: null, days: Infinity, reason: "empty" }
 
   const notCovered = coveredIds ? scoped.filter((t) => !coveredIds.has(t.id)) : scoped
   if (!notCovered.length) return { territory: null, days: Infinity, reason: "covered" }
 
-  const restCutoff = new Date(Date.now() - MIN_REST_DAYS * 86400000).toISOString()
+  const restCutoff = new Date(Date.now() - minRestDays * 86400000).toISOString()
   const rested = notCovered.filter((t) => !t.last_completed_at || t.last_completed_at < restCutoff)
   if (!rested.length) return { territory: null, days: Infinity, reason: "recent" }
 
@@ -62,6 +61,7 @@ function buildPreview(scoped: any[], coveredIds: Set<string> | null): RegionPrev
 
 export function useRequestTerritory() {
   const { user } = useAuth()
+  const { settings } = useAppSettings()
 
   const fetchGroups = useCallback(async (): Promise<Group[]> => {
     const { data } = await supabase.from("groups").select("*").eq("is_active", true).order("name")
@@ -98,13 +98,13 @@ export function useRequestTerritory() {
 
     const previews: Record<string, RegionPreview> = {}
     for (const g of groups) {
-      previews[g.id] = buildPreview(all.filter((t) => t.group_id === g.id), coveredIds)
+      previews[g.id] = buildPreview(all.filter((t) => t.group_id === g.id), coveredIds, settings.recent_days)
     }
-    previews.geral = buildPreview(all.filter((t) => !t.group_id && t.type !== "comercial"), coveredIds)
-    previews.comercial = buildPreview(all.filter((t) => t.type === "comercial"), coveredIds)
+    previews.geral = buildPreview(all.filter((t) => !t.group_id && t.type !== "comercial"), coveredIds, settings.recent_days)
+    previews.comercial = buildPreview(all.filter((t) => t.type === "comercial"), coveredIds, settings.recent_days)
 
     return previews
-  }, [])
+  }, [settings.recent_days])
 
   const requestTerritory = useCallback(
     async (territoryId: string): Promise<void> => {

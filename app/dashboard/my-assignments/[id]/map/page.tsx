@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { createTimeoutSignal } from "@/lib/utils/api-utils"
 import { useAuth } from "@/hooks/use-auth"
+import { useAppSettings } from "@/hooks/use-app-settings"
 import { useOfflineManager } from "@/hooks/use-offline-manager"
 import { TerritoryWithSubdivisions, Subdivision } from "@/lib/types"
 import { Button } from "@/components/ui/button"
@@ -38,6 +39,7 @@ export default function TerritoryMapPage() {
   const params = useParams()
   const router = useRouter()
   const { user, isReady, isSupervisor } = useAuth()
+  const { settings } = useAppSettings()
   const { isOnline, addPendingAction } = useOfflineManager()
   const [territory, setTerritory] = useState<TerritoryWithSubdivisions | null>(null)
   const [loading, setLoading] = useState(true)
@@ -521,6 +523,7 @@ export default function TerritoryMapPage() {
             currentMarkerId={user?.id ?? null}
             onMark={handleMarkUnit}
             emptyHint="Nenhuma quadra cadastrada ainda neste território."
+            enabledOptions={settings.enabled_marking_options}
           />
         </div>
       )}

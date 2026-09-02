@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { useAuth } from "@/hooks/use-auth"
+import { useAppSettings } from "@/hooks/use-app-settings"
 import { Loader2, MapPin, Clock } from "lucide-react"
 import { cn, fmtTerritoryNumber } from "@/lib/utils"
 import { format } from "date-fns"
@@ -47,6 +48,7 @@ function calcProgress(subdivisions: { status: string; completed: boolean }[]): n
 
 export function MobileTerritoriesView() {
   const { user, isReady } = useAuth()
+  const { settings } = useAppSettings()
   const router = useRouter()
   const supabase = getSupabaseBrowserClient()
 
@@ -133,7 +135,7 @@ export function MobileTerritoriesView() {
               const progress = calcProgress(t.subdivisions)
               const assignmentAt = t.assignments?.find(a => a.status === 'active')?.assigned_at
               const days = assignmentAt ? Math.ceil((Date.now() - new Date(assignmentAt).getTime()) / (1000 * 60 * 60 * 24)) : 0
-              const isOverdue = days > 90
+              const isOverdue = days > settings.overdue_days
 
               return (
                 <div

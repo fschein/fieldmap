@@ -4,7 +4,8 @@ import { useState, type ReactNode, type CSSProperties } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { cn, compareHouseNumbers } from "@/lib/utils"
-import { ChevronDown, ChevronUp, Loader2, Ban, Check, CheckCircle2, FlagOff, Mail } from "lucide-react"
+import { ChevronDown, ChevronUp, Loader2, Ban, Check, CheckCircle2, FlagOff, Mail, Home } from "lucide-react"
+import type { MarkingOption } from "@/lib/types"
 
 // ── Cores exatas da gaveta de marcação (mock aprovado) ──
 const DRAWER_BG = "oklch(0.24 0.02 220)"
@@ -20,7 +21,7 @@ const ALERT = "oklch(0.72 0.15 55)"
 const ALERT_TEXT = "oklch(0.75 0.15 55)"
 const ALERT_BG = "oklch(0.27 0.05 55)"
 
-export type UnitStatus = "pending" | "visited" | "visited_carta" | "do_not_visit"
+export type UnitStatus = "pending" | "visited" | "visited_carta" | "do_not_visit" | "not_home"
 
 export interface HouseUnit {
   id: string
@@ -55,6 +56,8 @@ interface HouseByHouseProps {
   emptyHint?: string
   /** Rótulo no título da gaveta — "Casa" (padrão) ou "Unidade" (condomínio tipo Predial). */
   unitLabel?: string
+  /** Quais opções de marcação aparecem na gaveta — vem de app_settings.enabled_marking_options. */
+  enabledOptions?: MarkingOption[]
 }
 
 function isGroupFullyMarked(group: HouseGroup) {
@@ -75,6 +78,8 @@ function statusChipClasses(status: UnitStatus, pendingAction?: "add" | "remove" 
       return "border-2"
     case "do_not_visit":
       return "bg-transparent text-amber-600 dark:text-amber-500 border-2 border-dashed border-amber-600 dark:border-amber-500"
+    case "not_home":
+      return "bg-transparent text-blue-600 dark:text-blue-400 border-2 border-dashed border-blue-600 dark:border-blue-400"
     default:
       return "bg-gray-200 text-gray-900 border-2 border-gray-400 dark:bg-muted dark:text-muted-foreground dark:border-transparent"
   }
@@ -104,6 +109,8 @@ function statusChipIcon(status: UnitStatus) {
       return <Mail className="h-4 w-4" />
     case "do_not_visit":
       return <Ban className="h-4 w-4" />
+    case "not_home":
+      return <Home className="h-4 w-4" />
     default:
       return null
   }
@@ -123,7 +130,9 @@ export function HouseByHouse({
   renderGroupExtra,
   emptyHint = "Nenhuma unidade cadastrada.",
   unitLabel = "Casa",
+  enabledOptions = ["visited", "visited_carta", "do_not_visit"],
 }: HouseByHouseProps) {
+  const isEnabled = (opt: MarkingOption) => enabledOptions.includes(opt)
   const [expandedId, setExpandedId] = useState<string | null>(groups[0]?.id ?? null)
   const [activeUnit, setActiveUnit] = useState<HouseUnit | null>(null)
   const [saving, setSaving] = useState(false)
@@ -298,36 +307,54 @@ export function HouseByHouse({
               ) : (
                 <>
                   <div className="flex flex-col" style={{ gap: 12 }}>
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={() => handleMark("visited")}
-                      className="flex items-center justify-center disabled:opacity-60"
-                      style={{ height: 60, borderRadius: 14, gap: 10, background: TEAL, color: TEAL_DARK, border: "none", fontSize: 16.5, fontWeight: 700 }}
-                    >
-                      <Check style={{ width: 20, height: 20 }} />
-                      Falou com morador
-                    </button>
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={() => handleMark("visited_carta")}
-                      className="flex items-center justify-center disabled:opacity-60"
-                      style={{ height: 60, borderRadius: 14, gap: 10, background: "transparent", color: TEAL, border: `1.5px solid ${TEAL}`, fontSize: 16.5, fontWeight: 700 }}
-                    >
-                      <Mail style={{ width: 20, height: 20 }} />
-                      Deixou carta
-                    </button>
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={() => handleMark("do_not_visit")}
-                      className="flex items-center justify-center disabled:opacity-60"
-                      style={{ height: 60, borderRadius: 14, gap: 10, background: "transparent", color: ALERT, border: `1.5px dashed ${ALERT}`, fontSize: 16.5, fontWeight: 700 }}
-                    >
-                      <Ban style={{ width: 20, height: 20 }} />
-                      Não visitar
-                    </button>
+                    {isEnabled("visited") && (
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => handleMark("visited")}
+                        className="flex items-center justify-center disabled:opacity-60"
+                        style={{ height: 60, borderRadius: 14, gap: 10, background: TEAL, color: TEAL_DARK, border: "none", fontSize: 16.5, fontWeight: 700 }}
+                      >
+                        <Check style={{ width: 20, height: 20 }} />
+                        Falou com morador
+                      </button>
+                    )}
+                    {isEnabled("visited_carta") && (
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => handleMark("visited_carta")}
+                        className="flex items-center justify-center disabled:opacity-60"
+                        style={{ height: 60, borderRadius: 14, gap: 10, background: "transparent", color: TEAL, border: `1.5px solid ${TEAL}`, fontSize: 16.5, fontWeight: 700 }}
+                      >
+                        <Mail style={{ width: 20, height: 20 }} />
+                        Deixou carta
+                      </button>
+                    )}
+                    {isEnabled("not_home") && (
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => handleMark("not_home")}
+                        className="flex items-center justify-center disabled:opacity-60"
+                        style={{ height: 60, borderRadius: 14, gap: 10, background: "transparent", color: "oklch(0.68 0.12 235)", border: "1.5px solid oklch(0.68 0.12 235)", fontSize: 16.5, fontWeight: 700 }}
+                      >
+                        <Home style={{ width: 20, height: 20 }} />
+                        Não em casa
+                      </button>
+                    )}
+                    {isEnabled("do_not_visit") && (
+                      <button
+                        type="button"
+                        disabled={saving}
+                        onClick={() => handleMark("do_not_visit")}
+                        className="flex items-center justify-center disabled:opacity-60"
+                        style={{ height: 60, borderRadius: 14, gap: 10, background: "transparent", color: ALERT, border: `1.5px dashed ${ALERT}`, fontSize: 16.5, fontWeight: 700 }}
+                      >
+                        <Ban style={{ width: 20, height: 20 }} />
+                        Não visitar
+                      </button>
+                    )}
                   </div>
 
                   <div className="flex flex-col items-center">

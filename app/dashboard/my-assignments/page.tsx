@@ -16,6 +16,7 @@ import { format, parseISO, isToday, isTomorrow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { ClipboardList, CalendarDays, Calendar } from "lucide-react"
 import { RequestTerritoryModal } from "@/components/dashboard/request-territory-modal"
+import { useAppSettings } from "@/hooks/use-app-settings"
 import { TransferTerritoryModal } from "@/components/dashboard/transfer-territory-modal"
 
 interface AssignmentRecord {
@@ -45,6 +46,7 @@ const supabase = getSupabaseBrowserClient()
 
 export default function MyAssignmentsPage() {
   const { user, profile, isReady } = useAuth()
+  const { settings } = useAppSettings()
   const [territories, setTerritories] = useState<TerritoryAssignment[]>([])
   const [loading, setLoading] = useState(true)
   const [requesting, setRequesting] = useState(false)
@@ -318,7 +320,7 @@ export default function MyAssignmentsPage() {
             {territories.map((t) => {
               const progress = calcProgress(t.subdivisions)
               const days = calcDays(t)
-              const isOverdue = days > 90
+              const isOverdue = days > settings.overdue_days
               const done = t.subdivisions?.filter(s => s.completed || s.status === "completed").length || 0
               const total = t.subdivisions?.length || 0
               const activeAssignment = t.assignments?.find(a => a.status === "active")

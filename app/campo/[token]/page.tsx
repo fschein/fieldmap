@@ -5,6 +5,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { cn, compareHouseNumbers, fmtTerritoryNumber } from "@/lib/utils"
 import { Loader2, ShieldAlert, MapPin, Lightbulb, X, Plus } from "lucide-react"
 import { HouseByHouse, type HouseGroup, type UnitStatus } from "@/components/dashboard/house-by-house"
+import { useAppSettings } from "@/hooks/use-app-settings"
 import { SettingsProvider } from "@/providers/settings-provider"
 import { A11yControls } from "@/components/dashboard/a11y-controls"
 import { FieldMapLogoBrand } from "@/components/icons/fieldmap-logo"
@@ -213,6 +214,7 @@ function FieldLinkPageContent({
   params: Promise<{ token: string }>
 }) {
   const { token } = use(params)
+  const { settings } = useAppSettings()
 
   const [loading, setLoading] = useState(true)
   const [sessionId, setSessionId] = useState<string | null>(null)
@@ -424,6 +426,7 @@ function FieldLinkPageContent({
             readOnly={linkExpired}
             onMark={handleMark}
             emptyHint="Nenhuma unidade cadastrada neste link ainda."
+            enabledOptions={settings.enabled_marking_options}
           />
         </div>
       )}

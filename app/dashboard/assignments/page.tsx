@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { useAuth } from "@/hooks/use-auth"
+import { useAppSettings } from "@/hooks/use-app-settings"
 import { AssignmentHistorySheet } from "@/components/dashboard/assignment-history-sheet"
 import { AssignmentCreateModal } from "@/components/dashboard/assignment-create-modal"
 import { Button } from "@/components/ui/button"
@@ -72,6 +73,7 @@ const STATUS_TABS = [
 
 export default function AssignmentsPage() {
   const { isReady, isAdmin, isDirigente } = useAuth()
+  const { settings } = useAppSettings()
   const supabase = getSupabaseBrowserClient()
   const canManage = isAdmin || isDirigente
 
@@ -208,7 +210,7 @@ export default function AssignmentsPage() {
         if (isAssignedToMe || isAssignedToMyGroup) {
           const start = new Date(activeAssig.assigned_at).getTime()
           daysInField = Math.ceil((now.getTime() - start) / (1000 * 60 * 60 * 24))
-          status = daysInField > 90 ? 'overdue' : 'active'
+          status = daysInField > settings.overdue_days ? 'overdue' : 'active'
         } else {
           const isFull = totalSubdivisions > 0 && completedSubdivisions === totalSubdivisions
           const isEmpty = completedSubdivisions === 0
@@ -248,7 +250,7 @@ export default function AssignmentsPage() {
     }).filter(t => t.status !== 'inactive')
 
     setData(processed)
-  }, [rawTerritories, rawAssignments, periodFilter])
+  }, [rawTerritories, rawAssignments, periodFilter, settings.overdue_days])
 
   const counts = useMemo(() => ({
     active: data.filter(t => t.status === 'active').length,
@@ -601,9 +603,9 @@ export default function AssignmentsPage() {
                     </TableCell>
                     <TableCell className="py-2.5 text-center whitespace-nowrap">
                       {t.daysInField !== null ? (
-                        <span className={`text-xs font-bold ${t.daysInField > 90 ? 'text-red-500' : 'text-foreground'}`}>
+                        <span className={`text-xs font-bold ${t.status === 'overdue' ? 'text-red-500' : 'text-foreground'}`}>
                           {t.daysInField} d
-                          {t.daysInField > 90 && (
+                          {t.status === 'overdue' && (
                             <AlertTriangle className="inline-block w-3 h-3 ml-1 text-red-500 print:hidden" />
                           )}
                         </span>
@@ -687,10 +689,10 @@ export default function AssignmentsPage() {
                       <span className="italic opacity-50">Disponível</span>
                     )}
                     {t.daysInField !== null && (
-                      <span className={cn("flex items-center gap-0.5 flex-shrink-0 font-semibold", t.daysInField > 90 && "text-red-500")}>
+                      <span className={cn("flex items-center gap-0.5 flex-shrink-0 font-semibold", t.status === 'overdue' && "text-red-500")}>
                         <Clock className="w-3 h-3" />
                         {t.daysInField}d
-                        {t.daysInField > 90 && <AlertTriangle className="w-3 h-3" />}
+                        {t.status === 'overdue' && <AlertTriangle className="w-3 h-3" />}
                       </span>
                     )}
                   </div>
