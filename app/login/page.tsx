@@ -55,13 +55,20 @@ if (!isReady) return <Loader2 className="animate-spin" />
       const { error: signInError } = await signIn(email, password)
 
       if (signInError) {
-        setError(signInError.message === "Invalid login credentials" 
-          ? "E-mail ou senha incorretos" 
+        console.error("Erro de login (detalhe completo):", {
+          message: signInError.message,
+          status: (signInError as any).status,
+          code: (signInError as any).code,
+          name: signInError.name,
+        })
+        setError(signInError.message === "Invalid login credentials"
+          ? "E-mail ou senha incorretos"
           : signInError.message)
         setIsSubmitting(false)
       }
       // If successful, the auth state will update and trigger the redirect
-    } catch {
+    } catch (err) {
+      console.error("Erro de login (exceção):", err)
       setError("Erro ao fazer login. Tente novamente.")
       setIsSubmitting(false)
     }
