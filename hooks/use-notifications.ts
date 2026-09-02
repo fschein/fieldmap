@@ -15,6 +15,8 @@ export type NotificationType =
   | "request"                // publicador solicitou território
   | "idle"                   // (legado)
   | "suggested_edit"         // visitante do link de campo sugeriu casas a adicionar/remover
+  | "campaign_paused"        // território pausado/liberado por início de campanha
+  | "campaign_restored"      // território devolvido ao dono original ao fim da campanha
 
 export interface AppNotification {
   id: string

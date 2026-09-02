@@ -65,7 +65,7 @@ export function MobileTerritoriesView() {
         .select(`
           id, number, name, color,
           subdivisions(status, completed),
-          assignments(id, assigned_at, status, campaign:campaigns(name))
+          assignments(id, assigned_at, status, campaign:campaigns!assignments_campaign_id_fkey(name))
         `)
         .eq("assigned_to", user.id)
         .order("number", { ascending: true })
@@ -82,7 +82,7 @@ export function MobileTerritoriesView() {
         .select(`
           id, assigned_at, returned_at, completed_at, status,
           territory:territories(number, name, color),
-          campaign:campaigns(name)
+          campaign:campaigns!assignments_campaign_id_fkey(name)
         `)
         .eq("user_id", user.id)
         .in("status", ["completed", "returned"])

@@ -14,6 +14,11 @@ export interface FetchAvailableResult {
   territory: Territory | null
   blockedByRecency: boolean
   crossGroup?: boolean
+  // true só quando existiam territórios no escopo pedido mas todos já estão
+  // cobertos pela campanha ativa — distinto de "não existe território
+  // nenhum disponível nesse escopo" (ex: só há 1 território no sistema e
+  // ele já está designado pro próprio solicitante).
+  allCoveredByCampaign?: boolean
 }
 
 export interface UrgentGroupSuggestion {
@@ -90,7 +95,7 @@ export function useRequestTerritory() {
 
     const { data, error } = await query
 
-    if (error || !data?.length) return { territory: null, blockedByRecency: false }
+    if (error || !data?.length) return { territory: null, blockedByRecency: false, allCoveredByCampaign: false }
 
     let candidates = data as any[]
 
@@ -98,7 +103,9 @@ export function useRequestTerritory() {
       candidates = candidates.filter((t) => !coveredIds!.has(t.id))
     }
 
-    if (!candidates.length) return { territory: null, blockedByRecency: false }
+    // Só chega aqui com 0 candidatos se havia território no escopo (data.length > 0)
+    // e o filtro de coveredIds zerou tudo — ou seja, cobertura de campanha de verdade.
+    if (!candidates.length) return { territory: null, blockedByRecency: false, allCoveredByCampaign: true }
 
     // Verificar se existe algum território urgente (> URGENT_THRESHOLD_DAYS) em qualquer lugar
     const urgentCutoff = new Date(Date.now() - URGENT_THRESHOLD_DAYS * 86400000).toISOString()

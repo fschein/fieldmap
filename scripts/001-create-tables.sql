@@ -38,7 +38,7 @@ CREATE TABLE subdivisions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   territory_id UUID NOT NULL REFERENCES territories(id) ON DELETE CASCADE,
   name TEXT,
-  geometry JSONB NOT NULL,
+  coordinates JSONB,
   order_index INTEGER DEFAULT 0,
   completed BOOLEAN DEFAULT false,
   status TEXT DEFAULT 'available',

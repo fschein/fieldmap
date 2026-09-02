@@ -38,7 +38,7 @@ const ASSIGNMENTS_SELECT = `
   status,
   group_id,
   campaign_id,
-  campaign:campaigns(id, name, active)
+  campaign:campaigns!assignments_campaign_id_fkey(id, name, active)
 `
 
 const supabase = getSupabaseBrowserClient()

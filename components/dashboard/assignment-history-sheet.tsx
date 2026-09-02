@@ -108,7 +108,7 @@ export function AssignmentHistorySheet({
           campaign_id, notes, return_reason,
           profiles!assignments_user_id_fkey(name),
           groups:groups(name),
-          campaigns:campaigns(name)
+          campaigns:campaigns!assignments_campaign_id_fkey(name)
         `)
         .eq("territory_id", territoryId)
         .order("assigned_at", { ascending: false })
@@ -122,6 +122,7 @@ export function AssignmentHistorySheet({
         .order("name")
       setCampaigns(campData || [])
     } catch (error: any) {
+      console.error("Erro ao carregar histórico de designações:", error)
       toast.error("Falha ao carregar o histórico.")
     } finally {
       setLoading(false)
