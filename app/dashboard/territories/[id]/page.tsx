@@ -63,7 +63,6 @@ interface Block {
   name: string
   id: string
   territory_id: string
-  geometry: unknown
   order_index: number
   completed: boolean
   status?: "available" | "assigned" | "completed"

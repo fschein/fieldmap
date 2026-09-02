@@ -178,9 +178,16 @@ export default function CampaignsPage() {
   }
 
   const handleToggleActive = async (campaign: Campaign) => {
+    const activating = !campaign.active
+    // Só pode existir uma campanha ativa por vez — sem isso, a resolução de
+    // "qual é a campanha vigente" (dashboard, Minhas Designações, etc.) fica
+    // ambígua quando duas ficam active=true ao mesmo tempo.
+    if (activating) {
+      await supabase.from("campaigns").update({ active: false }).eq("active", true)
+    }
     await supabase
       .from("campaigns")
-      .update({ active: !campaign.active })
+      .update({ active: activating })
       .eq("id", campaign.id)
     fetchCampaigns()
   }

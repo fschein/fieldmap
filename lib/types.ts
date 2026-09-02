@@ -1,6 +1,6 @@
 export type UserRole = "admin" | "dirigente" | "publicador" | "supervisor"
 export type TerritoryType = "residencial" | "comercial" | "condominium"
-export type AssignmentStatus = "active" | "completed" | "returned"
+export type AssignmentStatus = "active" | "completed" | "returned" | "paused"
 export type SubdivisionStatus = "available" | "assigned" | "completed"
 
 export interface Profile {
@@ -47,7 +47,6 @@ export interface Subdivision {
   name: string
   status: SubdivisionStatus
   coordinates: [number, number][][] | null // Array de polígonos
-  geometry: GeoJSON.Polygon | null
   order_index: number
   completed: boolean
   completed_at: string | null
@@ -67,7 +66,6 @@ export interface Territory {
   group_id: string | null
   assigned_to: string | null
   campaign_id: string | null
-  geometry: GeoJSON.Polygon | null
   last_completed_at: string | null
   notes: string | null
   created_at: string

@@ -45,6 +45,10 @@ function NotifIcon({ type }: { type: NotificationType }) {
       return <MapPin className="h-4 w-4 text-blue-500" />
     case "suggested_edit":
       return <Lightbulb className="h-4 w-4 text-teal-500" />
+    case "campaign_paused":
+      return <Clock className="h-4 w-4 text-amber-500" />
+    case "campaign_restored":
+      return <ArrowDownToLine className="h-4 w-4 text-emerald-500" />
     default:
       return <Bell className="h-4 w-4 text-muted-foreground" />
   }
@@ -61,6 +65,8 @@ function notifIconBg(type: NotificationType) {
     case "progress_60":            return "bg-orange-500/10"
     case "request":              return "bg-blue-500/10"
     case "suggested_edit":       return "bg-teal-500/10"
+    case "campaign_paused":      return "bg-amber-500/10"
+    case "campaign_restored":    return "bg-emerald-500/10"
     default:                     return "bg-muted"
   }
 }
@@ -80,6 +86,12 @@ function notifRoute(notif: AppNotification): string | null {
     case "idle_publisher":
     case "request":
       return "/dashboard/assignments"
+    case "campaign_paused":
+      return "/dashboard/assignments"
+    case "campaign_restored":
+      return notif.territory_id
+        ? `/dashboard/my-assignments/${notif.territory_id}/map`
+        : "/dashboard/my-assignments"
     case "suggested_edit":
       return notif.territory_id && notif.subdivision_id
         ? `/dashboard/territories/${notif.territory_id}?editHouses=${notif.subdivision_id}`

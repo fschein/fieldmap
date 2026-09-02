@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/check-overdue",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/campaign-lifecycle",
+      "schedule": "0 6 * * *"
     }
   ]
 }

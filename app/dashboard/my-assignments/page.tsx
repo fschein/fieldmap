@@ -38,7 +38,7 @@ const ASSIGNMENTS_SELECT = `
   status,
   group_id,
   campaign_id,
-  campaign:campaigns(id, name, active)
+  campaign:campaigns!assignments_campaign_id_fkey(id, name, active)
 `
 
 const supabase = getSupabaseBrowserClient()
@@ -77,7 +77,26 @@ export default function MyAssignmentsPage() {
 
       if (error) throw error
 
-      const allTerritories: TerritoryAssignment[] = (personal as TerritoryAssignment[]) || []
+      const fetchedTerritories: TerritoryAssignment[] = (personal as TerritoryAssignment[]) || []
+
+      // Com campanha ativa em andamento, só mostra territórios designados
+      // dentro dessa campanha — os de fora (de antes, ou de campanhas
+      // passadas) ficam ocultos, sem perder quadras/progresso, e voltam a
+      // aparecer sozinhos quando a campanha atual terminar.
+      const today = new Date().toISOString().slice(0, 10)
+      const { data: campaigns } = await supabase
+        .from("campaigns")
+        .select("id, start_date, end_date")
+        .eq("active", true)
+      const activeCampaign = (campaigns ?? []).find((c: { start_date: string | null; end_date: string | null }) => {
+        if (!c.start_date || today < c.start_date) return false
+        if (c.end_date && today > c.end_date) return false
+        return true
+      })
+
+      const allTerritories = activeCampaign
+        ? fetchedTerritories.filter((t) => t.assignments?.find((a) => a.status === "active")?.campaign_id === activeCampaign.id)
+        : fetchedTerritories
 
       setTerritories(allTerritories)
       localStorage.setItem("my_assignments_cache", JSON.stringify(allTerritories))

@@ -23,6 +23,8 @@ export type NotificationType =
   | "transferred"            // dirigente transferiu território para outro
   | "schedule_checkin"       // ~2h após início da saída — lembrete de atualizar quadras
   | "schedule_upcoming"      // ~24h antes da saída de campo
+  | "campaign_paused"        // território pausado/liberado por início de campanha
+  | "campaign_restored"      // território devolvido ao dono original ao fim da campanha
 
 export interface NotifyOptions {
   /** Supabase client com service role para contornar RLS */

@@ -119,15 +119,15 @@ export function RequestTerritoryModal({
         : opts.general
         ? { general: true as const }
         : { groupId: opts.groupId! }
-      const { territory: result, blockedByRecency, crossGroup } = await fetchAvailableTerritory(selector, campaign)
+      const { territory: result, blockedByRecency, crossGroup, allCoveredByCampaign } = await fetchAvailableTerritory(selector, campaign)
       setTerritory(result)
       setCrossGroupTerritory(!!crossGroup)
       if (result === null) {
-        if (campaignMode) {
-          setNoCampaignTerritory(true)
-        } else if (blockedByRecency) {
+        if (blockedByRecency) {
           setTooRecent(true)
           findMostUrgentGroup().then(setUrgentSuggestion)
+        } else if (campaignMode && allCoveredByCampaign) {
+          setNoCampaignTerritory(true)
         } else {
           setNoTerritory(true)
         }
