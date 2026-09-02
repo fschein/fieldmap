@@ -16,30 +16,45 @@ export interface RegionPreview {
   reason: RegionPreviewReason
 }
 
-function pickOldest(candidates: any[]): Territory {
+// Data "efetiva" de última atividade: a mais recente entre last_completed_at
+// (última conclusão de verdade) e o assigned_at de qualquer designação — pra
+// não mostrar um território como "há 66 dias sem trabalho" quando na
+// verdade alguém teve ele em mãos até a campanha pausar, só nunca chegou a
+// concluir (o que só atualiza last_completed_at na conclusão, não na pausa).
+function effectiveLastActivity(t: any): string | null {
+  const dates = [
+    t.last_completed_at,
+    ...((t.assignments ?? []) as { assigned_at: string | null }[]).map((a) => a.assigned_at),
+  ].filter(Boolean) as string[]
+  if (!dates.length) return null
+  return dates.reduce((max, d) => (d > max ? d : max))
+}
+
+function pickOldest(candidates: any[]): Territory & { effective_last_activity: string | null } {
   const sixMonthsAgo = new Date()
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
   const sixMonthsAgoStr = sixMonthsAgo.toISOString()
 
   const withCounts = candidates.map((t) => ({
     ...t,
+    effectiveLastActivity: effectiveLastActivity(t),
     recentCompletions: ((t.assignments ?? []) as { completed_at: string | null }[]).filter(
       (a) => a.completed_at && a.completed_at >= sixMonthsAgoStr
     ).length,
   }))
 
   withCounts.sort((a, b) => {
-    if (a.last_completed_at === null && b.last_completed_at !== null) return -1
-    if (a.last_completed_at !== null && b.last_completed_at === null) return 1
-    if (a.last_completed_at && b.last_completed_at) {
-      const diff = new Date(a.last_completed_at).getTime() - new Date(b.last_completed_at).getTime()
+    if (a.effectiveLastActivity === null && b.effectiveLastActivity !== null) return -1
+    if (a.effectiveLastActivity !== null && b.effectiveLastActivity === null) return 1
+    if (a.effectiveLastActivity && b.effectiveLastActivity) {
+      const diff = new Date(a.effectiveLastActivity).getTime() - new Date(b.effectiveLastActivity).getTime()
       if (diff !== 0) return diff
     }
     return a.recentCompletions - b.recentCompletions
   })
 
-  const { assignments: _a, recentCompletions: _r, ...territory } = withCounts[0]
-  return territory as Territory
+  const { assignments: _a, recentCompletions: _r, effectiveLastActivity: ela, ...territory } = withCounts[0]
+  return { ...(territory as Territory), effective_last_activity: ela }
 }
 
 function buildPreview(scoped: any[], coveredIds: Set<string> | null, minRestDays: number): RegionPreview {
@@ -49,12 +64,15 @@ function buildPreview(scoped: any[], coveredIds: Set<string> | null, minRestDays
   if (!notCovered.length) return { territory: null, days: Infinity, reason: "covered" }
 
   const restCutoff = new Date(Date.now() - minRestDays * 86400000).toISOString()
-  const rested = notCovered.filter((t) => !t.last_completed_at || t.last_completed_at < restCutoff)
+  const rested = notCovered.filter((t) => {
+    const activity = effectiveLastActivity(t)
+    return !activity || activity < restCutoff
+  })
   if (!rested.length) return { territory: null, days: Infinity, reason: "recent" }
 
   const territory = pickOldest(rested)
-  const days = territory.last_completed_at
-    ? Math.floor((Date.now() - new Date(territory.last_completed_at).getTime()) / 86400000)
+  const days = territory.effective_last_activity
+    ? Math.floor((Date.now() - new Date(territory.effective_last_activity).getTime()) / 86400000)
     : Infinity
   return { territory, days, reason: "ok" }
 }
@@ -90,7 +108,7 @@ export function useRequestTerritory() {
 
     const { data } = await supabase
       .from("territories")
-      .select("*, assignments(id, completed_at)")
+      .select("*, assignments(id, completed_at, assigned_at)")
       .in("status", ["available", "completed"])
       .is("assigned_to", null)
 

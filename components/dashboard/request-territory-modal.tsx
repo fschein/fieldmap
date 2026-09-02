@@ -41,9 +41,8 @@ function previewLabel(preview: RegionPreview | undefined): string {
   return preview.days === Infinity ? "Nunca trabalhado" : `${preview.days} dias sem trabalho`
 }
 
-function priorityReason(territory: Territory): string {
-  if (!territory.last_completed_at) return "Nunca trabalhado"
-  const days = Math.floor((Date.now() - new Date(territory.last_completed_at).getTime()) / 86400000)
+function priorityReason(days: number): string {
+  if (days === Infinity) return "Nunca trabalhado"
   return `Sem ser trabalhado há ${days} ${days === 1 ? "dia" : "dias"}`
 }
 
@@ -60,6 +59,7 @@ export function RequestTerritoryModal({
   const [loadingGroups, setLoadingGroups] = useState(false)
   const [previews, setPreviews] = useState<Record<string, RegionPreview>>({})
   const [territory, setTerritory] = useState<Territory | null>(null)
+  const [territoryDays, setTerritoryDays] = useState<number>(Infinity)
   const [confirming, setConfirming] = useState(false)
   const [activeCampaign, setActiveCampaign] = useState<ActiveCampaign | null>(null)
   const [campaignMode, setCampaignMode] = useState(false)
@@ -110,6 +110,7 @@ export function RequestTerritoryModal({
     const preview = previews[key]
     if (!preview?.territory) return
     setTerritory(preview.territory)
+    setTerritoryDays(preview.days)
     setStep("confirm")
   }, [previews])
 
@@ -143,6 +144,7 @@ export function RequestTerritoryModal({
   const handleBack = useCallback(() => {
     setStep("select-group")
     setTerritory(null)
+    setTerritoryDays(Infinity)
   }, [])
 
   const territoryGroup = territory ? groups.find((g) => g.id === territory.group_id) : undefined
@@ -239,7 +241,7 @@ export function RequestTerritoryModal({
 
                 <div className="flex items-center gap-2 text-xs text-muted-foreground bg-background rounded-lg px-3 py-2 border">
                   <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />
-                  <span>{priorityReason(territory)}</span>
+                  <span>{priorityReason(territoryDays)}</span>
                 </div>
               </div>
             ) : (

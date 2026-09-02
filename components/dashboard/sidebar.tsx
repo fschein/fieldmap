@@ -19,6 +19,7 @@ import {
   IconUserCircle,
   IconLogout,
   IconMapPins,
+  IconSettings,
 } from "@tabler/icons-react"
 import { Menu, X } from "lucide-react"
 import { useState, useCallback } from "react"
@@ -68,6 +69,7 @@ const NAV_SECTIONS: NavSection[] = [
 
 const FOOTER_ITEMS: NavItem[] = [
   { title: "Usuários", href: "/dashboard/users", icon: IconUsersGroup, roles: ["admin"] },
+  { title: "Configurações", href: "/dashboard/settings", icon: IconSettings, roles: ["admin"] },
   { title: "Perfil", href: "/dashboard/profile", icon: IconUserCircle, roles: ["admin", "supervisor", "dirigente", "publicador"] },
 ]
 
