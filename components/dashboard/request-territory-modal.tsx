@@ -289,22 +289,23 @@ function RegionButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        "flex items-center gap-3 w-full px-3 py-2.5 rounded-lg border text-sm font-medium text-left transition-colors",
+        "flex flex-col w-full px-3 py-2.5 rounded-lg border text-sm font-medium text-left transition-colors gap-1",
         "bg-card border-border",
         disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/60"
       )}
     >
-      {dotColor ? (
-        <span className="inline-block h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: dotColor }} />
-      ) : (
-        <span className={cn("inline-block h-3 w-3 rounded-full shrink-0", dotClassName)} />
-      )}
-      <span className="flex-1 min-w-0 truncate">{label}</span>
-      {!preview ? (
-        <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0 text-muted-foreground" />
-      ) : (
+      <span className="flex items-center gap-3">
+        {dotColor ? (
+          <span className="inline-block h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: dotColor }} />
+        ) : (
+          <span className={cn("inline-block h-3 w-3 rounded-full shrink-0", dotClassName)} />
+        )}
+        <span className="flex-1 min-w-0 truncate">{label}</span>
+        {!preview && <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0 text-muted-foreground" />}
+      </span>
+      {preview && (
         <span className={cn(
-          "text-xs text-right shrink min-w-0 max-w-[40%]",
+          "text-xs pl-6",
           disabled ? "text-muted-foreground" : "text-muted-foreground/80"
         )}>
           {previewLabel(preview)}
