@@ -476,7 +476,9 @@ export default function DashboardPage() {
         </SectionCard>
       )}
 
-      {/* ── Section: Em campo ── */}
+      {/* ── Section: Em campo (some quando tem campanha ativa — o bloco Campanha
+          acima já mostra "Em andamento", mostrar os dois é redundante) ── */}
+      {!campaignProgress && (
       <SectionCard>
         <SectionHeader
           icon={<Clock className="w-3.5 h-3.5 text-primary" />}
@@ -536,6 +538,7 @@ export default function DashboardPage() {
           )}
         </div>
       </SectionCard>
+      )}
     </div>
   )
 }
