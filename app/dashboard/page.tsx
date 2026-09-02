@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { useAuth } from "@/hooks/use-auth"
+import { useAppSettings } from "@/hooks/use-app-settings"
 import { cn, fmtTerritoryNumber } from "@/lib/utils"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -133,6 +134,7 @@ interface CampaignProgress {
 
 export default function DashboardPage() {
   const { profile, user, isReady } = useAuth()
+  const { settings } = useAppSettings()
   const [stats, setStats] = useState<{
     activeAssignments: number
     overdueAssignments: number
@@ -160,7 +162,8 @@ export default function DashboardPage() {
       const { data: tData } = await supabase
         .from("territories")
         .select(`
-          id, name, number, color, status,
+          id, name, number, color, status, group_id,
+          group:groups ( color ),
           subdivisions ( id, completed, status )
         `)
         .order("number", { ascending: true })
@@ -177,9 +180,15 @@ export default function DashboardPage() {
 
       if (!tData || !aData) return
 
+      // Cor do grupo tem prioridade sobre a cor própria do território (a
+      // maioria nunca teve uma customizada, então fica tudo no azul padrão
+      // se não priorizar o grupo).
+      const colorOf = (t: any) => t.group?.color || t.color || undefined
+      const territoryColorById = new Map<string, string | undefined>(tData.map((t: any) => [t.id, colorOf(t)]))
+
       const overdueCount = aData.filter((a: any) => {
         const days = Math.ceil((new Date().getTime() - new Date(a.assigned_at).getTime()) / (1000 * 60 * 60 * 24))
-        return days > 90
+        return days > settings.overdue_days
       }).length
 
       setStats({
@@ -193,6 +202,7 @@ export default function DashboardPage() {
           const active = aData.find((a: any) => a.territory_id === t.id)
           return {
             ...t,
+            color: colorOf(t),
             isActive: !!active,
             daysInField: active ? Math.ceil((new Date().getTime() - new Date(active.assigned_at).getTime()) / (1000 * 60 * 60 * 24)) : undefined,
             activeAssignee: active ? (lookup.get(active.user_id) || lookup.get(active.group_id) || '?') : undefined
@@ -254,7 +264,7 @@ export default function DashboardPage() {
                 territoryId: a.territory_id,
                 number: a.territories?.number || "",
                 name: a.territories?.name || "",
-                color: a.territories?.color || "",
+                color: territoryColorById.get(a.territory_id) || "",
                 completedAt: a.completed_at,
               })
             }
@@ -278,7 +288,7 @@ export default function DashboardPage() {
               territoryId: t.id,
               number: t.number || "",
               name: t.name || "",
-              color: t.color || "",
+              color: colorOf(t) || "",
               assignee: activeA ? (lookup.get(activeA.user_id) || lookup.get(activeA.group_id) || "?") : "?",
               daysInField: activeA ? Math.ceil((new Date().getTime() - new Date(activeA.assigned_at).getTime()) / (1000 * 60 * 60 * 24)) : 0,
               progress,
@@ -287,7 +297,7 @@ export default function DashboardPage() {
 
         const notStarted = tData
           .filter((t: any) => t.status !== "inactive" && !completedCampIds.has(t.id) && !activeTerritoryIds.has(t.id))
-          .map((t: any) => ({ territoryId: t.id, number: t.number, name: t.name, color: t.color }))
+          .map((t: any) => ({ territoryId: t.id, number: t.number, name: t.name, color: colorOf(t) }))
           .sort((a: any, b: any) => (a.number || "").localeCompare(b.number || "", undefined, { numeric: true }))
 
         setCampaignProgress({
@@ -315,7 +325,7 @@ export default function DashboardPage() {
         fetchDashboardData()
       }
     }
-  }, [isReady, profile, router])
+  }, [isReady, profile, router, settings.overdue_days])
 
   if (loading || !isReady || !profile) {
     return (
@@ -352,7 +362,7 @@ export default function DashboardPage() {
             icon={<AlertTriangle className="w-3.5 h-3.5" />}
             label="Atrasados"
             value={stats.overdueAssignments}
-            hint="mais de 90 dias"
+            hint={`mais de ${settings.overdue_days} dias`}
             danger={stats.overdueAssignments > 0}
           />
         </div>

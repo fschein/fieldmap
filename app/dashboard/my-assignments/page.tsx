@@ -16,6 +16,7 @@ import { format, parseISO, isToday, isTomorrow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import { ClipboardList, CalendarDays, Calendar } from "lucide-react"
 import { RequestTerritoryModal } from "@/components/dashboard/request-territory-modal"
+import { useAppSettings } from "@/hooks/use-app-settings"
 import { TransferTerritoryModal } from "@/components/dashboard/transfer-territory-modal"
 
 interface AssignmentRecord {
@@ -45,6 +46,7 @@ const supabase = getSupabaseBrowserClient()
 
 export default function MyAssignmentsPage() {
   const { user, profile, isReady } = useAuth()
+  const { settings } = useAppSettings()
   const [territories, setTerritories] = useState<TerritoryAssignment[]>([])
   const [loading, setLoading] = useState(true)
   const [requesting, setRequesting] = useState(false)
@@ -70,7 +72,7 @@ export default function MyAssignmentsPage() {
     try {
       const { data: personal, error } = await supabase
         .from("territories")
-        .select(`*, campaign:campaigns(*), subdivisions(*), assignments(${ASSIGNMENTS_SELECT})`)
+        .select(`*, campaign:campaigns(*), group:groups(color), subdivisions(*), assignments(${ASSIGNMENTS_SELECT})`)
         .eq("assigned_to", user.id)
         .abortSignal(signal)
         .order("number", { ascending: true })
@@ -318,7 +320,7 @@ export default function MyAssignmentsPage() {
             {territories.map((t) => {
               const progress = calcProgress(t.subdivisions)
               const days = calcDays(t)
-              const isOverdue = days > 90
+              const isOverdue = days > settings.overdue_days
               const done = t.subdivisions?.filter(s => s.completed || s.status === "completed").length || 0
               const total = t.subdivisions?.length || 0
               const activeAssignment = t.assignments?.find(a => a.status === "active")
@@ -356,7 +358,7 @@ export default function MyAssignmentsPage() {
                     )}
                     className="flex-1 text-left flex items-stretch active:scale-[0.99] transition-transform"
                   >
-                    <div className="w-1 shrink-0 self-stretch my-2.5 ml-2.5 rounded-full" style={{ backgroundColor: t.color || "var(--primary)" }} />
+                    <div className="w-1 shrink-0 self-stretch my-2.5 ml-2.5 rounded-full" style={{ backgroundColor: (t as any).group?.color || t.color || "var(--primary)" }} />
                     <div className="flex-1 px-3 py-2.5 space-y-1.5">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-foreground flex-1 truncate">

@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react"
 import { ChevronDown, ChevronUp } from "lucide-react"
 import { HouseByHouse, type HouseGroup, type UnitStatus } from "@/components/dashboard/house-by-house"
+import type { MarkingOption } from "@/lib/types"
 
 export interface MarkableQuadra {
   id: string
@@ -21,6 +22,7 @@ interface QuadraHouseByHouseProps {
   unitLabel?: string
   emptyHint?: string
   initialExpandedQuadraId?: string | null
+  enabledOptions?: MarkingOption[]
 }
 
 /**
@@ -38,6 +40,7 @@ export function QuadraHouseByHouse({
   unitLabel,
   emptyHint = "Nenhuma casa cadastrada ainda.",
   initialExpandedQuadraId,
+  enabledOptions,
 }: QuadraHouseByHouseProps) {
   const [expandedQuadraId, setExpandedQuadraId] = useState<string | null>(
     initialExpandedQuadraId ?? null
@@ -92,6 +95,7 @@ export function QuadraHouseByHouse({
                   renderGroupExtra={renderGroupExtra}
                   unitLabel={unitLabel}
                   emptyHint="Nenhuma rua cadastrada nesta quadra ainda."
+                  enabledOptions={enabledOptions}
                 />
               </div>
             )}

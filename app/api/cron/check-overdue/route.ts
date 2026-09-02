@@ -2,7 +2,6 @@ import { createClient } from "@supabase/supabase-js"
 import { NextResponse } from "next/server"
 import { sendNotification, notifyAdmins } from "@/lib/notifications"
 
-const OVERDUE_DAYS = parseInt(process.env.OVERDUE_DAYS ?? "90", 10)
 const PROGRESS_THRESHOLD = 0.6 // 60%
 
 /**
@@ -44,9 +43,16 @@ export async function GET(req: Request) {
     idle_publisher: 0,
   }
 
+  const { data: appSettings } = await supabase
+    .from("app_settings")
+    .select("overdue_days")
+    .eq("id", true)
+    .maybeSingle()
+  const overdueDays = appSettings?.overdue_days ?? 90
+
   // ─── 1. Territórios atrasados ─────────────────────────────────────────────
   const overdueThreshold = new Date()
-  overdueThreshold.setDate(overdueThreshold.getDate() - OVERDUE_DAYS)
+  overdueThreshold.setDate(overdueThreshold.getDate() - overdueDays)
 
   const { data: overdueAssignments } = await supabase
     .from("assignments")

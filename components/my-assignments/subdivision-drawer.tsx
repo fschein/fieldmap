@@ -7,6 +7,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
+import { useAppSettings } from "@/hooks/use-app-settings"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -54,6 +55,7 @@ export function SubdivisionDrawer({
   territoryId,
   isSupervisor = false,
 }: SubdivisionDrawerProps) {
+  const { settings } = useAppSettings()
   const [loading, setLoading] = useState(false)
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
   const [notes, setNotes] = useState(subdivision.notes || "")
@@ -247,7 +249,7 @@ export function SubdivisionDrawer({
         <div className="p-5 pt-4 space-y-6">
           {/* Link de campo + Anotações — agrupados com respiro reduzido entre si */}
           <div className="space-y-4">
-          {isSupervisor && (
+          {isSupervisor && settings.use_houses && (
             <div className="space-y-2">
               <Label className="text-[0.5625rem] font-black text-muted-foreground uppercase tracking-[0.2em] px-1">
                 Link de Campo

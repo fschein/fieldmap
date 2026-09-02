@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { TerritoryWithSubdivisions } from "@/lib/types"
+import { useAppSettings } from "@/hooks/use-app-settings"
 
 interface CompleteAssignmentDialogProps {
   open: boolean
@@ -28,7 +29,8 @@ export function CompleteAssignmentDialog({
   onConfirm,
 }: CompleteAssignmentDialogProps) {
   const [reason, setReason] = useState("")
-  
+  const { settings } = useAppSettings()
+
   const completedSubdivisions = territory.subdivisions?.filter(
     s => s.completed || s.status === 'completed'
   ).length || 0
@@ -46,7 +48,7 @@ export function CompleteAssignmentDialog({
     timeInFieldMs = new Date().getTime() - new Date(activeAssignmentDate).getTime();
   }
   const daysInField = Math.ceil(timeInFieldMs / (1000 * 60 * 60 * 24));
-  const daysRemaining = 90 - daysInField;
+  const daysRemaining = settings.overdue_days - daysInField;
 
   const handleConfirm = () => {
     if (!allCompleted && hasHalfDone) return
@@ -100,7 +102,7 @@ export function CompleteAssignmentDialog({
                   {daysRemaining < 0 ? (
                     <>
                       <p className="font-semibold">⚠️ Território atrasado</p>
-                      <p className="mt-1">Você está devolvendo o território sem completar todas as quadras. O prazo de 90 dias foi superado em <strong>{Math.abs(daysRemaining)} {Math.abs(daysRemaining) === 1 ? 'dia' : 'dias'}</strong>.</p>
+                      <p className="mt-1">Você está devolvendo o território sem completar todas as quadras. O prazo de {settings.overdue_days} dias foi superado em <strong>{Math.abs(daysRemaining)} {Math.abs(daysRemaining) === 1 ? 'dia' : 'dias'}</strong>.</p>
                     </>
                   ) : (
                     <>

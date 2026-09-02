@@ -301,7 +301,10 @@ function RegionButton({
       {!preview ? (
         <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0 text-muted-foreground" />
       ) : (
-        <span className={cn("text-xs shrink-0", disabled ? "text-muted-foreground" : "text-muted-foreground/80")}>
+        <span className={cn(
+          "text-xs text-right shrink min-w-0 max-w-[40%]",
+          disabled ? "text-muted-foreground" : "text-muted-foreground/80"
+        )}>
           {previewLabel(preview)}
         </span>
       )}

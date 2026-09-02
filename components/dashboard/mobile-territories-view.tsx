@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { useAuth } from "@/hooks/use-auth"
+import { useAppSettings } from "@/hooks/use-app-settings"
 import { Loader2, MapPin, Clock } from "lucide-react"
 import { cn, fmtTerritoryNumber } from "@/lib/utils"
 import { format } from "date-fns"
@@ -47,6 +48,7 @@ function calcProgress(subdivisions: { status: string; completed: boolean }[]): n
 
 export function MobileTerritoriesView() {
   const { user, isReady } = useAuth()
+  const { settings } = useAppSettings()
   const router = useRouter()
   const supabase = getSupabaseBrowserClient()
 
@@ -64,6 +66,7 @@ export function MobileTerritoriesView() {
         .from("territories")
         .select(`
           id, number, name, color,
+          group:groups(color),
           subdivisions(status, completed),
           assignments(id, assigned_at, status, campaign:campaigns!assignments_campaign_id_fkey(name))
         `)
@@ -81,7 +84,7 @@ export function MobileTerritoriesView() {
         .from("assignments")
         .select(`
           id, assigned_at, returned_at, completed_at, status,
-          territory:territories(number, name, color),
+          territory:territories(number, name, color, group:groups(color)),
           campaign:campaigns!assignments_campaign_id_fkey(name)
         `)
         .eq("user_id", user.id)
@@ -132,7 +135,7 @@ export function MobileTerritoriesView() {
               const progress = calcProgress(t.subdivisions)
               const assignmentAt = t.assignments?.find(a => a.status === 'active')?.assigned_at
               const days = assignmentAt ? Math.ceil((Date.now() - new Date(assignmentAt).getTime()) / (1000 * 60 * 60 * 24)) : 0
-              const isOverdue = days > 90
+              const isOverdue = days > settings.overdue_days
 
               return (
                 <div
@@ -143,7 +146,7 @@ export function MobileTerritoriesView() {
                     isOverdue ? "border-destructive/20 bg-destructive/5" : "border-border"
                   )}
                 >
-                  <div className="w-1 shrink-0 self-stretch rounded-full my-3 ml-3" style={{ backgroundColor: t.color || 'hsl(var(--primary))' }} />
+                  <div className="w-1 shrink-0 self-stretch rounded-full my-3 ml-3" style={{ backgroundColor: (t as any).group?.color || t.color || 'hsl(var(--primary))' }} />
                   <div className="flex-1 p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
@@ -185,7 +188,7 @@ export function MobileTerritoriesView() {
 
                 return (
                   <div key={h.id} className="flex items-stretch hover:bg-muted/30 transition-colors overflow-hidden">
-                    <div className="w-1 shrink-0 my-3 ml-3 rounded-full" style={{ backgroundColor: h.territory?.color || 'hsl(var(--muted-foreground))' }} />
+                    <div className="w-1 shrink-0 my-3 ml-3 rounded-full" style={{ backgroundColor: (h.territory as any)?.group?.color || h.territory?.color || 'hsl(var(--muted-foreground))' }} />
                     <div className="flex flex-1 items-center justify-between gap-3 p-4">
                     <div className="flex items-center gap-3">
                       <div className="space-y-0.5">

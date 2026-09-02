@@ -2,6 +2,14 @@ export type UserRole = "admin" | "dirigente" | "publicador" | "supervisor"
 export type TerritoryType = "residencial" | "comercial" | "condominium"
 export type AssignmentStatus = "active" | "completed" | "returned" | "paused"
 export type SubdivisionStatus = "available" | "assigned" | "completed"
+export type MarkingOption = "visited" | "visited_carta" | "do_not_visit" | "not_home"
+
+export interface AppSettings {
+  overdue_days: number
+  recent_days: number
+  use_houses: boolean
+  enabled_marking_options: MarkingOption[]
+}
 
 export interface Profile {
   id: string

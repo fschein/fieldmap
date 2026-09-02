@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
 import { useAuth } from "@/hooks/use-auth"
+import { useAppSettings } from "@/hooks/use-app-settings"
 import { fmtTerritoryNumber } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Loader2, Pencil, ShieldAlert } from "lucide-react"
@@ -48,6 +49,7 @@ export default function CondominiumPage({
   const { id } = use(params)
   const router = useRouter()
   const { user, isAdmin, isSupervisor } = useAuth()
+  const { settings } = useAppSettings()
 
   const [territory, setTerritory] = useState<{
     id: string
@@ -298,6 +300,7 @@ export default function CondominiumPage({
               ? "Nenhum bloco cadastrado."
               : "Nenhuma rua cadastrada ainda."
           }
+          enabledOptions={settings.enabled_marking_options}
         />
       </div>
     </div>

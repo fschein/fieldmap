@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import type { Subdivision, Profile } from "@/lib/types"
 import { useAuth } from "@/hooks/use-auth"
+import { useAppSettings } from "@/hooks/use-app-settings"
 import { type UnitStatus } from "@/components/dashboard/house-by-house"
 import { fmtTerritoryNumber } from "@/lib/utils"
 import { QuadraEditor, type EditableQuadra } from "@/components/dashboard/quadra-editor"
@@ -85,6 +86,7 @@ export default function TerritoryDetailPage({
 }) {
   const { id } = use(params)
   const { user, isAdmin, isSupervisor } = useAuth()
+  const { settings } = useAppSettings()
   const searchParams = useSearchParams()
   const router = useRouter()
   const [territory, setTerritory] = useState<TerritoryWithDetails | null>(null)
@@ -472,7 +474,7 @@ export default function TerritoryDetailPage({
               Editar mapa
             </Link>
           </Button>
-          {isSupervisor && (
+          {isSupervisor && settings.use_houses && (
             <Button
               variant="outline"
               size="sm"
@@ -658,13 +660,13 @@ export default function TerritoryDetailPage({
                             Designar
                           </DropdownMenuItem>
                         )}
-                        {isSupervisor && (
+                        {isSupervisor && settings.use_houses && (
                           <DropdownMenuItem onClick={() => { setFocusGroupId(subdivisions.id); setEditorOpen(true) }}>
                             <Home className="mr-2 h-4 w-4" />
                             Editar casas desta quadra
                           </DropdownMenuItem>
                         )}
-                        {isSupervisor && (
+                        {isSupervisor && settings.use_houses && (
                           <DropdownMenuItem onClick={() => handleGenerateFieldLink(subdivisions.id)}>
                             <Link2 className="mr-2 h-4 w-4" />
                             Link de campo

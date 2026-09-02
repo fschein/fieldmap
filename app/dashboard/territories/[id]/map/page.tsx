@@ -39,6 +39,7 @@ import {
 } from "lucide-react"
 import type { TerritoryWithSubdivisions, Subdivision } from "@/lib/types"
 import { useAuth } from "@/hooks/use-auth"
+import { useAppSettings } from "@/hooks/use-app-settings"
 import { countExpiredDnvs, isDnvExpired } from "@/lib/utils/do-not-visit"
 
 const TerritoryMap = dynamic(
@@ -64,6 +65,7 @@ export default function TerritoryMapPage({
   const { id } = use(params)
   const router = useRouter()
   const { isSupervisor } = useAuth()
+  const { settings } = useAppSettings()
   const [territory, setTerritory] = useState<TerritoryWithSubdivisions | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -582,7 +584,7 @@ export default function TerritoryMapPage({
                         <div className="flex items-center justify-between gap-2 mb-1.5">
                           <span className="font-bold text-foreground text-sm truncate">{subdivision.name}</span>
                           <div className="flex items-center gap-1 shrink-0">
-                            {isSupervisor && (
+                            {isSupervisor && settings.use_houses && (
                               <button
                                 className="hidden md:flex w-7 h-7 items-center justify-center rounded-lg hover:bg-muted text-muted-foreground transition-all"
                                 onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/territories/${id}?editHouses=${subdivision.id}`) }}
