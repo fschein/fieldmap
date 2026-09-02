@@ -7,7 +7,7 @@ import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Loader2, Check, Mail, Ban, Home } from "lucide-react"
+import { Loader2, Check, Mail, Ban, DoorClosed } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import type { MarkingOption } from "@/lib/types"
@@ -26,7 +26,7 @@ const MARKING_OPTIONS: {
   { key: "visited", label: "Falou com morador", icon: Check, iconClass: OPTION_ICON_CLASS },
   { key: "visited_carta", label: "Deixou carta", icon: Mail, iconClass: OPTION_ICON_CLASS },
   { key: "do_not_visit", label: "Não visitar", icon: Ban, iconClass: OPTION_ICON_CLASS },
-  { key: "not_home", label: "Não em casa", icon: Home, iconClass: OPTION_ICON_CLASS, isNew: true },
+  { key: "not_home", label: "Não em casa", icon: DoorClosed, iconClass: OPTION_ICON_CLASS, isNew: true },
 ]
 
 function SectionCard({ children, className }: { children: React.ReactNode; className?: string }) {
@@ -170,14 +170,14 @@ export default function SettingsPage() {
         <Divider />
         <DaysRow
           label="Território atrasado"
-          description="A partir de quantos dias sem visitas o território fica marcado como atrasado"
+          description="A partir de quantos dias designado (em campo, sem devolver) o território fica marcado como atrasado"
           value={overdueDays}
           onChange={setOverdueDays}
         />
         <Divider />
         <DaysRow
           label="Território muito recente"
-          description="Até quantos dias desde a última entrega o território é considerado recente demais para reservar de novo"
+          description="Quantos dias o território é considerado recente demais pra ser designado novamente"
           value={recentDays}
           onChange={setRecentDays}
         />

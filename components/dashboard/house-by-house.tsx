@@ -4,7 +4,7 @@ import { useState, type ReactNode, type CSSProperties } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { cn, compareHouseNumbers } from "@/lib/utils"
-import { ChevronDown, ChevronUp, Loader2, Ban, Check, CheckCircle2, FlagOff, Mail, Home } from "lucide-react"
+import { ChevronDown, ChevronUp, Loader2, Ban, Check, CheckCircle2, FlagOff, Mail, DoorClosed } from "lucide-react"
 import type { MarkingOption } from "@/lib/types"
 
 // ── Cores exatas da gaveta de marcação (mock aprovado) ──
@@ -110,7 +110,7 @@ function statusChipIcon(status: UnitStatus) {
     case "do_not_visit":
       return <Ban className="h-4 w-4" />
     case "not_home":
-      return <Home className="h-4 w-4" />
+      return <DoorClosed className="h-4 w-4" />
     default:
       return null
   }
@@ -133,6 +133,10 @@ export function HouseByHouse({
   enabledOptions = ["visited", "visited_carta", "do_not_visit"],
 }: HouseByHouseProps) {
   const isEnabled = (opt: MarkingOption) => enabledOptions.includes(opt)
+  // "Não visitar" e "deixou carta" só fazem sentido como progresso quando
+  // "falou com morador" também está em jogo — sem ele, a barra não
+  // representa nada de fato "concluído".
+  const showProgress = enabledOptions.includes("visited")
   const [expandedId, setExpandedId] = useState<string | null>(groups[0]?.id ?? null)
   const [activeUnit, setActiveUnit] = useState<HouseUnit | null>(null)
   const [saving, setSaving] = useState(false)
@@ -187,15 +191,19 @@ export function HouseByHouse({
               <div className="flex-1 min-w-0 text-left">
                 <p className="font-semibold text-sm text-foreground truncate">{group.label}</p>
                 <div className="mt-1.5 flex items-center gap-2">
-                  <div className="h-1.5 flex-1 max-w-[140px] rounded-full bg-muted overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-primary transition-all"
-                      style={{ width: total ? `${(doneCount / total) * 100}%` : "0%" }}
-                    />
-                  </div>
-                  <span className="text-[0.6875rem] text-muted-foreground tabular-nums shrink-0">
-                    {doneCount}/{total}
-                  </span>
+                  {showProgress && (
+                    <>
+                      <div className="h-1.5 flex-1 max-w-[140px] rounded-full bg-muted overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all"
+                          style={{ width: total ? `${(doneCount / total) * 100}%` : "0%" }}
+                        />
+                      </div>
+                      <span className="text-[0.6875rem] text-muted-foreground tabular-nums shrink-0">
+                        {doneCount}/{total}
+                      </span>
+                    </>
+                  )}
                   {group.completed && (
                     <Badge variant="secondary" className="text-[0.5625rem] h-4 px-1">Concluída</Badge>
                   )}
@@ -339,7 +347,7 @@ export function HouseByHouse({
                         className="flex items-center justify-center disabled:opacity-60"
                         style={{ height: 60, borderRadius: 14, gap: 10, background: "transparent", color: "oklch(0.68 0.12 235)", border: "1.5px solid oklch(0.68 0.12 235)", fontSize: 16.5, fontWeight: 700 }}
                       >
-                        <Home style={{ width: 20, height: 20 }} />
+                        <DoorClosed style={{ width: 20, height: 20 }} />
                         Não em casa
                       </button>
                     )}

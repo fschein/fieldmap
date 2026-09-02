@@ -45,6 +45,7 @@ export function QuadraHouseByHouse({
   const [expandedQuadraId, setExpandedQuadraId] = useState<string | null>(
     initialExpandedQuadraId ?? null
   )
+  const showProgress = !enabledOptions || enabledOptions.includes("visited")
 
   return (
     <div className="space-y-2 max-w-[640px] mx-auto">
@@ -69,17 +70,19 @@ export function QuadraHouseByHouse({
             >
               <div className="flex-1 min-w-0 text-left">
                 <p className="font-semibold text-sm text-foreground truncate">{quadra.label}</p>
-                <div className="mt-1.5 flex items-center gap-2">
-                  <div className="h-1.5 flex-1 max-w-[140px] rounded-full bg-muted overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-primary transition-all"
-                      style={{ width: total ? `${(done / total) * 100}%` : "0%" }}
-                    />
+                {showProgress && (
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <div className="h-1.5 flex-1 max-w-[140px] rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-primary transition-all"
+                        style={{ width: total ? `${(done / total) * 100}%` : "0%" }}
+                      />
+                    </div>
+                    <span className="text-[0.6875rem] text-muted-foreground tabular-nums shrink-0">
+                      {done}/{total}
+                    </span>
                   </div>
-                  <span className="text-[0.6875rem] text-muted-foreground tabular-nums shrink-0">
-                    {done}/{total}
-                  </span>
-                </div>
+                )}
               </div>
               {isExpanded ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" /> : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />}
             </button>
