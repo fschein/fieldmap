@@ -156,3 +156,11 @@
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* Ícone nativo de calendário/relógio (input type="date"/"time") vem preto
+   fixo do navegador — some no fundo escuro do modo dark sem isso. */
+.dark input[type="date"]::-webkit-calendar-picker-indicator,
+.dark input[type="time"]::-webkit-calendar-picker-indicator,
+.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+

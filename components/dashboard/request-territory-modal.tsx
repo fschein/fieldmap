@@ -5,14 +5,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Loader2, MapPin, CheckCircle2, ArrowRight } from "lucide-react"
+import { Loader2, CheckCircle2 } from "lucide-react"
 import { toast } from "sonner"
 import { cn, fmtTerritoryNumber } from "@/lib/utils"
 import { Territory, Group } from "@/lib/types"
-import { useRequestTerritory, UrgentGroupSuggestion } from "@/hooks/use-request-territory"
+import { useRequestTerritory, RegionPreview } from "@/hooks/use-request-territory"
 import { useAuth } from "@/hooks/use-auth"
 import { getSupabaseBrowserClient } from "@/lib/supabase/client"
-import { differenceInDays, parseISO } from "date-fns"
 
 const supabase = getSupabaseBrowserClient()
 
@@ -30,9 +29,21 @@ interface ActiveCampaign {
 
 type Step = "select-group" | "confirm"
 
+const REASON_LABEL: Record<string, string> = {
+  empty: "Nenhum território nesta região",
+  covered: "Territórios cobertos pela campanha",
+  recent: "Todos trabalhados recentemente",
+}
+
+function previewLabel(preview: RegionPreview | undefined): string {
+  if (!preview) return ""
+  if (preview.reason !== "ok") return REASON_LABEL[preview.reason] ?? ""
+  return preview.days === Infinity ? "Nunca trabalhado" : `${preview.days} dias sem trabalho`
+}
+
 function priorityReason(territory: Territory): string {
   if (!territory.last_completed_at) return "Nunca trabalhado"
-  const days = differenceInDays(new Date(), parseISO(territory.last_completed_at))
+  const days = Math.floor((Date.now() - new Date(territory.last_completed_at).getTime()) / 86400000)
   return `Sem ser trabalhado há ${days} ${days === 1 ? "dia" : "dias"}`
 }
 
@@ -41,36 +52,30 @@ export function RequestTerritoryModal({
   onOpenChange,
   onSuccess,
 }: RequestTerritoryModalProps) {
-  const { fetchGroups, fetchAvailableTerritory, findMostUrgentGroup, requestTerritory } = useRequestTerritory()
+  const { fetchGroups, fetchRegionPreviews, requestTerritory } = useRequestTerritory()
   const { user } = useAuth()
 
   const [step, setStep] = useState<Step>("select-group")
   const [groups, setGroups] = useState<Group[]>([])
   const [loadingGroups, setLoadingGroups] = useState(false)
-  const [selectedGroupId, setSelectedGroupId] = useState("")
-  const [selectedIsCommercial, setSelectedIsCommercial] = useState(false)
-  const [loadingGroupId, setLoadingGroupId] = useState<string | null>(null)
+  const [previews, setPreviews] = useState<Record<string, RegionPreview>>({})
   const [territory, setTerritory] = useState<Territory | null>(null)
-  const [noTerritory, setNoTerritory] = useState(false)
-  const [noCampaignTerritory, setNoCampaignTerritory] = useState(false)
   const [confirming, setConfirming] = useState(false)
-  const [tooRecent, setTooRecent] = useState(false)
-  const [crossGroupTerritory, setCrossGroupTerritory] = useState(false)
-  const [urgentSuggestion, setUrgentSuggestion] = useState<UrgentGroupSuggestion | null>(null)
   const [activeCampaign, setActiveCampaign] = useState<ActiveCampaign | null>(null)
   const [campaignMode, setCampaignMode] = useState(false)
+
+  const loadPreviews = useCallback(async (groupsData: Group[], campaign: { id: string } | null) => {
+    const result = await fetchRegionPreviews(groupsData, campaign)
+    setPreviews(result)
+  }, [fetchRegionPreviews])
 
   useEffect(() => {
     if (!open) return
     setStep("select-group")
-    setSelectedGroupId("")
-    setSelectedIsCommercial(false)
     setTerritory(null)
-    setNoTerritory(false)
-    setNoCampaignTerritory(false)
-    setTooRecent(false)
-    setUrgentSuggestion(null)
-    setCrossGroupTerritory(false)
+    setPreviews({})
+    setGroups([])
+    setLoadingGroups(true)
 
     const today = new Date().toISOString().slice(0, 10)
 
@@ -87,58 +92,26 @@ export function RequestTerritoryModal({
           if (c.end_date && today > c.end_date) return false
           return true
         })
-        if (found) {
-          setActiveCampaign({ id: found.id, name: found.name, startDate: found.start_date })
-          setCampaignMode(true)
-        } else {
-          setActiveCampaign(null)
-          setCampaignMode(false)
-        }
+        const campaign = found ? { id: found.id, name: found.name, startDate: found.start_date } : null
+        setActiveCampaign(campaign)
+        setCampaignMode(!!campaign)
       })
-      .catch(() => toast.error("Erro ao carregar grupos."))
+      .catch(() => toast.error("Erro ao carregar regiões."))
       .finally(() => setLoadingGroups(false))
-
-    setLoadingGroups(true)
   }, [open, fetchGroups])
 
-  const handleSelect = useCallback(async (opts: { groupId?: string; commercial?: boolean; general?: boolean }) => {
-    const key = opts.commercial ? "comercial" : opts.general ? "geral" : (opts.groupId ?? "")
-    setSelectedGroupId(key)
-    setSelectedIsCommercial(!!opts.commercial)
-    setLoadingGroupId(key)
-    setNoTerritory(false)
-    setNoCampaignTerritory(false)
-    setTooRecent(false)
-    setUrgentSuggestion(null)
-    try {
-      const campaign = campaignMode && activeCampaign
-        ? { id: activeCampaign.id, startDate: activeCampaign.startDate }
-        : null
-      const selector = opts.commercial
-        ? { territoryType: "comercial" as const }
-        : opts.general
-        ? { general: true as const }
-        : { groupId: opts.groupId! }
-      const { territory: result, blockedByRecency, crossGroup, allCoveredByCampaign } = await fetchAvailableTerritory(selector, campaign)
-      setTerritory(result)
-      setCrossGroupTerritory(!!crossGroup)
-      if (result === null) {
-        if (blockedByRecency) {
-          setTooRecent(true)
-          findMostUrgentGroup().then(setUrgentSuggestion)
-        } else if (campaignMode && allCoveredByCampaign) {
-          setNoCampaignTerritory(true)
-        } else {
-          setNoTerritory(true)
-        }
-      }
-      setStep("confirm")
-    } catch {
-      toast.error("Erro ao buscar território.")
-    } finally {
-      setLoadingGroupId(null)
-    }
-  }, [fetchAvailableTerritory, campaignMode, activeCampaign])
+  // Recalcula as prévias sempre que os grupos carregarem ou o modo campanha mudar
+  useEffect(() => {
+    if (!open || loadingGroups) return
+    loadPreviews(groups, campaignMode ? activeCampaign : null)
+  }, [open, loadingGroups, groups, campaignMode, activeCampaign, loadPreviews])
+
+  const handleSelect = useCallback((key: string) => {
+    const preview = previews[key]
+    if (!preview?.territory) return
+    setTerritory(preview.territory)
+    setStep("confirm")
+  }, [previews])
 
   const handleConfirm = useCallback(async () => {
     if (!territory || !user?.id) return
@@ -170,14 +143,9 @@ export function RequestTerritoryModal({
   const handleBack = useCallback(() => {
     setStep("select-group")
     setTerritory(null)
-    setNoTerritory(false)
-    setNoCampaignTerritory(false)
-    setTooRecent(false)
-    setUrgentSuggestion(null)
   }, [])
 
   const territoryGroup = territory ? groups.find((g) => g.id === territory.group_id) : undefined
-  const COMMERCIAL_KEY = "comercial"
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -217,65 +185,32 @@ export function RequestTerritoryModal({
               ) : (
                 <div className="flex flex-col gap-1.5">
                   {groups.map((g) => (
-                    <button
+                    <RegionButton
                       key={g.id}
-                      onClick={() => handleSelect({ groupId: g.id })}
-                      disabled={loadingGroupId !== null}
-                      className={cn(
-                        "flex items-center gap-3 w-full px-3 py-2.5 rounded-lg border text-sm font-medium text-left transition-colors",
-                        "bg-card hover:bg-muted/60 border-border",
-                        "disabled:opacity-50 disabled:cursor-not-allowed"
-                      )}
-                    >
-                      {loadingGroupId === g.id ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0 text-muted-foreground" />
-                      ) : (
-                        <span
-                          className="inline-block h-3 w-3 rounded-full shrink-0"
-                          style={{ backgroundColor: g.color }}
-                        />
-                      )}
-                      Região {g.name}
-                    </button>
+                      label={`Região ${g.name}`}
+                      dotColor={g.color}
+                      preview={previews[g.id]}
+                      onClick={() => handleSelect(g.id)}
+                    />
                   ))}
 
                   <div className="h-px bg-border my-0.5" />
 
-                  <button
-                    onClick={() => handleSelect({ general: true })}
-                    disabled={loadingGroupId !== null}
-                    className={cn(
-                      "flex items-center gap-3 w-full px-3 py-2.5 rounded-lg border text-sm font-medium text-left transition-colors",
-                      "bg-card hover:bg-muted/60 border-border",
-                      "disabled:opacity-50 disabled:cursor-not-allowed"
-                    )}
-                  >
-                    {loadingGroupId === "geral" ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0 text-muted-foreground" />
-                    ) : (
-                      <span className="inline-block h-3 w-3 rounded-full shrink-0 bg-muted-foreground" />
-                    )}
-                    Geral
-                  </button>
+                  <RegionButton
+                    label="Geral"
+                    dotClassName="bg-muted-foreground"
+                    preview={previews.geral}
+                    onClick={() => handleSelect("geral")}
+                  />
 
                   <div className="h-px bg-border my-0.5" />
 
-                  <button
-                    onClick={() => handleSelect({ commercial: true })}
-                    disabled={loadingGroupId !== null}
-                    className={cn(
-                      "flex items-center gap-3 w-full px-3 py-2.5 rounded-lg border text-sm font-medium text-left transition-colors",
-                      "bg-card hover:bg-muted/60 border-border",
-                      "disabled:opacity-50 disabled:cursor-not-allowed"
-                    )}
-                  >
-                    {loadingGroupId === COMMERCIAL_KEY ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0 text-muted-foreground" />
-                    ) : (
-                      <span className="inline-block h-3 w-3 rounded-full shrink-0 bg-amber-500" />
-                    )}
-                    Comercial
-                  </button>
+                  <RegionButton
+                    label="Comercial"
+                    dotClassName="bg-amber-500"
+                    preview={previews.comercial}
+                    onClick={() => handleSelect("comercial")}
+                  />
                 </div>
               )}
             </div>
@@ -284,56 +219,12 @@ export function RequestTerritoryModal({
 
         {step === "confirm" && (
           <div className="space-y-5 pt-1">
-            {noCampaignTerritory ? (
-              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-1">
-                <p className="text-sm font-medium text-foreground">
-                  Todos os territórios desta região já foram cobertos na campanha.
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Escolha outra região ou desmarque o modo campanha.
-                </p>
-              </div>
-            ) : tooRecent ? (
-              <div className="space-y-2">
-                <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-4">
-                  <p className="text-sm font-medium text-foreground">
-                    Territórios desta região foram trabalhados recentemente.
-                  </p>
-                </div>
-                {urgentSuggestion && (
-                  <button
-                    onClick={() => handleSelect({ groupId: urgentSuggestion.groupId })}
-                    disabled={loadingGroupId !== null}
-                    className="w-full flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3 text-left hover:bg-muted/60 transition-colors disabled:opacity-50"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-muted-foreground">Região com territórios mais urgentes</p>
-                      <p className="text-sm font-semibold text-foreground">
-                        {urgentSuggestion.groupName}
-                        <span className="font-normal text-muted-foreground ml-1">
-                          · {urgentSuggestion.days === 9999 ? "nunca trabalhado" : `${urgentSuggestion.days} dias`}
-                        </span>
-                      </p>
-                    </div>
-                    {loadingGroupId === urgentSuggestion.groupId
-                      ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground shrink-0" />
-                      : <ArrowRight className="h-4 w-4 text-emerald-500 shrink-0" />
-                    }
-                  </button>
-                )}
-              </div>
-            ) : noTerritory || !territory ? (
-              <div className="rounded-lg border border-border bg-muted/30 p-4">
-                <p className="text-sm text-muted-foreground">
-                  Nenhum território disponível nesta região no momento.
-                </p>
-              </div>
-            ) : (
+            {territory ? (
               <div className={cn("rounded-xl border p-4 space-y-3", "bg-muted/30")}>
                 <div className="flex items-center gap-3">
                   <div
                     className="h-8 w-1 rounded-full shrink-0"
-                    style={{ backgroundColor: selectedIsCommercial ? "#f59e0b" : (territoryGroup?.color || "hsl(var(--muted-foreground))") }}
+                    style={{ backgroundColor: territoryGroup?.color || "hsl(var(--muted-foreground))" }}
                   />
                   <div>
                     <p className="font-semibold text-foreground text-base leading-tight">
@@ -350,13 +241,12 @@ export function RequestTerritoryModal({
                   <CheckCircle2 className="h-3.5 w-3.5 text-success shrink-0" />
                   <span>{priorityReason(territory)}</span>
                 </div>
-
-                {crossGroupTerritory && (
-                  <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 rounded-lg px-3 py-2 border border-amber-500/20">
-                    <ArrowRight className="h-3.5 w-3.5 shrink-0" />
-                    <span>Este território é de outra região, mas está muito atrasado.</span>
-                  </div>
-                )}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-border bg-muted/30 p-4">
+                <p className="text-sm text-muted-foreground">
+                  Nenhum território disponível nesta região no momento.
+                </p>
               </div>
             )}
 
@@ -375,5 +265,46 @@ export function RequestTerritoryModal({
         )}
       </DialogContent>
     </Dialog>
+  )
+}
+
+function RegionButton({
+  label,
+  dotColor,
+  dotClassName,
+  preview,
+  onClick,
+}: {
+  label: string
+  dotColor?: string
+  dotClassName?: string
+  preview?: RegionPreview
+  onClick: () => void
+}) {
+  const disabled = !preview || preview.reason !== "ok"
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "flex items-center gap-3 w-full px-3 py-2.5 rounded-lg border text-sm font-medium text-left transition-colors",
+        "bg-card border-border",
+        disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-muted/60"
+      )}
+    >
+      {dotColor ? (
+        <span className="inline-block h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: dotColor }} />
+      ) : (
+        <span className={cn("inline-block h-3 w-3 rounded-full shrink-0", dotClassName)} />
+      )}
+      <span className="flex-1 min-w-0 truncate">{label}</span>
+      {!preview ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0 text-muted-foreground" />
+      ) : (
+        <span className={cn("text-xs shrink-0", disabled ? "text-muted-foreground" : "text-muted-foreground/80")}>
+          {previewLabel(preview)}
+        </span>
+      )}
+    </button>
   )
 }
