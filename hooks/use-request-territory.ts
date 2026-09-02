@@ -142,7 +142,23 @@ export function useRequestTerritory() {
       })
       const campaignId = activeCampaign?.id ?? null
 
-      const { data: inserted, error: assignError } = await supabase
+      // Reserva o território primeiro, e só se ele ainda estiver livre
+      // (.is("assigned_to", null)) — evita a corrida de duas pessoas
+      // pedindo o mesmo território ao mesmo tempo: só uma das duas
+      // atualizações bate nessa condição, a outra afeta 0 linhas.
+      const { data: updatedTerr, error: updateError } = await supabase
+        .from("territories")
+        .update({ assigned_to: user.id, status: "assigned", campaign_id: campaignId })
+        .eq("id", territoryId)
+        .is("assigned_to", null)
+        .select("id")
+
+      if (updateError) throw updateError
+      if (!updatedTerr || updatedTerr.length === 0) {
+        throw new Error("Esse território acabou de ser designado para outra pessoa. Tenta pedir de novo.")
+      }
+
+      const { error: assignError } = await supabase
         .from("assignments")
         .insert({
           territory_id: territoryId,
@@ -151,21 +167,12 @@ export function useRequestTerritory() {
           assigned_at: new Date().toISOString(),
           campaign_id: campaignId,
         })
-        .select("id")
-        .single()
-      if (assignError) throw assignError
 
-      const { data: updatedTerr, error: updateError } = await supabase
-        .from("territories")
-        .update({ assigned_to: user.id, status: "assigned", campaign_id: campaignId })
-        .eq("id", territoryId)
-        .select("id")
-
-      if (updateError || !updatedTerr || updatedTerr.length === 0) {
-        // Desfaz a designação criada acima para não deixar estado inconsistente
-        // (assignment ativo sem o território realmente marcado como designado).
-        await supabase.from("assignments").delete().eq("id", inserted.id)
-        throw updateError ?? new Error("Não foi possível atualizar o território (0 linhas afetadas).")
+      if (assignError) {
+        // Desfaz a reserva do território pra não deixar ele preso a
+        // ninguém sem uma designação real por trás.
+        await supabase.from("territories").update({ assigned_to: null, status: "available", campaign_id: null }).eq("id", territoryId)
+        throw assignError
       }
     },
     [user?.id]
