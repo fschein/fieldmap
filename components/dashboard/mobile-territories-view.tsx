@@ -64,6 +64,7 @@ export function MobileTerritoriesView() {
         .from("territories")
         .select(`
           id, number, name, color,
+          group:groups(color),
           subdivisions(status, completed),
           assignments(id, assigned_at, status, campaign:campaigns!assignments_campaign_id_fkey(name))
         `)
@@ -81,7 +82,7 @@ export function MobileTerritoriesView() {
         .from("assignments")
         .select(`
           id, assigned_at, returned_at, completed_at, status,
-          territory:territories(number, name, color),
+          territory:territories(number, name, color, group:groups(color)),
           campaign:campaigns!assignments_campaign_id_fkey(name)
         `)
         .eq("user_id", user.id)
@@ -143,7 +144,7 @@ export function MobileTerritoriesView() {
                     isOverdue ? "border-destructive/20 bg-destructive/5" : "border-border"
                   )}
                 >
-                  <div className="w-1 shrink-0 self-stretch rounded-full my-3 ml-3" style={{ backgroundColor: t.color || 'hsl(var(--primary))' }} />
+                  <div className="w-1 shrink-0 self-stretch rounded-full my-3 ml-3" style={{ backgroundColor: (t as any).group?.color || t.color || 'hsl(var(--primary))' }} />
                   <div className="flex-1 p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
@@ -185,7 +186,7 @@ export function MobileTerritoriesView() {
 
                 return (
                   <div key={h.id} className="flex items-stretch hover:bg-muted/30 transition-colors overflow-hidden">
-                    <div className="w-1 shrink-0 my-3 ml-3 rounded-full" style={{ backgroundColor: h.territory?.color || 'hsl(var(--muted-foreground))' }} />
+                    <div className="w-1 shrink-0 my-3 ml-3 rounded-full" style={{ backgroundColor: (h.territory as any)?.group?.color || h.territory?.color || 'hsl(var(--muted-foreground))' }} />
                     <div className="flex flex-1 items-center justify-between gap-3 p-4">
                     <div className="flex items-center gap-3">
                       <div className="space-y-0.5">

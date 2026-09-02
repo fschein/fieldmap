@@ -70,7 +70,7 @@ export default function MyAssignmentsPage() {
     try {
       const { data: personal, error } = await supabase
         .from("territories")
-        .select(`*, campaign:campaigns(*), subdivisions(*), assignments(${ASSIGNMENTS_SELECT})`)
+        .select(`*, campaign:campaigns(*), group:groups(color), subdivisions(*), assignments(${ASSIGNMENTS_SELECT})`)
         .eq("assigned_to", user.id)
         .abortSignal(signal)
         .order("number", { ascending: true })
@@ -356,7 +356,7 @@ export default function MyAssignmentsPage() {
                     )}
                     className="flex-1 text-left flex items-stretch active:scale-[0.99] transition-transform"
                   >
-                    <div className="w-1 shrink-0 self-stretch my-2.5 ml-2.5 rounded-full" style={{ backgroundColor: t.color || "var(--primary)" }} />
+                    <div className="w-1 shrink-0 self-stretch my-2.5 ml-2.5 rounded-full" style={{ backgroundColor: (t as any).group?.color || t.color || "var(--primary)" }} />
                     <div className="flex-1 px-3 py-2.5 space-y-1.5">
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium text-foreground flex-1 truncate">

@@ -233,7 +233,7 @@ export default function AssignmentsPage() {
         id: t.id,
         number: t.number || "",
         name: t.name,
-        color: t.color || "#044454",
+        color: (t as any).group?.color || t.color || "#044454",
         status,
         activePublisher: activeAssig?.publisherName || null,
         assignedAt: activeAssig?.assigned_at || null,
