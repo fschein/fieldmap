@@ -268,7 +268,11 @@ export default function EditUserPage({
 
           <div className="space-y-1">
             <Label className="text-xs">Tipo de Usuário</Label>
-            <Select value={formData.role} onValueChange={(v: any) => setFormData({ ...formData, role: v })}>
+            <Select
+              value={formData.role}
+              onValueChange={(v: any) => setFormData({ ...formData, role: v })}
+              disabled={user?.id === id && formData.role === "admin"}
+            >
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="publicador">Publicador</SelectItem>
@@ -277,6 +281,11 @@ export default function EditUserPage({
                 <SelectItem value="admin">Administrador</SelectItem>
               </SelectContent>
             </Select>
+            {user?.id === id && formData.role === "admin" && (
+              <p className="text-[0.6875rem] text-muted-foreground">
+                Você não pode rebaixar seu próprio perfil de administrador — peça pra outro admin fazer isso.
+              </p>
+            )}
           </div>
 
           <div className="space-y-1">
