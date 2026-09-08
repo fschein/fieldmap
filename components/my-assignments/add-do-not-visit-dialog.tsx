@@ -14,7 +14,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Loader2, MapPinOff } from "lucide-react"
 
 interface AddDoNotVisitDialogProps {
@@ -36,7 +35,6 @@ export function AddDoNotVisitDialog({
 }: AddDoNotVisitDialogProps) {
   const { user } = useAuth()
   const [address, setAddress] = useState("")
-  const [notes, setNotes] = useState("")
   const [saving, setSaving] = useState(false)
   const supabase = getSupabaseBrowserClient()
 
@@ -50,7 +48,6 @@ export function AddDoNotVisitDialog({
         latitude,
         longitude,
         address: address.trim() || null,
-        notes: notes.trim() || null,
         created_by: user.id
       })
 
@@ -59,7 +56,6 @@ export function AddDoNotVisitDialog({
       }
 
       setAddress("")
-      setNotes("")
       onSuccess()
       onOpenChange(false)
     } catch (error: any) {
@@ -91,16 +87,6 @@ export function AddDoNotVisitDialog({
               placeholder="Ex: Rua A, Casa 12"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="notes">Observações (opcional)</Label>
-            <Textarea
-              id="notes"
-              placeholder="Ex: Morador muito bravo, pediu para nunca bater palma lá."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
             />
           </div>
           <div className="text-xs text-muted-foreground bg-slate-50 p-2 rounded border">
