@@ -6,6 +6,8 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "start": "next start",
     "setup": "node scripts/setup.js",
     "supabase:init": "supabase init",
@@ -91,7 +93,8 @@
     "supabase": "^1.191.3",
     "tailwindcss": "^4.1.9",
     "tw-animate-css": "1.3.3",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

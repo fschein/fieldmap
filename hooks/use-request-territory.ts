@@ -17,20 +17,28 @@ export interface RegionPreview {
 }
 
 // Data "efetiva" de última atividade: a mais recente entre last_completed_at
-// (última conclusão de verdade) e o assigned_at de qualquer designação — pra
-// não mostrar um território como "há 66 dias sem trabalho" quando na
-// verdade alguém teve ele em mãos até a campanha pausar, só nunca chegou a
-// concluir (o que só atualiza last_completed_at na conclusão, não na pausa).
-function effectiveLastActivity(t: any): string | null {
+// (última conclusão de verdade) e o assigned_at das designações que ainda
+// estão em mãos (active/paused) — pra não mostrar um território como "há 66
+// dias sem trabalho" quando na verdade alguém tem ele até hoje, só nunca
+// chegou a concluir (o que só atualiza last_completed_at na conclusão, não
+// na pausa por campanha). Designação "returned" fica de fora de propósito:
+// pedir e devolver sem fazer nada não é atividade — antes disso entrava aqui
+// e travava o território em cooldown a partir da data do pedido, não da
+// devolução nem de trabalho de verdade. "completed" também fica de fora:
+// last_completed_at já é a fonte correta pra conclusão, mais precisa que o
+// assigned_at da designação que a gerou.
+export function effectiveLastActivity(t: any): string | null {
   const dates = [
     t.last_completed_at,
-    ...((t.assignments ?? []) as { assigned_at: string | null }[]).map((a) => a.assigned_at),
+    ...((t.assignments ?? []) as { assigned_at: string | null; status?: string }[])
+      .filter((a) => a.status === "active" || a.status === "paused")
+      .map((a) => a.assigned_at),
   ].filter(Boolean) as string[]
   if (!dates.length) return null
   return dates.reduce((max, d) => (d > max ? d : max))
 }
 
-function pickOldest(candidates: any[]): Territory & { effective_last_activity: string | null } {
+export function pickOldest(candidates: any[]): Territory & { effective_last_activity: string | null } {
   const sixMonthsAgo = new Date()
   sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
   const sixMonthsAgoStr = sixMonthsAgo.toISOString()
@@ -57,7 +65,7 @@ function pickOldest(candidates: any[]): Territory & { effective_last_activity: s
   return { ...(territory as Territory), effective_last_activity: ela }
 }
 
-function buildPreview(scoped: any[], coveredIds: Set<string> | null, minRestDays: number): RegionPreview {
+export function buildPreview(scoped: any[], coveredIds: Set<string> | null, minRestDays: number): RegionPreview {
   if (!scoped.length) return { territory: null, days: Infinity, reason: "empty" }
 
   const notCovered = coveredIds ? scoped.filter((t) => !coveredIds.has(t.id)) : scoped
@@ -75,6 +83,64 @@ function buildPreview(scoped: any[], coveredIds: Set<string> | null, minRestDays
     ? Math.floor((Date.now() - new Date(territory.effective_last_activity).getTime()) / 86400000)
     : Infinity
   return { territory, days, reason: "ok" }
+}
+
+/**
+ * Núcleo de `requestTerritory`, extraído do hook pra ser testável sem
+ * precisar renderizar componente/hook nenhum — recebe o client do
+ * Supabase e o userId por parâmetro em vez de fechar sobre eles.
+ */
+export async function requestTerritoryCore(
+  supabaseClient: ReturnType<typeof getSupabaseBrowserClient>,
+  userId: string,
+  territoryId: string
+): Promise<void> {
+  const today = new Date().toISOString().slice(0, 10)
+  const { data: campaigns } = await supabaseClient
+    .from("campaigns")
+    .select("id, start_date, end_date")
+    .eq("active", true)
+
+  const activeCampaign = (campaigns ?? []).find((c: { id: string; start_date: string | null; end_date: string | null }) => {
+    if (!c.start_date) return false
+    if (today < c.start_date) return false
+    if (c.end_date && today > c.end_date) return false
+    return true
+  })
+  const campaignId = activeCampaign?.id ?? null
+
+  // Reserva o território primeiro, e só se ele ainda estiver livre
+  // (.is("assigned_to", null)) — evita a corrida de duas pessoas
+  // pedindo o mesmo território ao mesmo tempo: só uma das duas
+  // atualizações bate nessa condição, a outra afeta 0 linhas.
+  const { data: updatedTerr, error: updateError } = await supabaseClient
+    .from("territories")
+    .update({ assigned_to: userId, status: "assigned", campaign_id: campaignId })
+    .eq("id", territoryId)
+    .is("assigned_to", null)
+    .select("id")
+
+  if (updateError) throw updateError
+  if (!updatedTerr || updatedTerr.length === 0) {
+    throw new Error("Esse território acabou de ser designado para outra pessoa. Tenta pedir de novo.")
+  }
+
+  const { error: assignError } = await supabaseClient
+    .from("assignments")
+    .insert({
+      territory_id: territoryId,
+      user_id: userId,
+      status: "active",
+      assigned_at: new Date().toISOString(),
+      campaign_id: campaignId,
+    })
+
+  if (assignError) {
+    // Desfaz a reserva do território pra não deixar ele preso a
+    // ninguém sem uma designação real por trás.
+    await supabaseClient.from("territories").update({ assigned_to: null, status: "available", campaign_id: null }).eq("id", territoryId)
+    throw assignError
+  }
 }
 
 export function useRequestTerritory() {
@@ -108,7 +174,7 @@ export function useRequestTerritory() {
 
     const { data } = await supabase
       .from("territories")
-      .select("*, assignments(id, completed_at, assigned_at)")
+      .select("*, assignments(id, completed_at, assigned_at, status)")
       .in("status", ["available", "completed"])
       .is("assigned_to", null)
 
@@ -127,53 +193,7 @@ export function useRequestTerritory() {
   const requestTerritory = useCallback(
     async (territoryId: string): Promise<void> => {
       if (!user?.id) throw new Error("Usuário não autenticado")
-
-      const today = new Date().toISOString().slice(0, 10)
-      const { data: campaigns } = await supabase
-        .from("campaigns")
-        .select("id, start_date, end_date")
-        .eq("active", true)
-
-      const activeCampaign = (campaigns ?? []).find((c: { id: string; start_date: string | null; end_date: string | null }) => {
-        if (!c.start_date) return false
-        if (today < c.start_date) return false
-        if (c.end_date && today > c.end_date) return false
-        return true
-      })
-      const campaignId = activeCampaign?.id ?? null
-
-      // Reserva o território primeiro, e só se ele ainda estiver livre
-      // (.is("assigned_to", null)) — evita a corrida de duas pessoas
-      // pedindo o mesmo território ao mesmo tempo: só uma das duas
-      // atualizações bate nessa condição, a outra afeta 0 linhas.
-      const { data: updatedTerr, error: updateError } = await supabase
-        .from("territories")
-        .update({ assigned_to: user.id, status: "assigned", campaign_id: campaignId })
-        .eq("id", territoryId)
-        .is("assigned_to", null)
-        .select("id")
-
-      if (updateError) throw updateError
-      if (!updatedTerr || updatedTerr.length === 0) {
-        throw new Error("Esse território acabou de ser designado para outra pessoa. Tenta pedir de novo.")
-      }
-
-      const { error: assignError } = await supabase
-        .from("assignments")
-        .insert({
-          territory_id: territoryId,
-          user_id: user.id,
-          status: "active",
-          assigned_at: new Date().toISOString(),
-          campaign_id: campaignId,
-        })
-
-      if (assignError) {
-        // Desfaz a reserva do território pra não deixar ele preso a
-        // ninguém sem uma designação real por trás.
-        await supabase.from("territories").update({ assigned_to: null, status: "available", campaign_id: null }).eq("id", territoryId)
-        throw assignError
-      }
+      await requestTerritoryCore(supabase, user.id, territoryId)
     },
     [user?.id]
   )
