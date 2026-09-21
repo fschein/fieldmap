@@ -288,30 +288,37 @@ export default function TerritoryMapPage() {
         updateData.completed_at = null
       }
 
-      if (campaignId) {
-        const campaignUpdateData: any = {
-          subdivision_id: selectedSubdivision.id,
-          campaign_id: campaignId,
-          status: nextStatus,
-          completed: nextCompleted,
-          updated_at: new Date().toISOString(),
+      const { signal: writeSignal, clear: clearWriteTimeout } = createTimeoutSignal(15000)
+      try {
+        if (campaignId) {
+          const campaignUpdateData: any = {
+            subdivision_id: selectedSubdivision.id,
+            campaign_id: campaignId,
+            status: nextStatus,
+            completed: nextCompleted,
+            updated_at: new Date().toISOString(),
+          }
+
+          // Clear notes on completion; preserve on reopen
+          campaignUpdateData.notes = isNowCompleting ? null : (selectedSubdivision.notes ?? null)
+
+          const { error } = await supabase
+            .from("subdivision_campaign_progress")
+            .upsert(campaignUpdateData, { onConflict: "subdivision_id,campaign_id" })
+            .abortSignal(writeSignal)
+
+          if (error) throw error
+        } else {
+          const { error } = await supabase
+            .from("subdivisions")
+            .update(updateData)
+            .eq("id", selectedSubdivision.id)
+            .abortSignal(writeSignal)
+
+          if (error) throw error
         }
-        
-        // Clear notes on completion; preserve on reopen
-        campaignUpdateData.notes = isNowCompleting ? null : (selectedSubdivision.notes ?? null)
-
-        const { error } = await supabase
-          .from("subdivision_campaign_progress")
-          .upsert(campaignUpdateData, { onConflict: "subdivision_id,campaign_id" })
-
-        if (error) throw error
-      } else {
-        const { error } = await supabase
-          .from("subdivisions")
-          .update(updateData)
-          .eq("id", selectedSubdivision.id)
-
-        if (error) throw error
+      } finally {
+        clearWriteTimeout()
       }
 
       if (isNowCompleting) {
@@ -344,7 +351,7 @@ export default function TerritoryMapPage() {
       }
     } catch (error: any) {
       console.error("Erro ao atualizar quadra:", error?.message || error)
-      toast.error("Erro ao atualizar quadra")
+      toast.error(error?.name === "AbortError" ? "Tempo esgotado ao salvar quadra. Tente novamente." : "Erro ao atualizar quadra")
     }
   }
 
