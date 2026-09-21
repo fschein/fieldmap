@@ -322,7 +322,11 @@ export default function TerritoryMapPage() {
       }
 
       if (isNowCompleting) {
-        toast.success(`Quadra ${selectedSubdivision.name} concluída!`)
+        // Empurra o toast pra logo abaixo da barra do território (h-11 = 44px),
+        // em vez do topo do viewport (padrão do Toaster global) — nessa página
+        // a barra não é sticky/transparente, então o toast no topo ficava
+        // colado nela em vez de aparecer sobre o mapa.
+        toast.success(`Quadra ${selectedSubdivision.name} concluída!`, { style: { marginTop: 44 } })
         setAnimatingSubdivisionId(selectedSubdivision.id)
         setTimeout(() => setAnimatingSubdivisionId(null), 1000)
       }
