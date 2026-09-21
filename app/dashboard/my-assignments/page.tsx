@@ -79,7 +79,35 @@ export default function MyAssignmentsPage() {
 
       if (error) throw error
 
-      const fetchedTerritories: TerritoryAssignment[] = (personal as TerritoryAssignment[]) || []
+      let fetchedTerritories: TerritoryAssignment[] = (personal as TerritoryAssignment[]) || []
+
+      // Territórios com atribuição vinculada a uma campanha guardam o progresso
+      // das quadras em subdivision_campaign_progress (não em subdivisions),
+      // igual à página de detalhe do mapa — sem esse merge o card mostra o
+      // estado cru de subdivisions, que fica obsoleto durante a campanha.
+      const subdivisionIds = fetchedTerritories.flatMap((t) => t.subdivisions?.map((s) => s.id) || [])
+      if (subdivisionIds.length > 0) {
+        const { data: progressData } = await supabase
+          .from("subdivision_campaign_progress")
+          .select("*")
+          .in("subdivision_id", subdivisionIds)
+
+        if (progressData?.length) {
+          fetchedTerritories = fetchedTerritories.map((t) => {
+            const campaignId = t.assignments?.find((a) => a.status === "active")?.campaign_id
+            if (!campaignId || !t.subdivisions?.length) return t
+            return {
+              ...t,
+              subdivisions: t.subdivisions.map((s) => {
+                const prog = progressData.find((p: any) => p.subdivision_id === s.id && p.campaign_id === campaignId)
+                return prog
+                  ? { ...s, completed: prog.completed, status: prog.status, completed_at: prog.updated_at }
+                  : s
+              }),
+            }
+          })
+        }
+      }
 
       // Com campanha ativa em andamento, só mostra territórios designados
       // dentro dessa campanha — os de fora (de antes, ou de campanhas
