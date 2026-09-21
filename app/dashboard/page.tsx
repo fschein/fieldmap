@@ -173,7 +173,7 @@ export default function DashboardPage() {
         .from("assignments")
         .select(`
           id, status, assigned_at,
-          territory_id, user_id, group_id,
+          territory_id, user_id, group_id, campaign_id,
           territories ( name, number )
         `)
         .eq("status", "active")
@@ -208,6 +208,30 @@ export default function DashboardPage() {
             activeAssignee: active ? (lookup.get(active.user_id) || lookup.get(active.group_id) || '?') : undefined
           }
         })
+
+      // Territórios com designação vinculada a uma campanha guardam o
+      // progresso das quadras em subdivision_campaign_progress, não em
+      // subdivisions — sem esse merge, o progresso exibido aqui (Em campo)
+      // e na seção de campanha ativa abaixo fica obsoleto.
+      const allSubdivisionIds = tStats.flatMap((t: any) => (t.subdivisions ?? []).map((s: any) => s.id))
+      if (allSubdivisionIds.length > 0) {
+        const { data: dashProgressData } = await supabase
+          .from("subdivision_campaign_progress")
+          .select("subdivision_id, campaign_id, completed, status")
+          .in("subdivision_id", allSubdivisionIds)
+
+        if (dashProgressData?.length) {
+          tStats.forEach((t: any) => {
+            const campaignId = aData.find((a: any) => a.territory_id === t.id && a.status === "active")?.campaign_id
+            if (!campaignId || !t.subdivisions?.length) return
+            t.subdivisions = t.subdivisions.map((s: any) => {
+              const prog = dashProgressData.find((p: any) => p.subdivision_id === s.id && p.campaign_id === campaignId)
+              return prog ? { ...s, completed: prog.completed, status: prog.status } : s
+            })
+          })
+        }
+      }
+
       setTerritories(tStats)
 
       // 4. Campanha ativa
@@ -231,9 +255,9 @@ export default function DashboardPage() {
           .eq("campaign_id", activeCamp.id)
           .in("status", ["completed", "active"])
 
-        const activeTData = tData.filter((t: any) => t.status !== "inactive")
+        const activeTData = tStats
         const totalTerritories = activeTData.length
-        const subsLookup = new Map<string, any[]>(tData.map((t: any) => [t.id, t.subdivisions ?? []]))
+        const subsLookup = new Map<string, any[]>(tStats.map((t: any) => [t.id, t.subdivisions ?? []]))
 
         // Progresso por quadra dentro da campanha — mais preciso que por território,
         // pois reflete trabalho parcial em vez de exigir 100% pra contar.
