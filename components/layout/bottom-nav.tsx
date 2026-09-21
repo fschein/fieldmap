@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, MapPin, ClipboardList, User, LayoutDashboard, ChevronUp, Map, Component, Calendar, Users, LogOut } from "lucide-react"
+import { Home, MapPin, ClipboardList, User, LayoutDashboard, ChevronUp, Map, Component, Calendar, Users, LogOut, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/use-auth"
 import { useState } from "react"
@@ -30,6 +30,7 @@ export function BottomNav({ unreadCount = 0 }: { unreadCount?: number }) {
       { label: "Minhas Designações", href: "/dashboard/my-assignments", icon: MapPin },
       { label: "Minha Escala", href: "/dashboard/my-schedule", icon: ClipboardList },
       { label: "Usuários", href: "/dashboard/users", icon: Users },
+      { label: "Configurações", href: "/dashboard/settings", icon: Settings },
       { label: "Perfil", href: "/dashboard/profile", icon: User },
     ]
 
