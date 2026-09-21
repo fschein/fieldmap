@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
 import { AuthProvider } from "@/providers/auth-provider"
-import { PWAMonitor } from "@/components/providers/pwa-monitor"
+import { VersionCheck } from "@/components/providers/version-check"
 import { ServiceWorkerRegister } from "@/components/providers/sw-register"
 import { NoSelect } from "@/components/providers/no-select"
 import { Toaster } from "sonner"
@@ -44,7 +44,7 @@ export default function RootLayout({
         <AuthProvider>
           <NoSelect />
           <ServiceWorkerRegister />
-          <PWAMonitor />
+          <VersionCheck />
           {children}
           <Toaster position="top-center" richColors />
         </AuthProvider>
