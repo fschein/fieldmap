@@ -111,15 +111,19 @@ export default function TerritoryMapPage() {
           .in("subdivision_id", subdivisions.map((s: any) => s.id))
         
         if (!progressError && progressData) {
+          // Sem linha de progresso ainda pra essa campanha (campanha nova,
+          // ou campaign_id desatualizado na designação), cai pro valor cru
+          // em vez de assumir "não concluída" — senão reseta visualmente
+          // progresso real já gravado em subdivisions.
           subdivisions = subdivisions.map((s: any) => {
             const prog = progressData.find((p: any) => p.subdivision_id === s.id)
-            return {
+            return prog ? {
               ...s,
-              completed: prog ? prog.completed : false,
-              status: prog ? prog.status : "available",
-              notes: prog ? prog.notes : (s.notes || null),
-              completed_at: prog ? prog.updated_at : null
-            }
+              completed: prog.completed,
+              status: prog.status,
+              notes: prog.notes,
+              completed_at: prog.updated_at
+            } : s
           })
         }
       }
