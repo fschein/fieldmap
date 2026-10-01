@@ -52,7 +52,7 @@ export default function MapPage() {
           subdivisions ( id, name, coordinates, completed, notes )
         `).neq("status", "inactive").order("number"),
         supabase.from("assignments")
-          .select("territory_id, user_id, group_id, profiles!assignments_user_id_fkey(name), groups:groups(name)")
+          .select("territory_id, user_id, group_id, campaign_id, profiles!assignments_user_id_fkey(name), groups:groups(name)")
           .eq("status", "active"),
         supabase.from("assignments")
           .select("territory_id")
@@ -62,9 +62,11 @@ export default function MapPage() {
       const groupMap = new Map<string, GroupInfo>((gData ?? []).map((g: any) => [g.id, g]))
 
       const assigneeMap = new Map<string, string>()
+      const campaignIdByTerritory = new Map<string, string | null>()
       ;(aData ?? []).forEach((a: any) => {
         const name = a.profiles?.name || a.groups?.name || null
         if (name) assigneeMap.set(a.territory_id, name)
+        campaignIdByTerritory.set(a.territory_id, a.campaign_id ?? null)
       })
 
       // Count completed assignments per territory
@@ -73,18 +75,37 @@ export default function MapPage() {
         historyMap.set(a.territory_id, (historyMap.get(a.territory_id) ?? 0) + 1)
       })
 
+      // Territórios com designação vinculada a uma campanha guardam o
+      // progresso das quadras em subdivision_campaign_progress, não em
+      // subdivisions — sem esse merge, o mapa geral mostra progresso
+      // obsoleto durante uma campanha ativa (igual ao bug já corrigido
+      // no dashboard e em my-assignments).
+      const allSubdivisionIds = (tAll ?? []).flatMap((t: any) => (t.subdivisions ?? []).map((s: any) => s.id))
+      let progressBySubdivision = new Map<string, any>()
+      if (allSubdivisionIds.length > 0) {
+        const { data: progressData } = await supabase
+          .from("subdivision_campaign_progress")
+          .select("subdivision_id, campaign_id, completed, status, notes")
+          .in("subdivision_id", allSubdivisionIds)
+        ;(progressData ?? []).forEach((p: any) => {
+          progressBySubdivision.set(`${p.subdivision_id}:${p.campaign_id}`, p)
+        })
+      }
+
       const flat: SubdivisionFlat[] = []
       ;(tAll ?? []).forEach((t: any) => {
         const group = t.group_id ? groupMap.get(t.group_id) : null
         const count = historyMap.get(t.id) ?? 0
+        const campaignId = campaignIdByTerritory.get(t.id)
         ;(t.subdivisions ?? []).forEach((s: any) => {
           if (!s.coordinates?.length) return
+          const prog = campaignId ? progressBySubdivision.get(`${s.id}:${campaignId}`) : null
           flat.push({
             id: s.id,
             name: s.name,
             coordinates: s.coordinates,
-            completed: s.completed ?? false,
-            notes: s.notes ?? null,
+            completed: prog ? prog.completed : (s.completed ?? false),
+            notes: prog ? prog.notes : (s.notes ?? null),
             territoryId: t.id,
             territoryName: t.name,
             territoryNumber: t.number,

@@ -125,21 +125,17 @@ export async function POST(request: Request) {
 
     if (territoryError) throw territoryError
 
-    // 3. Ao concluir o território, a anotação crua de quadra nunca deve
-    // persistir — senão ela "vaza" de volta numa campanha futura (quando
-    // subdivision_campaign_progress ainda não tem linha e o app cai pro
-    // valor cru de subdivisions.notes). completed/status só são resetados
-    // quando não há campanha, pra não sobrescrever o histórico por campanha.
-    if (isComplete) {
-      const resetPayload: Record<string, unknown> = { notes: null, updated_at: now }
-      if (!campaignId) {
-        resetPayload.completed = false
-        resetPayload.status = "available"
-      }
-
+    // 3. Ao concluir o território fora de campanha, reseta a quadra crua
+    // (completed/status/notes) pro próximo ciclo. Com campanha ativa, a
+    // coluna subdivisions é compartilhada com o dono original (ainda
+    // pausado, aguardando a campanha terminar pra ser restaurado) — nunca
+    // deve ser tocada aqui, senão apaga o progresso/anotação dele antes da
+    // hora. O progresso da campanha some junto com a própria
+    // subdivision_campaign_progress; não precisa resetar nada crú aqui.
+    if (isComplete && !campaignId) {
       const { error: subdivisionError } = await supabaseAdmin
         .from("subdivisions")
-        .update(resetPayload)
+        .update({ completed: false, status: "available", notes: null, updated_at: now })
         .eq("territory_id", territoryId)
 
       if (subdivisionError) {
